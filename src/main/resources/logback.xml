@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+  <!-- Console appender with pattern -->
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Global root level - controllable via LOG_LEVEL env var, defaults to INFO -->
+  <root level="${LOG_LEVEL:-INFO}">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+
+  <!-- Package-specific loggers -->
+
+  <!-- Klag application -->
+  <logger name="io.github.themoah.klag" level="${LOG_LEVEL_KLAG:-INFO}"/>
+
+  <!-- Kafka client (health monitor, service) -->
+  <logger name="io.github.themoah.klag.kafka" level="${LOG_LEVEL_KAFKA:-INFO}"/>
+
+  <!-- Health check components -->
+  <logger name="io.github.themoah.klag.health" level="${LOG_LEVEL_HEALTH:-INFO}"/>
+
+  <!-- Vert.x framework -->
+  <logger name="io.vertx" level="${LOG_LEVEL_VERTX:-WARN}"/>
+
+  <!-- Kafka clients (Apache) -->
+  <logger name="org.apache.kafka" level="${LOG_LEVEL_KAFKA_CLIENT:-INFO}"/>
+
+  <!-- Netty (suppress verbose logging) -->
+  <logger name="io.netty" level="WARN"/>
+
+</configuration>
