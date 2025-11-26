@@ -1,4 +1,7 @@
-# Klag
+# Klag  [![license-badge][]][license]
+
+[license]:             https://github.com/themoah/klag/blob/main/LICENSE
+[license-badge]:       https://img.shields.io/badge/License-Apache%202.0-blue.svg
 
 Klag ~> A service for monitoring Kafka consumer lag.
 Inspired by [kafka lag exporter](https://github.com/seglo/kafka-lag-exporter) that was archived in 2024.
@@ -14,6 +17,9 @@ Supported sinks:
 * (planned) Google stackdriver.
 
 Docker / Helm chart - WIP.
+
+Not only it reports metrics, but also:
+* Tracks active consumer groups, stale ones are deleted in mark and sweep manner.
 
 ## Building
 

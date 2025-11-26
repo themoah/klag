@@ -10,6 +10,7 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -111,9 +112,15 @@ public class MetricsCollector {
       .compose(lagData -> {
         if (lagData.isEmpty()) {
           log.debug("No lag data to report");
+          // Still need to cleanup in case all groups disappeared
+          if (reporter instanceof MicrometerReporter micrometerReporter) {
+            micrometerReporter.cleanupStaleGauges(Set.of());
+          }
           return Future.succeededFuture();
         }
         log.debug("Reporting lag metrics for {} consumer groups", lagData.size());
+
+        Set<String> activeKeys = new HashSet<>();
 
         // Report topic partition counts (max partition number + 1)
         Map<String, Integer> topicPartitions = new HashMap<>();
@@ -123,7 +130,10 @@ public class MetricsCollector {
           }
         }
         if (reporter instanceof MicrometerReporter micrometerReporter) {
-          micrometerReporter.reportTopicPartitions(topicPartitions);
+          micrometerReporter.reportTopicPartitions(topicPartitions, activeKeys);
+          micrometerReporter.reportLag(lagData, activeKeys);
+          micrometerReporter.cleanupStaleGauges(activeKeys);
+          return Future.succeededFuture();
         }
 
         return reporter.reportLag(lagData);
