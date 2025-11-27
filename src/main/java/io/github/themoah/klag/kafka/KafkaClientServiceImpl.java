@@ -2,6 +2,7 @@ package io.github.themoah.klag.kafka;
 
 import io.github.themoah.klag.model.ConsumerGroupOffsets;
 import io.github.themoah.klag.model.ConsumerGroupOffsets.TopicPartitionKey;
+import io.github.themoah.klag.model.ConsumerGroupState;
 import io.github.themoah.klag.model.PartitionInfo;
 import io.github.themoah.klag.model.PartitionOffsets;
 import io.vertx.core.Future;
@@ -12,6 +13,7 @@ import io.vertx.kafka.admin.OffsetSpec;
 import io.vertx.kafka.admin.TopicDescription;
 import io.vertx.kafka.client.common.TopicPartition;
 import io.vertx.kafka.client.common.TopicPartitionInfo;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -163,6 +165,30 @@ public class KafkaClientServiceImpl implements KafkaClientService {
         .collect(Collectors.toSet()))
       .onSuccess(groups -> log.info("Listed {} consumer groups", groups.size()))
       .onFailure(err -> log.error("Failed to list consumer groups", err));
+  }
+
+  @Override
+  public Future<Map<String, ConsumerGroupState>> describeConsumerGroups(Set<String> groupIds) {
+    if (groupIds == null || groupIds.isEmpty()) {
+      log.debug("No consumer groups to describe");
+      return Future.succeededFuture(Map.of());
+    }
+
+    log.debug("Describing {} consumer groups", groupIds.size());
+
+    return adminClient.describeConsumerGroups(new ArrayList<>(groupIds))
+      .map(descriptions -> {
+        Map<String, ConsumerGroupState> result = new HashMap<>();
+        descriptions.forEach((groupId, description) -> {
+          ConsumerGroupState.State state = ConsumerGroupState.State
+              .fromKafkaState(description.getState());
+          result.put(groupId, new ConsumerGroupState(groupId, state));
+          log.debug("Consumer group {} state: {}", groupId, state);
+        });
+        log.info("Described {} consumer groups", result.size());
+        return result;
+      })
+      .onFailure(err -> log.error("Failed to describe consumer groups", err));
   }
 
   @Override

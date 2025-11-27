@@ -5,6 +5,7 @@ import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import io.github.themoah.klag.model.ConsumerGroupOffsets;
 import io.github.themoah.klag.model.ConsumerGroupOffsets.TopicPartitionKey;
+import io.github.themoah.klag.model.ConsumerGroupState;
 import io.github.themoah.klag.model.PartitionOffsets;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -90,55 +91,71 @@ public class MetricsCollector {
           groups.size(), filteredGroups.size());
 
         if (filteredGroups.isEmpty()) {
-          return Future.succeededFuture(List.<ConsumerGroupLag>of());
-        }
-
-        List<Future<ConsumerGroupLag>> futures = filteredGroups.stream()
-          .map(this::collectGroupLag)
-          .collect(Collectors.toList());
-
-        return Future.all(futures)
-          .map(composite -> {
-            List<ConsumerGroupLag> results = new ArrayList<>();
-            for (int i = 0; i < composite.size(); i++) {
-              ConsumerGroupLag lag = composite.resultAt(i);
-              if (lag != null) {
-                results.add(lag);
-              }
-            }
-            return results;
-          });
-      })
-      .compose(lagData -> {
-        if (lagData.isEmpty()) {
-          log.debug("No lag data to report");
-          // Still need to cleanup in case all groups disappeared
+          // Cleanup stale gauges when no groups match
           if (reporter instanceof MicrometerReporter micrometerReporter) {
             micrometerReporter.cleanupStaleGauges(Set.of());
           }
           return Future.succeededFuture();
         }
-        log.debug("Reporting lag metrics for {} consumer groups", lagData.size());
 
-        Set<String> activeKeys = new HashSet<>();
+        // Collect lag and state in parallel
+        Future<List<ConsumerGroupLag>> lagFuture = collectAllGroupLags(filteredGroups);
+        Future<Map<String, ConsumerGroupState>> stateFuture =
+            kafkaClient.describeConsumerGroups(filteredGroups);
 
-        // Report topic partition counts (max partition number + 1)
-        Map<String, Integer> topicPartitions = new HashMap<>();
-        for (ConsumerGroupLag group : lagData) {
-          for (PartitionLag p : group.partitions()) {
-            topicPartitions.merge(p.topic(), p.partition() + 1, Integer::max);
-          }
-        }
-        if (reporter instanceof MicrometerReporter micrometerReporter) {
-          micrometerReporter.reportTopicPartitions(topicPartitions, activeKeys);
-          micrometerReporter.reportLag(lagData, activeKeys);
-          micrometerReporter.cleanupStaleGauges(activeKeys);
-          return Future.succeededFuture();
-        }
-
-        return reporter.reportLag(lagData);
+        return Future.all(lagFuture, stateFuture)
+          .compose(composite -> {
+            List<ConsumerGroupLag> lagData = composite.resultAt(0);
+            Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
+            return reportAllMetrics(lagData, stateData);
+          });
       })
       .onFailure(err -> log.error("Failed to collect lag metrics", err));
+  }
+
+  private Future<List<ConsumerGroupLag>> collectAllGroupLags(Set<String> groups) {
+    List<Future<ConsumerGroupLag>> futures = groups.stream()
+      .map(this::collectGroupLag)
+      .collect(Collectors.toList());
+
+    return Future.all(futures)
+      .map(composite -> {
+        List<ConsumerGroupLag> results = new ArrayList<>();
+        for (int i = 0; i < composite.size(); i++) {
+          ConsumerGroupLag lag = composite.resultAt(i);
+          if (lag != null) {
+            results.add(lag);
+          }
+        }
+        return results;
+      });
+  }
+
+  private Future<Void> reportAllMetrics(
+      List<ConsumerGroupLag> lagData,
+      Map<String, ConsumerGroupState> stateData
+  ) {
+    Set<String> activeKeys = new HashSet<>();
+
+    if (reporter instanceof MicrometerReporter micrometerReporter) {
+      // Report topic partition counts (max partition number + 1)
+      Map<String, Integer> topicPartitions = new HashMap<>();
+      for (ConsumerGroupLag group : lagData) {
+        for (PartitionLag p : group.partitions()) {
+          topicPartitions.merge(p.topic(), p.partition() + 1, Integer::max);
+        }
+      }
+
+      micrometerReporter.reportTopicPartitions(topicPartitions, activeKeys);
+      micrometerReporter.reportLag(lagData, activeKeys);
+      micrometerReporter.reportConsumerGroupStates(stateData, activeKeys);
+      micrometerReporter.cleanupStaleGauges(activeKeys);
+
+      log.debug("Reported metrics for {} consumer groups", lagData.size());
+      return Future.succeededFuture();
+    }
+
+    return reporter.reportLag(lagData);
   }
 
   private Future<ConsumerGroupLag> collectGroupLag(String groupId) {

@@ -1,10 +1,12 @@
 package io.github.themoah.klag.kafka;
 
 import io.github.themoah.klag.model.ConsumerGroupOffsets;
+import io.github.themoah.klag.model.ConsumerGroupState;
 import io.github.themoah.klag.model.PartitionInfo;
 import io.github.themoah.klag.model.PartitionOffsets;
 import io.vertx.core.Future;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -57,6 +59,14 @@ public interface KafkaClientService {
    * @return Future containing set of consumer group IDs
    */
   Future<Set<String>> listConsumerGroups();
+
+  /**
+   * Describes consumer groups and returns their states.
+   *
+   * @param groupIds set of consumer group IDs to describe
+   * @return Future containing map of group ID to ConsumerGroupState
+   */
+  Future<Map<String, ConsumerGroupState>> describeConsumerGroups(Set<String> groupIds);
 
   /**
    * Closes the underlying Kafka admin client and releases resources.

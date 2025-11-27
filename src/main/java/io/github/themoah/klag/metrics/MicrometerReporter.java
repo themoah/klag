@@ -2,6 +2,7 @@ package io.github.themoah.klag.metrics;
 
 import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
+import io.github.themoah.klag.model.ConsumerGroupState;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -95,6 +96,27 @@ public class MicrometerReporter implements MetricsReporter {
     for (var entry : topicPartitions.entrySet()) {
       Tags tags = Tags.of("topic", entry.getKey());
       trackKey(activeKeys, recordGauge("klag.topic.partitions", tags, entry.getValue()));
+    }
+  }
+
+  /**
+   * Reports consumer group state metrics.
+   *
+   * @param stateData map of group ID to consumer group state
+   * @param activeKeys set to populate with active gauge keys (can be null)
+   */
+  public void reportConsumerGroupStates(
+      Map<String, ConsumerGroupState> stateData,
+      Set<String> activeKeys
+  ) {
+    log.debug("Reporting state metrics for {} consumer groups", stateData.size());
+
+    for (ConsumerGroupState groupState : stateData.values()) {
+      Tags tags = Tags.of(
+        "consumer_group", groupState.groupId(),
+        "state", groupState.state().toMetricValue()
+      );
+      trackKey(activeKeys, recordGauge("klag.consumer.group.state", tags, 1));
     }
   }
 
