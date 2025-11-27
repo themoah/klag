@@ -36,6 +36,7 @@ jobs:
           BRANCH_NAME=${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}
           TAG="${VERSION}-${BRANCH_NAME}"
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "branch=${BRANCH_NAME}" >> $GITHUB_OUTPUT
           echo "Generated tag: ${TAG}"
 
       - name: Set up Docker Buildx
@@ -54,7 +55,7 @@ jobs:
           push: true
           tags: |
             themoah/klag:${{ steps.tag.outputs.tag }}
-            themoah/klag:${{ github.ref_name }}-latest
+            themoah/klag:${{ steps.tag.outputs.branch }}-latest
 
       - name: Create and push git tag
         run: |
