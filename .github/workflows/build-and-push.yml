@@ -32,7 +32,7 @@ jobs:
       - name: Generate tag
         id: tag
         run: |
-          BRANCH_NAME=${GITHUB_REF_NAME}
+          BRANCH_NAME=${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}
           DATE=$(date +'%y%m%d')
           SHORT_SHA=$(git rev-parse --short HEAD)
           TAG="${BRANCH_NAME}-${DATE}-${SHORT_SHA}"
