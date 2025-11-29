@@ -54,12 +54,12 @@ jobs:
           context: .
           push: true
           tags: |
-            themoah/klag:$TAG
-            themoah/klag:${{ steps.tag.outputs.branch }}-latest
+            themoah/klag:${{ env.tag }}
+            themoah/klag:${{ env.branch }}-latest
 
       - name: Create and push git tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag $TAG
-          git push origin $TAG
+          git tag $tag
+          git push origin $tag
