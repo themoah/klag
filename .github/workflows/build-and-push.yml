@@ -4,11 +4,16 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
       - dev
+      - main
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -29,11 +34,11 @@ jobs:
       - name: Generate tag
         id: tag
         run: |
-          BRANCH_NAME=${GITHUB_REF_NAME}
-          DATE=$(date +'%y%m%d')
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          TAG="${BRANCH_NAME}-${DATE}-${SHORT_SHA}"
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' build.gradle.kts)
+          BRANCH_NAME=${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}
+          TAG="${VERSION}-${BRANCH_NAME}"
+          echo "tag=${TAG}" >> $GITHUB_ENV
+          echo "branch=${BRANCH_NAME}" >> $GITHUB_ENV
           echo "Generated tag: ${TAG}"
 
       - name: Set up Docker Buildx
@@ -51,12 +56,12 @@ jobs:
           context: .
           push: true
           tags: |
-            themoah/klag:${{ steps.tag.outputs.tag }}
-            themoah/klag:${{ github.ref_name }}-latest
+            themoah/klag:${{ env.tag }}
+            themoah/klag:${{ env.branch }}-latest
 
       - name: Create and push git tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag ${{ steps.tag.outputs.tag }}
-          git push origin ${{ steps.tag.outputs.tag }}
+          git tag $tag
+          git push origin $tag
