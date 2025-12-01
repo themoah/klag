@@ -27,7 +27,8 @@ src/main/java/io/github/themoah/klag/
 ├── health/                    # KafkaHealthMonitor, HealthCheckHandler, HealthStatus
 ├── kafka/                     # KafkaClientService[Impl], KafkaClientConfig
 ├── metrics/                   # MetricsCollector, MicrometerReporter, PrometheusHandler
-└── model/                     # Records: ConsumerGroupLag, ConsumerGroupState, PartitionOffsets, etc.
+│   └── velocity/              # LagVelocityTracker, TopicLagHistory, RingBuffer
+└── model/                     # Records: ConsumerGroupLag, ConsumerGroupState, PartitionOffsets, LagVelocity, etc.
 ```
 
 ## HTTP Endpoints
