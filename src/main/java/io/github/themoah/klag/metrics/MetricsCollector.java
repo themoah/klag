@@ -46,12 +46,26 @@ public class MetricsCollector {
     long intervalMs,
     String groupFilter
   ) {
+    this(vertx, kafkaClient, reporter, intervalMs, groupFilter, new LagVelocityTracker());
+  }
+
+  /**
+   * Constructor with injectable velocity tracker (for testing).
+   */
+  MetricsCollector(
+    Vertx vertx,
+    KafkaClientService kafkaClient,
+    MetricsReporter reporter,
+    long intervalMs,
+    String groupFilter,
+    LagVelocityTracker velocityTracker
+  ) {
     this.vertx = vertx;
     this.kafkaClient = kafkaClient;
     this.reporter = reporter;
     this.intervalMs = intervalMs;
     this.groupPattern = compileGlobPattern(groupFilter);
-    this.velocityTracker = new LagVelocityTracker();
+    this.velocityTracker = velocityTracker;
   }
 
   /**
@@ -164,22 +178,12 @@ public class MetricsCollector {
 
       // Record snapshots for velocity calculation
       Set<String> velocityKeys = new HashSet<>();
-      for (var groupEntry : groupTopicAggregates.entrySet()) {
-        String consumerGroup = groupEntry.getKey();
-        for (var topicEntry : groupEntry.getValue().entrySet()) {
-          String topic = topicEntry.getKey();
-          TopicAggregates agg = topicEntry.getValue();
-
-          velocityTracker.recordSnapshot(
-            consumerGroup,
-            topic,
-            agg.totalLogEndOffset(),
-            agg.totalCommittedOffset(),
-            agg.totalLag()
-          );
+      groupTopicAggregates.forEach((consumerGroup, topicMap) ->
+        topicMap.forEach((topic, agg) -> {
+          recordVelocitySnapshot(consumerGroup, topic, agg);
           velocityKeys.add(consumerGroup + ":" + topic);
-        }
-      }
+        })
+      );
 
       // Calculate and report velocities
       List<LagVelocity> velocities = velocityTracker.calculateVelocities();
@@ -288,6 +292,23 @@ public class MetricsCollector {
     regex.append("$");
 
     return Pattern.compile(regex.toString());
+  }
+
+  /**
+   * Records a velocity snapshot for a consumer group and topic.
+   *
+   * @param consumerGroup the consumer group ID
+   * @param topic the topic name
+   * @param agg the aggregated topic metrics
+   */
+  private void recordVelocitySnapshot(String consumerGroup, String topic, TopicAggregates agg) {
+    velocityTracker.recordSnapshot(
+      consumerGroup,
+      topic,
+      agg.totalLogEndOffset(),
+      agg.totalCommittedOffset(),
+      agg.totalLag()
+    );
   }
 
   /**
