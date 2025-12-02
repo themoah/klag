@@ -27,7 +27,8 @@ src/main/java/io/github/themoah/klag/
 ├── health/                    # KafkaHealthMonitor, HealthCheckHandler, HealthStatus
 ├── kafka/                     # KafkaClientService[Impl], KafkaClientConfig
 ├── metrics/                   # MetricsCollector, MicrometerReporter, PrometheusHandler
-└── model/                     # Records: ConsumerGroupLag, ConsumerGroupState, PartitionOffsets, etc.
+│   └── velocity/              # LagVelocityTracker, TopicLagHistory
+└── model/                     # Records: ConsumerGroupLag, ConsumerGroupState, PartitionOffsets, LagVelocity, etc.
 ```
 
 ## HTTP Endpoints
@@ -61,3 +62,4 @@ Tags: `consumer_group`, `topic`, `partition`
 
 - Async ops return `Future<T>`, Java 17 records for DTOs, SLF4J+Logback logging
 - Config priority: classpath → external file → env vars
+- Bump up the version in @build.gradle.kts after each minor or major change.

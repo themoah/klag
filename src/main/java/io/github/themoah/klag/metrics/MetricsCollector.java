@@ -1,11 +1,13 @@
 package io.github.themoah.klag.metrics;
 
 import io.github.themoah.klag.kafka.KafkaClientService;
+import io.github.themoah.klag.metrics.velocity.LagVelocityTracker;
 import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import io.github.themoah.klag.model.ConsumerGroupOffsets;
 import io.github.themoah.klag.model.ConsumerGroupOffsets.TopicPartitionKey;
 import io.github.themoah.klag.model.ConsumerGroupState;
+import io.github.themoah.klag.model.LagVelocity;
 import io.github.themoah.klag.model.PartitionOffsets;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -33,6 +35,7 @@ public class MetricsCollector {
   private final MetricsReporter reporter;
   private final long intervalMs;
   private final Pattern groupPattern;
+  private final LagVelocityTracker velocityTracker;
 
   private Long timerId;
 
@@ -43,11 +46,26 @@ public class MetricsCollector {
     long intervalMs,
     String groupFilter
   ) {
+    this(vertx, kafkaClient, reporter, intervalMs, groupFilter, new LagVelocityTracker());
+  }
+
+  /**
+   * Constructor with injectable velocity tracker (for testing).
+   */
+  MetricsCollector(
+    Vertx vertx,
+    KafkaClientService kafkaClient,
+    MetricsReporter reporter,
+    long intervalMs,
+    String groupFilter,
+    LagVelocityTracker velocityTracker
+  ) {
     this.vertx = vertx;
     this.kafkaClient = kafkaClient;
     this.reporter = reporter;
     this.intervalMs = intervalMs;
     this.groupPattern = compileGlobPattern(groupFilter);
+    this.velocityTracker = velocityTracker;
   }
 
   /**
@@ -146,6 +164,33 @@ public class MetricsCollector {
         }
       }
 
+      // Aggregate partition data by topic for velocity tracking
+      Map<String, Map<String, TopicAggregates>> groupTopicAggregates = new HashMap<>();
+      for (ConsumerGroupLag group : lagData) {
+        Map<String, TopicAggregates> topicAggregates = groupTopicAggregates
+          .computeIfAbsent(group.consumerGroup(), k -> new HashMap<>());
+
+        for (PartitionLag p : group.partitions()) {
+          topicAggregates.computeIfAbsent(p.topic(), k -> new TopicAggregates())
+            .add(p.logEndOffset(), p.committedOffset(), p.lag());
+        }
+      }
+
+      // Record snapshots for velocity calculation
+      Set<String> velocityKeys = new HashSet<>();
+      groupTopicAggregates.forEach((consumerGroup, topicMap) ->
+        topicMap.forEach((topic, agg) -> {
+          recordVelocitySnapshot(consumerGroup, topic, agg);
+          velocityKeys.add(consumerGroup + ":" + topic);
+        })
+      );
+
+      // Calculate and report velocities
+      List<LagVelocity> velocities = velocityTracker.calculateVelocities();
+      micrometerReporter.reportVelocity(velocities, activeKeys);
+      velocityTracker.cleanupStaleTopics(velocityKeys);
+
+      // Report lag and state metrics
       micrometerReporter.reportTopicPartitions(topicPartitions, activeKeys);
       micrometerReporter.reportLag(lagData, activeKeys);
       micrometerReporter.reportConsumerGroupStates(stateData, activeKeys);
@@ -247,5 +292,41 @@ public class MetricsCollector {
     regex.append("$");
 
     return Pattern.compile(regex.toString());
+  }
+
+  /**
+   * Records a velocity snapshot for a consumer group and topic.
+   *
+   * @param consumerGroup the consumer group ID
+   * @param topic the topic name
+   * @param agg the aggregated topic metrics
+   */
+  private void recordVelocitySnapshot(String consumerGroup, String topic, TopicAggregates agg) {
+    velocityTracker.recordSnapshot(
+      consumerGroup,
+      topic,
+      agg.totalLogEndOffset(),
+      agg.totalCommittedOffset(),
+      agg.totalLag()
+    );
+  }
+
+  /**
+   * Helper class for topic-level aggregation.
+   */
+  private static class TopicAggregates {
+    private long totalLogEndOffset = 0;
+    private long totalCommittedOffset = 0;
+    private long totalLag = 0;
+
+    void add(long logEndOffset, long committedOffset, long lag) {
+      this.totalLogEndOffset += logEndOffset;
+      this.totalCommittedOffset += committedOffset;
+      this.totalLag += lag;
+    }
+
+    long totalLogEndOffset() { return totalLogEndOffset; }
+    long totalCommittedOffset() { return totalCommittedOffset; }
+    long totalLag() { return totalLag; }
   }
 }
