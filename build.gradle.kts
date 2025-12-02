@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.github.themoah"
-version = "0.0.3-SNAPSHOT"
+version = "0.0.4-SNAPSHOT"
 
 repositories {
   mavenCentral()
@@ -39,6 +39,7 @@ dependencies {
   // Micrometer registries
   implementation("io.micrometer:micrometer-registry-datadog:$micrometerVersion")
   implementation("io.micrometer:micrometer-registry-prometheus:$micrometerVersion")
+  implementation("io.micrometer:micrometer-registry-otlp:$micrometerVersion")
 
   testImplementation("io.vertx:vertx-junit5")
   testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
