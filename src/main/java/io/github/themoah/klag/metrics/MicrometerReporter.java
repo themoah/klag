@@ -3,6 +3,7 @@ package io.github.themoah.klag.metrics;
 import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import io.github.themoah.klag.model.ConsumerGroupState;
+import io.github.themoah.klag.model.LagVelocity;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -117,6 +118,27 @@ public class MicrometerReporter implements MetricsReporter {
         "state", groupState.state().toMetricValue()
       );
       trackKey(activeKeys, recordGauge("klag.consumer.group.state", tags, 1));
+    }
+  }
+
+  /**
+   * Reports lag velocity metrics.
+   *
+   * @param velocities list of calculated velocities
+   * @param activeKeys set to populate with active gauge keys (can be null)
+   */
+  public void reportVelocity(List<LagVelocity> velocities, Set<String> activeKeys) {
+    log.debug("Reporting velocity metrics for {} consumer-group/topic pairs", velocities.size());
+
+    for (LagVelocity velocity : velocities) {
+      Tags tags = Tags.of(
+        "consumer_group", velocity.consumerGroup(),
+        "topic", velocity.topic()
+      );
+
+      // Round to 2 decimal places for cleaner metrics
+      long velocityScaled = Math.round(velocity.velocity() * 100);
+      trackKey(activeKeys, recordGauge("klag.consumer.lag.velocity", tags, velocityScaled));
     }
   }
 
