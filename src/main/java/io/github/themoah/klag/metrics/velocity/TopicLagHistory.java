@@ -54,7 +54,27 @@ public class TopicLagHistory {
 
     List<TopicOffsetSnapshot> samples = new ArrayList<>(snapshots);
 
-    // Linear regression: fit line through (timestamp, lag) points
+    // ============================================================================
+    // LINEAR REGRESSION: Ordinary Least Squares (OLS)
+    // ============================================================================
+    // Fits a line (y = mx + b) through (timestamp, lag) points to find slope (m).
+    // The slope represents the rate of lag change (velocity in messages/second).
+    //
+    // Algorithm:
+    //   Given n points: (t₁, lag₁), (t₂, lag₂), ..., (tₙ, lagₙ)
+    //
+    //   1. Calculate means: mean_t = Σtᵢ/n, mean_lag = Σlagᵢ/n
+    //   2. Calculate slope: m = Σ((tᵢ - mean_t) × (lagᵢ - mean_lag)) / Σ((tᵢ - mean_t)²)
+    //
+    // Expanded form (used below for efficiency):
+    //   m = (Σ(tᵢ × lagᵢ) - n × mean_t × mean_lag) / (Σ(tᵢ²) - n × mean_t²)
+    //
+    // Interpretation:
+    //   - Positive slope: lag increasing (consumer falling behind)
+    //   - Negative slope: lag decreasing (consumer catching up)
+    //   - Zero slope: equilibrium (consumer keeping pace)
+    // ============================================================================
+
     long n = samples.size();
     double sumT = 0, sumLag = 0, sumTLag = 0, sumTSquared = 0;
 
@@ -74,7 +94,7 @@ public class TopicLagHistory {
     double meanT = sumT / n;
     double meanLag = sumLag / n;
 
-    // Calculate slope (velocity in messages per millisecond)
+    // Calculate slope using OLS formula (velocity in messages per millisecond)
     double numerator = sumTLag - n * meanT * meanLag;
     double denominator = sumTSquared - n * meanT * meanT;
 
