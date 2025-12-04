@@ -14,7 +14,7 @@ In any order:
 * Grafana dashboard.
 
 * sinks:
-  * OTel
+  * ~~OTel~~
   * Prom push gateway
   * statsD / DogStatsD.
   * Google stackdriver.

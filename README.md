@@ -15,8 +15,8 @@ Not only it reports lag metrics, but also:
 Supported sinks:
 * Prometheus endpoint.
 * Datadog.
+* Otel/OLTP
 * (planned) Prometheus push gateway.
-* (planned) OTel.
 * (planned) statsD.
 * (planned) Google stackdriver.
 

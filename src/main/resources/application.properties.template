@@ -1,0 +1,12 @@
+# Kafka Lag Exporter Configuration
+
+# Kafka cluster connection
+kafka.bootstrap.servers=server.confluent.cloud:9092
+
+# Request timeout in milliseconds
+kafka.request.timeout.ms=30000
+
+# Additional Kafka admin client properties (optional)
+kafka.security.protocol=SASL_SSL
+kafka.sasl.mechanism=PLAIN
+kafka.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="${SASL_USERNAME}" password="${SASL_PASSWORD}";
