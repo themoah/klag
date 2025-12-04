@@ -1,0 +1,38 @@
+name: Security Scan
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - dev
+      - main
+
+jobs:
+  trufflehog-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for --since-commit to work
+
+      - name: TruffleHog OSS scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --results=verified,unknown --only-verified=false
+        continue-on-error: true  # Always succeed, even if secrets found
+
+      - name: Report scan status
+        if: always()
+        run: |
+          echo "TruffleHog scan completed"
+          echo "Check the logs above for any detected secrets"
