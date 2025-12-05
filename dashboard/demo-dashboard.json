@@ -513,18 +513,7 @@
             },
             "inspect": false
           },
-          "mappings": [
-            {
-              "options": {
-                "1": {
-                  "color": "green",
-                  "index": 0,
-                  "text": "Stable"
-                }
-              },
-              "type": "value"
-            }
-          ],
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -539,7 +528,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "state"
+              "options": "State"
             },
             "properties": [
               {
@@ -547,30 +536,75 @@
                 "value": [
                   {
                     "options": {
-                      "Dead": {
+                      "dead": {
                         "color": "red",
-                        "index": 0
+                        "index": 0,
+                        "text": "Dead"
                       },
-                      "Empty": {
+                      "empty": {
                         "color": "green",
-                        "index": 1
+                        "index": 1,
+                        "text": "Empty"
                       },
-                      "Stable": {
+                      "stable": {
                         "color": "green",
-                        "index": 2
+                        "index": 2,
+                        "text": "Stable"
                       },
-                      "PreparingRebalance": {
+                      "preparing_rebalance": {
                         "color": "yellow",
-                        "index": 3
+                        "index": 3,
+                        "text": "Preparing Rebalance"
                       },
-                      "CompletingRebalance": {
+                      "completing_rebalance": {
                         "color": "yellow",
-                        "index": 4
+                        "index": 4,
+                        "text": "Completing Rebalance"
+                      },
+                      "unknown": {
+                        "color": "orange",
+                        "index": 5,
+                        "text": "Unknown"
                       }
                     },
                     "type": "value"
                   }
                 ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "State Changes"
+            },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 5
+                    }
+                  ]
+                }
               },
               {
                 "id": "custom.cellOptions",
@@ -609,10 +643,10 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "klag_consumer_group_state{consumer_group=~\"$consumer_group\"} == 1",
+          "expr": "klag_consumer_group_state{consumer_group=~\"$consumer_group\"}",
           "format": "table",
           "legendFormat": "__auto",
-          "range": true,
+          "instant": true,
           "refId": "A"
         }
       ],
@@ -623,24 +657,123 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "Value": true,
               "job": true,
               "service_name": true
             },
             "indexByName": {
               "Time": 0,
-              "Value": 4,
               "consumer_group": 1,
-              "state": 2
+              "state": 2,
+              "Value": 3
             },
             "renameByName": {
               "consumer_group": "Consumer Group",
-              "state": "State"
+              "state": "State",
+              "Value": "State Changes"
             }
           }
         }
       ],
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Shows cumulative state changes over time. Spikes indicate state transitions (rebalances, failures).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "State Changes",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "stepAfter",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": ["max", "sum"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "klag_consumer_group_state{consumer_group=~\"$consumer_group\"} > 0",
+          "legendFormat": "{{consumer_group}} ({{state}})",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Consumer Group State Changes",
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -678,7 +811,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 18
       },
       "id": 6,
@@ -770,8 +903,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 18
+        "x": 0,
+        "y": 26
       },
       "id": 12,
       "options": {
@@ -808,7 +941,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 34
       },
       "id": 102,
       "panels": [],
@@ -864,7 +997,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 27
+        "y": 35
       },
       "id": 7,
       "options": {
@@ -964,7 +1097,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 27
+        "y": 35
       },
       "id": 8,
       "options": {
@@ -1062,7 +1195,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 27
+        "y": 35
       },
       "id": 9,
       "options": {
@@ -1099,7 +1232,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 35
+        "y": 43
       },
       "id": 103,
       "panels": [],
@@ -1185,7 +1318,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 36
+        "y": 44
       },
       "id": 13,
       "options": {
@@ -1305,7 +1438,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 36
+        "y": 44
       },
       "id": 14,
       "options": {
@@ -1395,7 +1528,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 44
+        "y": 52
       },
       "id": 15,
       "options": {
@@ -1498,7 +1631,7 @@
         "h": 4,
         "w": 8,
         "x": 8,
-        "y": 44
+        "y": 52
       },
       "id": 16,
       "options": {
@@ -1563,7 +1696,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 44
+        "y": 52
       },
       "id": 17,
       "options": {
@@ -1654,7 +1787,7 @@
         "h": 4,
         "w": 8,
         "x": 8,
-        "y": 48
+        "y": 56
       },
       "id": 18,
       "options": {
@@ -1714,7 +1847,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 48
+        "y": 56
       },
       "id": 19,
       "options": {
