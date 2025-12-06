@@ -1,0 +1,9 @@
+# Test values for SASL authentication configuration
+kafka:
+  bootstrapServers: "kafka-broker:9092"
+  securityProtocol: "SASL_SSL"
+  saslMechanism: "PLAIN"
+  saslJaasConfig: "org.apache.kafka.common.security.plain.PlainLoginModule required username='test' password='test';"
+
+metrics:
+  reporter: "prometheus"

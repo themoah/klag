@@ -1,0 +1,10 @@
+# Test values for Datadog metrics configuration
+kafka:
+  bootstrapServers: "kafka-broker:9092"
+
+metrics:
+  reporter: "datadog"
+  datadog:
+    apiKey: "test-api-key"
+    appKey: "test-app-key"
+    site: "datadoghq.eu"

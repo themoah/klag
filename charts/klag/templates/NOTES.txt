@@ -1,0 +1,45 @@
+Klag has been deployed successfully!
+
+1. Get the application URL by running these commands:
+{{- if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "klag.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else if contains "LoadBalancer" .Values.service.type }}
+     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+           You can watch the status of by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "klag.fullname" . }}'
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "klag.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.service.port }}
+{{- else if contains "ClusterIP" .Values.service.type }}
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "klag.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:8888 to access the application"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8888:$CONTAINER_PORT
+{{- end }}
+
+2. Available endpoints:
+   - /healthz  - Liveness probe (always 200 if running)
+   - /readyz   - Readiness probe (200 if Kafka connected, 503 otherwise)
+{{- if eq .Values.metrics.reporter "prometheus" }}
+   - /metrics  - Prometheus metrics endpoint
+{{- end }}
+
+3. Metrics reporter: {{ .Values.metrics.reporter }}
+{{- if eq .Values.metrics.reporter "prometheus" }}
+
+   To scrape metrics with Prometheus, ensure your Prometheus instance is configured
+   to scrape the /metrics endpoint on port {{ .Values.service.port }}.
+{{- if .Values.serviceMonitor.enabled }}
+
+   A ServiceMonitor has been created for Prometheus Operator integration.
+{{- end }}
+{{- else if eq .Values.metrics.reporter "otlp" }}
+
+   Metrics are being sent to OTLP endpoint: {{ .Values.metrics.otlp.endpoint | default "http://localhost:4318/v1/metrics" }}
+{{- else if eq .Values.metrics.reporter "datadog" }}
+
+   Metrics are being sent to Datadog ({{ .Values.metrics.datadog.site }}).
+{{- end }}
+
+4. Check the logs:
+   kubectl logs -f --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "klag.name" . }},app.kubernetes.io/instance={{ .Release.Name }}"

@@ -1,0 +1,13 @@
+# Test values for Helm template validation
+# Used by CI to verify chart renders correctly with various configurations
+
+# Basic configuration
+kafka:
+  bootstrapServers: "kafka-broker:9092"
+
+metrics:
+  reporter: "prometheus"
+  jvmEnabled: true
+
+serviceMonitor:
+  enabled: true

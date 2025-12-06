@@ -1,0 +1,11 @@
+# Test values for OTLP metrics configuration
+kafka:
+  bootstrapServers: "kafka-broker:9092"
+
+metrics:
+  reporter: "otlp"
+  otlp:
+    endpoint: "https://otlp-gateway.example.com/v1/metrics"
+    headers: "Authorization=Basic dGVzdDp0ZXN0"
+    serviceName: "klag-test"
+    resourceAttributes: "environment=test,cluster=ci"

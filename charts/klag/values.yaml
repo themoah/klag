@@ -1,0 +1,165 @@
+# Default values for klag.
+# This is a YAML-formatted file.
+
+replicaCount: 1
+
+image:
+  repository: themoah/klag
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8888
+
+# Kafka connection configuration
+kafka:
+  # Kafka bootstrap servers (comma-separated list)
+  bootstrapServers: "localhost:9092"
+  # Admin client request timeout in milliseconds
+  requestTimeoutMs: 30000
+  # Security protocol: PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL
+  securityProtocol: ""
+  # SASL mechanism: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512
+  saslMechanism: ""
+  # JAAS configuration string for SASL authentication
+  # Example: org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="pass";
+  saslJaasConfig: ""
+  # Use an existing secret for Kafka credentials instead of creating one
+  existingSecret: ""
+  # Keys in the existing secret
+  secretKeys:
+    jaasConfig: "jaas-config"
+
+# Metrics configuration
+metrics:
+  # Metrics reporter: none, prometheus, datadog, otlp
+  reporter: "prometheus"
+  # Metrics collection interval in milliseconds
+  intervalMs: 60000
+  # Glob pattern to filter consumer groups (e.g., "app-*", "*-prod")
+  groupFilter: "*"
+  # Enable JVM metrics (memory, GC, threads, CPU)
+  jvmEnabled: false
+
+  # OTLP (OpenTelemetry) configuration - used when reporter is "otlp"
+  otlp:
+    # OTLP endpoint URL (e.g., http://localhost:4318/v1/metrics)
+    endpoint: ""
+    # Authentication headers (format: key1=value1,key2=value2)
+    # Example for Grafana Cloud: Authorization=Basic <base64-credentials>
+    headers: ""
+    # Service name for OTEL_SERVICE_NAME
+    serviceName: "klag"
+    # Additional resource attributes (format: key1=value1,key2=value2)
+    resourceAttributes: ""
+    # Use an existing secret for OTLP headers
+    existingSecret: ""
+    secretKeys:
+      headers: "otlp-headers"
+
+  # Datadog configuration - used when reporter is "datadog"
+  datadog:
+    # Datadog API key (required for Datadog reporter)
+    apiKey: ""
+    # Datadog application key (required for Datadog reporter)
+    appKey: ""
+    # Datadog site: datadoghq.com, datadoghq.eu, etc.
+    site: "datadoghq.com"
+    # Use an existing secret for Datadog credentials
+    existingSecret: ""
+    secretKeys:
+      apiKey: "api-key"
+      appKey: "app-key"
+
+# Application configuration
+app:
+  # Kafka health check interval in milliseconds
+  healthCheckIntervalMs: 30000
+  # Enable Java 21 virtual threads (experimental)
+  useVirtualThreads: false
+
+# Logging configuration
+logging:
+  # Root logger level
+  level: "INFO"
+  # Klag module logger level (leave empty to use root level)
+  levelKlag: ""
+  # Kafka client logger level
+  levelKafka: ""
+  # Health check logger level
+  levelHealth: ""
+  # Metrics collector logger level
+  levelMetrics: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Prometheus ServiceMonitor configuration
+serviceMonitor:
+  # Enable ServiceMonitor for Prometheus Operator
+  enabled: false
+  # Namespace for the ServiceMonitor (defaults to release namespace)
+  namespace: ""
+  # Scrape interval
+  interval: 30s
+  # Scrape timeout
+  scrapeTimeout: 10s
+  # Additional labels for the ServiceMonitor
+  labels: {}

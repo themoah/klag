@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "klag.fullname" . }}
+  labels:
+    {{- include "klag.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "klag.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "klag.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "klag.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            # Application configuration
+            - name: HTTP_PORT
+              value: {{ .Values.service.port | quote }}
+            - name: KAFKA_HEALTH_CHECK_INTERVAL_MS
+              value: {{ .Values.app.healthCheckIntervalMs | quote }}
+            - name: VERTX_USE_VIRTUAL_THREADS
+              value: {{ .Values.app.useVirtualThreads | quote }}
+            # Kafka configuration
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ .Values.kafka.bootstrapServers | quote }}
+            - name: KAFKA_REQUEST_TIMEOUT_MS
+              value: {{ .Values.kafka.requestTimeoutMs | quote }}
+            {{- if .Values.kafka.securityProtocol }}
+            - name: KAFKA_SECURITY_PROTOCOL
+              value: {{ .Values.kafka.securityProtocol | quote }}
+            {{- end }}
+            {{- if .Values.kafka.saslMechanism }}
+            - name: KAFKA_SASL_MECHANISM
+              value: {{ .Values.kafka.saslMechanism | quote }}
+            {{- end }}
+            {{- if or .Values.kafka.saslJaasConfig .Values.kafka.existingSecret }}
+            - name: KAFKA_SASL_JAAS_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "klag.kafkaSecretName" . }}
+                  key: {{ .Values.kafka.secretKeys.jaasConfig }}
+            {{- end }}
+            # Metrics configuration
+            - name: METRICS_REPORTER
+              value: {{ .Values.metrics.reporter | quote }}
+            - name: METRICS_INTERVAL_MS
+              value: {{ .Values.metrics.intervalMs | quote }}
+            - name: METRICS_GROUP_FILTER
+              value: {{ .Values.metrics.groupFilter | quote }}
+            - name: METRICS_JVM_ENABLED
+              value: {{ .Values.metrics.jvmEnabled | quote }}
+            # OTLP configuration (when reporter is otlp)
+            {{- if eq .Values.metrics.reporter "otlp" }}
+            {{- if .Values.metrics.otlp.endpoint }}
+            - name: OTLP_ENDPOINT
+              value: {{ .Values.metrics.otlp.endpoint | quote }}
+            {{- end }}
+            {{- if or .Values.metrics.otlp.headers .Values.metrics.otlp.existingSecret }}
+            - name: OTLP_HEADERS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "klag.otlpSecretName" . }}
+                  key: {{ .Values.metrics.otlp.secretKeys.headers }}
+            {{- end }}
+            {{- if .Values.metrics.otlp.serviceName }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.metrics.otlp.serviceName | quote }}
+            {{- end }}
+            {{- if .Values.metrics.otlp.resourceAttributes }}
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: {{ .Values.metrics.otlp.resourceAttributes | quote }}
+            {{- end }}
+            {{- end }}
+            # Datadog configuration (when reporter is datadog)
+            {{- if eq .Values.metrics.reporter "datadog" }}
+            {{- if or .Values.metrics.datadog.apiKey .Values.metrics.datadog.existingSecret }}
+            - name: DD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "klag.datadogSecretName" . }}
+                  key: {{ .Values.metrics.datadog.secretKeys.apiKey }}
+            {{- end }}
+            {{- if or .Values.metrics.datadog.appKey .Values.metrics.datadog.existingSecret }}
+            - name: DD_APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "klag.datadogSecretName" . }}
+                  key: {{ .Values.metrics.datadog.secretKeys.appKey }}
+            {{- end }}
+            {{- if .Values.metrics.datadog.site }}
+            - name: DD_SITE
+              value: {{ .Values.metrics.datadog.site | quote }}
+            {{- end }}
+            {{- end }}
+            # Logging configuration
+            {{- if .Values.logging.level }}
+            - name: LOG_LEVEL
+              value: {{ .Values.logging.level | quote }}
+            {{- end }}
+            {{- if .Values.logging.levelKlag }}
+            - name: LOG_LEVEL_KLAG
+              value: {{ .Values.logging.levelKlag | quote }}
+            {{- end }}
+            {{- if .Values.logging.levelKafka }}
+            - name: LOG_LEVEL_KAFKA
+              value: {{ .Values.logging.levelKafka | quote }}
+            {{- end }}
+            {{- if .Values.logging.levelHealth }}
+            - name: LOG_LEVEL_HEALTH
+              value: {{ .Values.logging.levelHealth | quote }}
+            {{- end }}
+            {{- if .Values.logging.levelMetrics }}
+            - name: LOG_LEVEL_METRICS
+              value: {{ .Values.logging.levelMetrics | quote }}
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
