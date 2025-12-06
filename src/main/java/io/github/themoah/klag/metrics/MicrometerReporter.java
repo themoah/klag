@@ -29,6 +29,7 @@ public class MicrometerReporter implements MetricsReporter {
   private final MeterRegistry registry;
   private final Map<String, AtomicLong> gaugeValues = new ConcurrentHashMap<>();
   private final Set<String> markedForDeletion = ConcurrentHashMap.newKeySet();
+  private final ConsumerGroupStateTracker stateTracker = new ConsumerGroupStateTracker();
 
   public MicrometerReporter(MeterRegistry registry) {
     this.registry = registry;
@@ -103,6 +104,12 @@ public class MicrometerReporter implements MetricsReporter {
   /**
    * Reports consumer group state metrics.
    *
+   * <p>The metric value represents cumulative state changes:
+   * <ul>
+   *   <li>0 = state unchanged from previous check (or first observation)</li>
+   *   <li>N = cumulative count of state changes since tracking started</li>
+   * </ul>
+   *
    * @param stateData map of group ID to consumer group state
    * @param activeKeys set to populate with active gauge keys (can be null)
    */
@@ -113,12 +120,14 @@ public class MicrometerReporter implements MetricsReporter {
     log.debug("Reporting state metrics for {} consumer groups", stateData.size());
 
     for (ConsumerGroupState groupState : stateData.values()) {
+      long changeCount = stateTracker.recordState(groupState.groupId(), groupState.state());
       Tags tags = Tags.of(
         "consumer_group", groupState.groupId(),
         "state", groupState.state().toMetricValue()
       );
-      trackKey(activeKeys, recordGauge("klag.consumer.group.state", tags, 1));
+      trackKey(activeKeys, recordGauge("klag.consumer.group.state", tags, changeCount));
     }
+    stateTracker.cleanup(stateData.keySet());
   }
 
   /**

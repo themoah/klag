@@ -7,7 +7,7 @@ Klag is a service for monitoring Kafka consumer behaviour and lag.
 Inspired by [kafka lag exporter](https://github.com/seglo/kafka-lag-exporter) that was archived in 2024.
 Simple, lightweight and extendable lag exporter built with vert.x and micrometer.
 
-Not only it reports lag metrics, but also:
+* Lag velocity (track how fast lag is growing or decreasing).
 * Tracks consumer groups:
   * State changes (Stable, Rebalancing, Stale, Dead, Empty).
   * Stale or deleted groups are deleted from reporting.
@@ -20,8 +20,25 @@ Supported sinks:
 * (planned) statsD.
 * (planned) Google stackdriver.
 
+`docker run --env-file .env themoah/klag`
 Helm chart - WIP.
 
+sample `.env` file
+```dotenv
+# kafka configuration
+KAFKA_BOOTSTRAP_SERVERS=instance.gcp.confluent.cloud:9092
+KAFKA_SECURITY_PROTOCOL=SASL_SSL
+KAFKA_SASL_MECHANISM=PLAIN
+KAFKA_SASL_JAAS_CONFIG="org.apache.kafka.common.security.plain.PlainLoginModule required username=${SASL_USERNAME} password=${SASL_PASSWORD};"
+
+# metrics reporter
+METRICS_REPORTER=prometheus
+METRICS_INTERVAL_MS=30000
+METRICS_GROUP_FILTER=*
+
+# jvm metrics
+METRICS_JVM_ENABLED=true
+```
 ## Building
 
 To launch your tests:

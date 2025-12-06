@@ -1,5 +1,5 @@
 # Build stage
-FROM eclipse-temurin:17-jdk AS builder
+FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ COPY src src
 RUN gradle assemble --no-daemon
 
 # Runtime stage
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 

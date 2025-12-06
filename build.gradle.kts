@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "io.github.themoah"
-version = "0.0.5-SNAPSHOT"
+version = "0.1.0-SNAPSHOT"
 
 repositories {
   mavenCentral()
@@ -19,7 +19,7 @@ val junitJupiterVersion = "5.9.1"
 val micrometerVersion = "1.12.0"
 
 val mainVerticleName = "io.github.themoah.klag.MainVerticle"
-val launcherClassName = "io.vertx.core.Launcher"
+val launcherClassName = "io.github.themoah.klag.KlagLauncher"
 
 val watchForChange = "src/**/*"
 val doOnChange = "${projectDir}/gradlew classes"
@@ -47,14 +47,17 @@ dependencies {
 }
 
 java {
-  sourceCompatibility = JavaVersion.VERSION_17
-  targetCompatibility = JavaVersion.VERSION_17
+  sourceCompatibility = JavaVersion.VERSION_21
+  targetCompatibility = JavaVersion.VERSION_21
 }
 
 tasks.withType<ShadowJar> {
   archiveClassifier.set("fat")
   manifest {
-    attributes(mapOf("Main-Verticle" to mainVerticleName))
+    attributes(mapOf(
+      "Main-Verticle" to mainVerticleName,
+      "Main-Class" to launcherClassName
+    ))
   }
   mergeServiceFiles()
 }
@@ -67,7 +70,8 @@ tasks.withType<Test> {
 }
 
 tasks.withType<JavaExec> {
-  args = listOf("run", mainVerticleName, "--redeploy=$watchForChange", "--launcher-class=$launcherClassName", "--on-redeploy=$doOnChange")
+  mainClass.set("io.vertx.core.Launcher")
+  args = listOf("run", mainVerticleName, "--redeploy=$watchForChange", "--launcher-class=io.vertx.core.Launcher", "--on-redeploy=$doOnChange")
 
   // Load environment variables from .env file if it exists
   val envFile = file(".env")

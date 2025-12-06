@@ -7,7 +7,7 @@ Klag is a Kafka Lag Exporter built with Vert.x 4.5.22. Monitors consumer lag and
 ## Build Commands
 
 ```bash
-# Requires Java 17 - use SDKMAN if needed: sdk use java 17.0.15-tem
+# Requires Java 21 - use SDKMAN if needed: sdk use java 21.0.9-tem
 # Local: use ./gradlew | CI: uses gradle directly (no wrapper JAR committed)
 
 ./gradlew compileJava          # Compile
@@ -41,7 +41,7 @@ src/main/java/io/github/themoah/klag/
 
 ## Environment Variables
 
-**App:** `HTTP_PORT` (8888), `KAFKA_HEALTH_CHECK_INTERVAL_MS` (30000)
+**App:** `HTTP_PORT` (8888), `KAFKA_HEALTH_CHECK_INTERVAL_MS` (30000), `VERTX_USE_VIRTUAL_THREADS` (false)
 
 **Kafka:** `KAFKA_BOOTSTRAP_SERVERS` (localhost:9092), `KAFKA_REQUEST_TIMEOUT_MS` (30000)
 
@@ -135,6 +135,6 @@ A pre-built comprehensive Grafana dashboard is available in `dashboard/demo-dash
 
 ## Code Style
 
-- Async ops return `Future<T>`, Java 17 records for DTOs, SLF4J+Logback logging
+- Async ops return `Future<T>`, Java 21 records for DTOs, SLF4J+Logback logging
 - Config priority: classpath → external file → env vars
 - Bump up the version in @build.gradle.kts after each minor or major change.
