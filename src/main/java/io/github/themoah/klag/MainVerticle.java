@@ -12,6 +12,7 @@ import io.github.themoah.klag.metrics.MetricsReporter;
 import io.github.themoah.klag.metrics.MicrometerConfig;
 import io.github.themoah.klag.metrics.MicrometerReporter;
 import io.github.themoah.klag.metrics.PrometheusHandler;
+import io.github.themoah.klag.metrics.hotpartition.HotPartitionConfig;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.prometheus.PrometheusMeterRegistry;
 import io.vertx.core.AbstractVerticle;
@@ -149,13 +150,17 @@ public class MainVerticle extends AbstractVerticle {
       prometheusHandler.registerRoutes(router);
     }
 
+    // Load hot partition config
+    HotPartitionConfig hotPartitionConfig = HotPartitionConfig.fromEnvironment();
+
     MetricsReporter reporter = new MicrometerReporter(registry);
     return new MetricsCollector(
       vertx,
       kafkaClientService,
       reporter,
       config.collectionIntervalMs(),
-      config.consumerGroupFilter()
+      config.consumerGroupFilter(),
+      hotPartitionConfig
     );
   }
 
