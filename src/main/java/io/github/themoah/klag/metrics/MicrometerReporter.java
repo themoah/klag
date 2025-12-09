@@ -3,6 +3,8 @@ package io.github.themoah.klag.metrics;
 import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import io.github.themoah.klag.model.ConsumerGroupState;
+import io.github.themoah.klag.model.HotPartitionLag;
+import io.github.themoah.klag.model.HotPartitionThroughput;
 import io.github.themoah.klag.model.LagVelocity;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;
@@ -148,6 +150,49 @@ public class MicrometerReporter implements MetricsReporter {
       // Round to 2 decimal places for cleaner metrics
       long velocityScaled = Math.round(velocity.velocity() * 100);
       trackKey(activeKeys, recordGauge("klag.consumer.lag.velocity", tags, velocityScaled));
+    }
+  }
+
+  /**
+   * Reports hot partition lag metrics.
+   * Only reports partitions that are statistical outliers.
+   *
+   * @param hotPartitions list of detected hot partitions by lag
+   * @param activeKeys set to populate with active gauge keys (can be null)
+   */
+  public void reportHotPartitionLag(List<HotPartitionLag> hotPartitions, Set<String> activeKeys) {
+    log.debug("Reporting {} hot partition lag metrics", hotPartitions.size());
+
+    for (HotPartitionLag hot : hotPartitions) {
+      Tags tags = Tags.of(
+        "consumer_group", hot.consumerGroup(),
+        "topic", hot.topic(),
+        "partition", String.valueOf(hot.partition())
+      );
+
+      trackKey(activeKeys, recordGauge("klag.hot_partition.lag", tags, hot.lag()));
+    }
+  }
+
+  /**
+   * Reports hot partition throughput metrics.
+   * Only reports partitions that are statistical outliers.
+   *
+   * @param hotPartitions list of detected hot partitions by throughput
+   * @param activeKeys set to populate with active gauge keys (can be null)
+   */
+  public void reportHotPartitionThroughput(List<HotPartitionThroughput> hotPartitions, Set<String> activeKeys) {
+    log.debug("Reporting {} hot partition throughput metrics", hotPartitions.size());
+
+    for (HotPartitionThroughput hot : hotPartitions) {
+      Tags tags = Tags.of(
+        "topic", hot.topic(),
+        "partition", String.valueOf(hot.partition())
+      );
+
+      // Report throughput scaled by 100 to preserve 2 decimal places of precision
+      long throughputScaled = Math.round(hot.throughput() * 100);
+      trackKey(activeKeys, recordGauge("klag.hot_partition", tags, throughputScaled));
     }
   }
 
