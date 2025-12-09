@@ -5,9 +5,9 @@ In any order:
 * Estimated Time to Catch Up (or Fall Behind).
 * Per-Member Assignment Tracking / Partitions per member of consumer group.
 * Chunking request to kafka.
-* Hot Partition Detection - Flag partitions with disproportionate lag.
+* ~~Hot Partition Detection - Flag partitions with disproportionate lag.~~
 * Track rebalance frequency—too many rebalances indicate instability.
-* Java 21 and usage of virtual threads.
+* ~~Java 21 and usage of virtual threads.~~
 * Convert lag to estimate of seconds.
 * ~~Dockerfile~~ + Helm chart.
 * ~~Github actions~~.

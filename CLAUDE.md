@@ -27,7 +27,8 @@ src/main/java/io/github/themoah/klag/
 ├── health/                    # KafkaHealthMonitor, HealthCheckHandler, HealthStatus
 ├── kafka/                     # KafkaClientService[Impl], KafkaClientConfig
 ├── metrics/                   # MetricsCollector, MicrometerReporter, PrometheusHandler
-│   └── velocity/              # LagVelocityTracker, TopicLagHistory
+│   ├── velocity/              # LagVelocityTracker, TopicLagHistory
+│   └── hotpartition/          # HotPartitionDetector, HotPartitionConfig, StatisticalUtils
 └── model/                     # Records: ConsumerGroupLag, ConsumerGroupState, PartitionOffsets, LagVelocity, etc.
 ```
 
@@ -46,6 +47,13 @@ src/main/java/io/github/themoah/klag/
 **Kafka:** `KAFKA_BOOTSTRAP_SERVERS` (localhost:9092), `KAFKA_REQUEST_TIMEOUT_MS` (30000)
 
 **Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (glob pattern), `METRICS_JVM_ENABLED` (false)
+
+**Hot Partition Detection:**
+- `HOT_PARTITION_ENABLED` (true) - Enable/disable hot partition detection
+- `HOT_PARTITION_SIGMA_MULTIPLIER` (2.0) - Standard deviations for outlier threshold
+- `HOT_PARTITION_MIN_PARTITIONS` (3) - Minimum partitions per topic for detection
+- `HOT_PARTITION_MIN_SAMPLES` (3) - Minimum samples for throughput calculation
+- `HOT_PARTITION_BUFFER_SIZE` (20) - Samples to retain per partition
 
 **Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`
 
@@ -90,8 +98,14 @@ OTEL_RESOURCE_ATTRIBUTES=environment=development,cluster=local
 - `klag.partition.log_end_offset`, `klag.partition.log_start_offset`
 - `klag.consumer.committed_offset`, `klag.consumer.group.state`
 - `klag.topic.partitions` - Partition count per topic
+- `klag.consumer.lag.velocity` - Lag velocity (messages/second × 100)
+
+**Hot Partition Metrics (conditional - only reported when outliers exist):**
+- `klag.hot_partition.lag` - Partition lag when statistically high (outlier)
+- `klag.hot_partition` - Partition throughput × 100 when statistically high (outlier)
 
 Tags: `consumer_group`, `topic`, `partition`
+Note: `klag.hot_partition` only has `topic` and `partition` tags (throughput is partition-level, independent of consumers)
 
 ## Grafana Dashboard
 
@@ -115,12 +129,15 @@ A pre-built comprehensive Grafana dashboard is available in `dashboard/demo-dash
 - Partition count by topic
 - Topic throughput (log end offset rate)
 - Top 10 partition offset gaps
+- Hot Partition Detection (count, table, time series)
 - JVM Memory Usage (heap/non-heap)
 - JVM GC Pause Time
 - JVM Thread States (stacked)
 - Process CPU Usage
 - JVM Memory Allocation Rate
 - JVM Loaded Classes
+
+WHEN ADDING A NEW METRIC ALWAYS UPDATE GRAFANA DASHBOARD !
 
 **Import to Grafana Cloud:**
 1. Navigate to Grafana → Dashboards → Import

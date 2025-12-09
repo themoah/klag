@@ -8,6 +8,7 @@ Inspired by [kafka lag exporter](https://github.com/seglo/kafka-lag-exporter) th
 Simple, lightweight and extendable lag exporter built with vert.x and micrometer.
 
 * Lag velocity (track how fast lag is growing or decreasing).
+* Hot partitions - find partitions with uneven lag or records growth.
 * Tracks consumer groups:
   * State changes (Stable, Rebalancing, Stale, Dead, Empty).
   * Stale or deleted groups are deleted from reporting.
@@ -19,6 +20,10 @@ Supported sinks:
 * (planned) Prometheus push gateway.
 * (planned) statsD.
 * (planned) Google stackdriver.
+
+[Blogpost about klag.](https://medium.com/p/introducing-klag-the-kafka-lag-exporter-i-always-wanted-d919bdb64a7a?source=github)
+![Optional grafana dashboard](dashboard/grafana.png)
+
 
 `docker run --env-file .env themoah/klag`
 

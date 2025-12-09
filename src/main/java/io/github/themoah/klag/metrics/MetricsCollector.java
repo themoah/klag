@@ -1,12 +1,16 @@
 package io.github.themoah.klag.metrics;
 
 import io.github.themoah.klag.kafka.KafkaClientService;
+import io.github.themoah.klag.metrics.hotpartition.HotPartitionConfig;
+import io.github.themoah.klag.metrics.hotpartition.HotPartitionDetector;
 import io.github.themoah.klag.metrics.velocity.LagVelocityTracker;
 import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import io.github.themoah.klag.model.ConsumerGroupOffsets;
 import io.github.themoah.klag.model.ConsumerGroupOffsets.TopicPartitionKey;
 import io.github.themoah.klag.model.ConsumerGroupState;
+import io.github.themoah.klag.model.HotPartitionLag;
+import io.github.themoah.klag.model.HotPartitionThroughput;
 import io.github.themoah.klag.model.LagVelocity;
 import io.github.themoah.klag.model.PartitionOffsets;
 import io.vertx.core.Future;
@@ -36,6 +40,7 @@ public class MetricsCollector {
   private final long intervalMs;
   private final Pattern groupPattern;
   private final LagVelocityTracker velocityTracker;
+  private final HotPartitionDetector hotPartitionDetector;
 
   private Long timerId;
 
@@ -46,11 +51,24 @@ public class MetricsCollector {
     long intervalMs,
     String groupFilter
   ) {
-    this(vertx, kafkaClient, reporter, intervalMs, groupFilter, new LagVelocityTracker());
+    this(vertx, kafkaClient, reporter, intervalMs, groupFilter,
+      new LagVelocityTracker(), HotPartitionConfig.fromEnvironment());
+  }
+
+  public MetricsCollector(
+    Vertx vertx,
+    KafkaClientService kafkaClient,
+    MetricsReporter reporter,
+    long intervalMs,
+    String groupFilter,
+    HotPartitionConfig hotPartitionConfig
+  ) {
+    this(vertx, kafkaClient, reporter, intervalMs, groupFilter,
+      new LagVelocityTracker(), hotPartitionConfig);
   }
 
   /**
-   * Constructor with injectable velocity tracker (for testing).
+   * Constructor with injectable velocity tracker and hot partition config (for testing).
    */
   MetricsCollector(
     Vertx vertx,
@@ -58,7 +76,8 @@ public class MetricsCollector {
     MetricsReporter reporter,
     long intervalMs,
     String groupFilter,
-    LagVelocityTracker velocityTracker
+    LagVelocityTracker velocityTracker,
+    HotPartitionConfig hotPartitionConfig
   ) {
     this.vertx = vertx;
     this.kafkaClient = kafkaClient;
@@ -66,6 +85,9 @@ public class MetricsCollector {
     this.intervalMs = intervalMs;
     this.groupPattern = compileGlobPattern(groupFilter);
     this.velocityTracker = velocityTracker;
+    this.hotPartitionDetector = hotPartitionConfig.enabled()
+      ? new HotPartitionDetector(hotPartitionConfig)
+      : null;
   }
 
   /**
@@ -194,6 +216,24 @@ public class MetricsCollector {
       micrometerReporter.reportTopicPartitions(topicPartitions, activeKeys);
       micrometerReporter.reportLag(lagData, activeKeys);
       micrometerReporter.reportConsumerGroupStates(stateData, activeKeys);
+
+      // Hot partition detection and reporting
+      if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
+        // Record throughput snapshots and get active keys
+        Set<String> throughputKeys = hotPartitionDetector.recordThroughputSnapshots(lagData);
+
+        // Detect hot partitions by lag
+        List<HotPartitionLag> hotByLag = hotPartitionDetector.detectHotPartitionsByLag(lagData);
+        micrometerReporter.reportHotPartitionLag(hotByLag, activeKeys);
+
+        // Detect hot partitions by throughput
+        List<HotPartitionThroughput> hotByThroughput = hotPartitionDetector.detectHotPartitionsByThroughput();
+        micrometerReporter.reportHotPartitionThroughput(hotByThroughput, activeKeys);
+
+        // Cleanup stale throughput data
+        hotPartitionDetector.cleanupStalePartitions(throughputKeys);
+      }
+
       micrometerReporter.cleanupStaleGauges(activeKeys);
 
       log.debug("Reported metrics for {} consumer groups", lagData.size());
