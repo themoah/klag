@@ -1,5 +1,7 @@
 package io.github.themoah.klag.metrics;
 
+import io.github.themoah.klag.kafka.ChunkConfig;
+import io.github.themoah.klag.kafka.ChunkProcessor;
 import io.github.themoah.klag.kafka.KafkaClientService;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionConfig;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionDetector;
@@ -21,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -41,6 +44,10 @@ public class MetricsCollector {
   private final Pattern groupPattern;
   private final LagVelocityTracker velocityTracker;
   private final HotPartitionDetector hotPartitionDetector;
+  private final ChunkConfig chunkConfig;
+
+  private final Map<String, Integer> cachedGroupPartitionCounts = new ConcurrentHashMap<>();
+  private final Map<String, Integer> cachedTopicPartitionCounts = new ConcurrentHashMap<>();
 
   private Long timerId;
 
@@ -52,7 +59,8 @@ public class MetricsCollector {
     String groupFilter
   ) {
     this(vertx, kafkaClient, reporter, intervalMs, groupFilter,
-      new LagVelocityTracker(), HotPartitionConfig.fromEnvironment());
+      new LagVelocityTracker(), HotPartitionConfig.fromEnvironment(),
+      ChunkConfig.fromEnvironment());
   }
 
   public MetricsCollector(
@@ -64,11 +72,12 @@ public class MetricsCollector {
     HotPartitionConfig hotPartitionConfig
   ) {
     this(vertx, kafkaClient, reporter, intervalMs, groupFilter,
-      new LagVelocityTracker(), hotPartitionConfig);
+      new LagVelocityTracker(), hotPartitionConfig,
+      ChunkConfig.fromEnvironment());
   }
 
   /**
-   * Constructor with injectable velocity tracker and hot partition config (for testing).
+   * Constructor with injectable velocity tracker, hot partition config, and chunk config (for testing).
    */
   MetricsCollector(
     Vertx vertx,
@@ -77,7 +86,8 @@ public class MetricsCollector {
     long intervalMs,
     String groupFilter,
     LagVelocityTracker velocityTracker,
-    HotPartitionConfig hotPartitionConfig
+    HotPartitionConfig hotPartitionConfig,
+    ChunkConfig chunkConfig
   ) {
     this.vertx = vertx;
     this.kafkaClient = kafkaClient;
@@ -88,6 +98,7 @@ public class MetricsCollector {
     this.hotPartitionDetector = hotPartitionConfig.enabled()
       ? new HotPartitionDetector(hotPartitionConfig)
       : null;
+    this.chunkConfig = chunkConfig;
   }
 
   /**
@@ -131,26 +142,180 @@ public class MetricsCollector {
           groups.size(), filteredGroups.size());
 
         if (filteredGroups.isEmpty()) {
-          // Cleanup stale gauges when no groups match
           if (reporter instanceof MicrometerReporter micrometerReporter) {
             micrometerReporter.cleanupStaleGauges(Set.of());
           }
           return Future.succeededFuture();
         }
 
-        // Collect lag and state in parallel
-        Future<List<ConsumerGroupLag>> lagFuture = collectAllGroupLags(filteredGroups);
-        Future<Map<String, ConsumerGroupState>> stateFuture =
-            kafkaClient.describeConsumerGroups(filteredGroups);
+        if (chunkConfig.isChunkingEnabled()) {
+          return collectAndReportChunked(filteredGroups);
+        }
 
-        return Future.all(lagFuture, stateFuture)
-          .compose(composite -> {
-            List<ConsumerGroupLag> lagData = composite.resultAt(0);
-            Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
-            return reportAllMetrics(lagData, stateData);
-          });
+        return collectAllGroupsParallel(filteredGroups);
       })
       .onFailure(err -> log.error("Failed to collect lag metrics", err));
+  }
+
+  /**
+   * Original non-chunked path: collects all groups in parallel.
+   */
+  private Future<Void> collectAllGroupsParallel(Set<String> filteredGroups) {
+    Future<List<ConsumerGroupLag>> lagFuture = collectAllGroupLags(filteredGroups);
+    Future<Map<String, ConsumerGroupState>> stateFuture =
+        kafkaClient.describeConsumerGroups(filteredGroups);
+
+    return Future.all(lagFuture, stateFuture)
+      .compose(composite -> {
+        List<ConsumerGroupLag> lagData = composite.resultAt(0);
+        Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
+        Set<String> activeKeys = new HashSet<>();
+        reportMetrics(lagData, stateData, activeKeys);
+        if (reporter instanceof MicrometerReporter micrometerReporter) {
+          micrometerReporter.cleanupStaleGauges(activeKeys);
+        }
+        return Future.succeededFuture();
+      });
+  }
+
+  /**
+   * Chunked path: splits groups into balanced chunks and processes sequentially.
+   */
+  private Future<Void> collectAndReportChunked(Set<String> filteredGroups) {
+    log.debug("Processing {} groups in {} chunks with {}ms delay",
+      filteredGroups.size(), chunkConfig.chunkCount(), chunkConfig.chunkDelayMs());
+
+    List<List<String>> groupChunks = ChunkProcessor.balanceIntoChunks(
+      filteredGroups, chunkConfig.chunkCount(),
+      group -> cachedGroupPartitionCounts.getOrDefault(group, 1));
+
+    Set<String> cycleActiveKeys = new HashSet<>();
+
+    return ChunkProcessor.<String, Void>processSequentially(
+      vertx, groupChunks, chunkConfig.chunkDelayMs(),
+      chunk -> processGroupChunk(chunk, cycleActiveKeys)
+    ).compose(results -> {
+      if (reporter instanceof MicrometerReporter micrometerReporter) {
+        micrometerReporter.cleanupStaleGauges(cycleActiveKeys);
+      }
+      return Future.succeededFuture();
+    });
+  }
+
+  /**
+   * Processes a single chunk of consumer groups: collects lag, describes groups, reports metrics.
+   */
+  private Future<Void> processGroupChunk(List<String> chunk, Set<String> cycleActiveKeys) {
+    log.debug("Processing group chunk with {} groups", chunk.size());
+
+    Future<List<ConsumerGroupLag>> lagFuture;
+    if (chunkConfig.isChunkingEnabled()) {
+      lagFuture = collectGroupLagsChunked(chunk);
+    } else {
+      lagFuture = collectAllGroupLags(new HashSet<>(chunk));
+    }
+
+    Future<Map<String, ConsumerGroupState>> stateFuture =
+        kafkaClient.describeConsumerGroups(new HashSet<>(chunk));
+
+    return Future.all(lagFuture, stateFuture)
+      .compose(composite -> {
+        List<ConsumerGroupLag> lagData = composite.resultAt(0);
+        Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
+
+        reportMetrics(lagData, stateData, cycleActiveKeys);
+
+        // Update cached group partition counts
+        for (ConsumerGroupLag lag : lagData) {
+          cachedGroupPartitionCounts.put(lag.consumerGroup(), lag.partitions().size());
+        }
+
+        return Future.<Void>succeededFuture();
+      })
+      .onFailure(err -> log.warn("Failed to process group chunk: {}", err.getMessage()));
+  }
+
+  /**
+   * Collects lag for a list of groups with topic-level chunking.
+   */
+  private Future<List<ConsumerGroupLag>> collectGroupLagsChunked(List<String> groups) {
+    List<Future<ConsumerGroupLag>> futures = groups.stream()
+      .map(this::collectGroupLagChunked)
+      .collect(Collectors.toList());
+
+    return Future.all(futures)
+      .map(composite -> {
+        List<ConsumerGroupLag> results = new ArrayList<>();
+        for (int i = 0; i < composite.size(); i++) {
+          ConsumerGroupLag lag = composite.resultAt(i);
+          if (lag != null) {
+            results.add(lag);
+          }
+        }
+        return results;
+      });
+  }
+
+  /**
+   * Collects lag for a single group with topic-level chunking for log end offset fetches.
+   */
+  private Future<ConsumerGroupLag> collectGroupLagChunked(String groupId) {
+    return kafkaClient.getConsumerGroupOffsets(groupId)
+      .compose(offsets -> {
+        Set<String> topics = offsets.offsets().keySet().stream()
+          .map(TopicPartitionKey::topic)
+          .collect(Collectors.toSet());
+
+        if (topics.isEmpty()) {
+          return Future.succeededFuture(ConsumerGroupLag.fromPartitions(groupId, List.of()));
+        }
+
+        // Balance topics into chunks
+        List<List<String>> topicChunks = ChunkProcessor.balanceIntoChunks(
+          topics, chunkConfig.chunkCount(),
+          topic -> cachedTopicPartitionCounts.getOrDefault(topic, 1));
+
+        // Process topic chunks sequentially, each chunk fetches offsets in parallel
+        return ChunkProcessor.<String, List<PartitionOffsets>>processSequentially(
+          vertx, topicChunks, chunkConfig.chunkDelayMs(),
+          topicChunk -> {
+            List<Future<List<PartitionOffsets>>> offsetFutures = topicChunk.stream()
+              .map(kafkaClient::getLogEndOffsets)
+              .collect(Collectors.toList());
+
+            return Future.all(offsetFutures)
+              .map(composite -> {
+                List<PartitionOffsets> merged = new ArrayList<>();
+                for (int i = 0; i < composite.size(); i++) {
+                  List<PartitionOffsets> partitionOffsets = composite.resultAt(i);
+                  merged.addAll(partitionOffsets);
+                }
+                return merged;
+              });
+          }
+        ).map(chunkResults -> {
+          // Merge all partition offsets from all topic chunks
+          Map<TopicPartitionKey, PartitionOffsets> topicOffsets = new HashMap<>();
+          for (List<PartitionOffsets> chunkResult : chunkResults) {
+            for (PartitionOffsets po : chunkResult) {
+              TopicPartitionKey key = new TopicPartitionKey(po.topic(), po.partition());
+              topicOffsets.put(key, po);
+              // Update cached topic partition counts
+              cachedTopicPartitionCounts.merge(po.topic(), 1, Integer::max);
+            }
+          }
+
+          // Update cached topic partition counts with actual partition counts
+          Map<String, Integer> topicPartitionCounts = new HashMap<>();
+          for (PartitionOffsets po : topicOffsets.values()) {
+            topicPartitionCounts.merge(po.topic(), 1, Integer::sum);
+          }
+          cachedTopicPartitionCounts.putAll(topicPartitionCounts);
+
+          return buildConsumerGroupLag(groupId, offsets, topicOffsets);
+        });
+      })
+      .onFailure(err -> log.warn("Failed to collect lag for group {}: {}", groupId, err.getMessage()));
   }
 
   private Future<List<ConsumerGroupLag>> collectAllGroupLags(Set<String> groups) {
@@ -171,12 +336,15 @@ public class MetricsCollector {
       });
   }
 
-  private Future<Void> reportAllMetrics(
+  /**
+   * Reports metrics for the given lag and state data.
+   * Adds active gauge keys to the provided set but does NOT perform cleanup.
+   */
+  private void reportMetrics(
       List<ConsumerGroupLag> lagData,
-      Map<String, ConsumerGroupState> stateData
+      Map<String, ConsumerGroupState> stateData,
+      Set<String> activeKeys
   ) {
-    Set<String> activeKeys = new HashSet<>();
-
     if (reporter instanceof MicrometerReporter micrometerReporter) {
       // Report topic partition counts (max partition number + 1)
       Map<String, Integer> topicPartitions = new HashMap<>();
@@ -219,28 +387,21 @@ public class MetricsCollector {
 
       // Hot partition detection and reporting
       if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
-        // Record throughput snapshots and get active keys
         Set<String> throughputKeys = hotPartitionDetector.recordThroughputSnapshots(lagData);
 
-        // Detect hot partitions by lag
         List<HotPartitionLag> hotByLag = hotPartitionDetector.detectHotPartitionsByLag(lagData);
         micrometerReporter.reportHotPartitionLag(hotByLag, activeKeys);
 
-        // Detect hot partitions by throughput
         List<HotPartitionThroughput> hotByThroughput = hotPartitionDetector.detectHotPartitionsByThroughput();
         micrometerReporter.reportHotPartitionThroughput(hotByThroughput, activeKeys);
 
-        // Cleanup stale throughput data
         hotPartitionDetector.cleanupStalePartitions(throughputKeys);
       }
 
-      micrometerReporter.cleanupStaleGauges(activeKeys);
-
       log.debug("Reported metrics for {} consumer groups", lagData.size());
-      return Future.succeededFuture();
+    } else {
+      reporter.reportLag(lagData);
     }
-
-    return reporter.reportLag(lagData);
   }
 
   private Future<ConsumerGroupLag> collectGroupLag(String groupId) {
