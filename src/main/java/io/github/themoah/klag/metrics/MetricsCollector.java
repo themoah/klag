@@ -5,6 +5,8 @@ import io.github.themoah.klag.kafka.ChunkProcessor;
 import io.github.themoah.klag.kafka.KafkaClientService;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionConfig;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionDetector;
+import io.github.themoah.klag.metrics.timelag.TimeLagConfig;
+import io.github.themoah.klag.metrics.timelag.TimeLagEstimator;
 import io.github.themoah.klag.metrics.velocity.LagVelocityTracker;
 import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
@@ -15,6 +17,8 @@ import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.HotPartitionThroughput;
 import io.github.themoah.klag.model.LagVelocity;
 import io.github.themoah.klag.model.PartitionOffsets;
+import io.github.themoah.klag.model.TimeLagEstimate;
+import io.github.themoah.klag.model.TimeToCloseEstimate;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import java.util.ArrayList;
@@ -44,6 +48,7 @@ public class MetricsCollector {
   private final Pattern groupPattern;
   private final LagVelocityTracker velocityTracker;
   private final HotPartitionDetector hotPartitionDetector;
+  private final TimeLagEstimator timeLagEstimator;
   private final ChunkConfig chunkConfig;
 
   private final Map<String, Integer> cachedGroupPartitionCounts = new ConcurrentHashMap<>();
@@ -60,7 +65,7 @@ public class MetricsCollector {
   ) {
     this(vertx, kafkaClient, reporter, intervalMs, groupFilter,
       new LagVelocityTracker(), HotPartitionConfig.fromEnvironment(),
-      ChunkConfig.fromEnvironment());
+      TimeLagConfig.fromEnvironment(), ChunkConfig.fromEnvironment());
   }
 
   public MetricsCollector(
@@ -73,11 +78,11 @@ public class MetricsCollector {
   ) {
     this(vertx, kafkaClient, reporter, intervalMs, groupFilter,
       new LagVelocityTracker(), hotPartitionConfig,
-      ChunkConfig.fromEnvironment());
+      TimeLagConfig.fromEnvironment(), ChunkConfig.fromEnvironment());
   }
 
   /**
-   * Constructor with injectable velocity tracker, hot partition config, and chunk config (for testing).
+   * Constructor with injectable velocity tracker, hot partition config, time lag config, and chunk config (for testing).
    */
   MetricsCollector(
     Vertx vertx,
@@ -87,6 +92,7 @@ public class MetricsCollector {
     String groupFilter,
     LagVelocityTracker velocityTracker,
     HotPartitionConfig hotPartitionConfig,
+    TimeLagConfig timeLagConfig,
     ChunkConfig chunkConfig
   ) {
     this.vertx = vertx;
@@ -97,6 +103,9 @@ public class MetricsCollector {
     this.velocityTracker = velocityTracker;
     this.hotPartitionDetector = hotPartitionConfig.enabled()
       ? new HotPartitionDetector(hotPartitionConfig)
+      : null;
+    this.timeLagEstimator = timeLagConfig.enabled()
+      ? new TimeLagEstimator(timeLagConfig)
       : null;
     this.chunkConfig = chunkConfig;
   }
@@ -170,7 +179,9 @@ public class MetricsCollector {
         List<ConsumerGroupLag> lagData = composite.resultAt(0);
         Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
         Set<String> activeKeys = new HashSet<>();
-        reportMetrics(lagData, stateData, activeKeys);
+        Set<String> velocityKeys = new HashSet<>();
+        reportMetrics(lagData, stateData, activeKeys, velocityKeys);
+        velocityTracker.cleanupStaleTopics(velocityKeys);
         if (reporter instanceof MicrometerReporter micrometerReporter) {
           micrometerReporter.cleanupStaleGauges(activeKeys);
         }
@@ -190,11 +201,13 @@ public class MetricsCollector {
       group -> cachedGroupPartitionCounts.getOrDefault(group, 1));
 
     Set<String> cycleActiveKeys = new HashSet<>();
+    Set<String> cycleVelocityKeys = new HashSet<>();
 
     return ChunkProcessor.<String, Void>processSequentially(
       vertx, groupChunks, chunkConfig.chunkDelayMs(),
-      chunk -> processGroupChunk(chunk, cycleActiveKeys)
+      chunk -> processGroupChunk(chunk, cycleActiveKeys, cycleVelocityKeys)
     ).compose(results -> {
+      velocityTracker.cleanupStaleTopics(cycleVelocityKeys);
       if (reporter instanceof MicrometerReporter micrometerReporter) {
         micrometerReporter.cleanupStaleGauges(cycleActiveKeys);
       }
@@ -205,7 +218,11 @@ public class MetricsCollector {
   /**
    * Processes a single chunk of consumer groups: collects lag, describes groups, reports metrics.
    */
-  private Future<Void> processGroupChunk(List<String> chunk, Set<String> cycleActiveKeys) {
+  private Future<Void> processGroupChunk(
+      List<String> chunk,
+      Set<String> cycleActiveKeys,
+      Set<String> cycleVelocityKeys
+  ) {
     log.debug("Processing group chunk with {} groups", chunk.size());
 
     Future<List<ConsumerGroupLag>> lagFuture;
@@ -223,7 +240,7 @@ public class MetricsCollector {
         List<ConsumerGroupLag> lagData = composite.resultAt(0);
         Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
 
-        reportMetrics(lagData, stateData, cycleActiveKeys);
+        reportMetrics(lagData, stateData, cycleActiveKeys, cycleVelocityKeys);
 
         // Update cached group partition counts
         for (ConsumerGroupLag lag : lagData) {
@@ -339,11 +356,13 @@ public class MetricsCollector {
   /**
    * Reports metrics for the given lag and state data.
    * Adds active gauge keys to the provided set but does NOT perform cleanup.
+   * Velocity keys are accumulated across chunks for cycle-level cleanup.
    */
   private void reportMetrics(
       List<ConsumerGroupLag> lagData,
       Map<String, ConsumerGroupState> stateData,
-      Set<String> activeKeys
+      Set<String> activeKeys,
+      Set<String> velocityKeys
   ) {
     if (reporter instanceof MicrometerReporter micrometerReporter) {
       // Report topic partition counts (max partition number + 1)
@@ -366,8 +385,7 @@ public class MetricsCollector {
         }
       }
 
-      // Record snapshots for velocity calculation
-      Set<String> velocityKeys = new HashSet<>();
+      // Record snapshots for velocity calculation (velocityKeys accumulates across chunks)
       groupTopicAggregates.forEach((consumerGroup, topicMap) ->
         topicMap.forEach((topic, agg) -> {
           recordVelocitySnapshot(consumerGroup, topic, agg);
@@ -378,7 +396,24 @@ public class MetricsCollector {
       // Calculate and report velocities
       List<LagVelocity> velocities = velocityTracker.calculateVelocities();
       micrometerReporter.reportVelocity(velocities, activeKeys);
-      velocityTracker.cleanupStaleTopics(velocityKeys);
+
+      // Time lag estimation (based on velocity data)
+      if (timeLagEstimator != null && timeLagEstimator.isEnabled()) {
+        // Build lag map: group -> topic -> totalLag
+        Map<String, Map<String, Long>> lagByGroupTopic = new HashMap<>();
+        groupTopicAggregates.forEach((group, topicMap) ->
+          topicMap.forEach((topic, agg) ->
+            lagByGroupTopic.computeIfAbsent(group, k -> new HashMap<>())
+              .put(topic, agg.totalLag())
+          )
+        );
+
+        List<TimeLagEstimate> timeLagEstimates = timeLagEstimator.calculateTimeLags(velocities, lagByGroupTopic);
+        micrometerReporter.reportTimeLag(timeLagEstimates, activeKeys);
+
+        List<TimeToCloseEstimate> timeToCloseEstimates = timeLagEstimator.calculateTimeToClose(velocities, lagByGroupTopic);
+        micrometerReporter.reportTimeToClose(timeToCloseEstimates, activeKeys);
+      }
 
       // Report lag and state metrics
       micrometerReporter.reportTopicPartitions(topicPartitions, activeKeys);
