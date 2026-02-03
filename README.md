@@ -24,6 +24,7 @@ Klag continuously monitors all consumer groups and exposes metrics to your obser
 | Feature | Why It Matters |
 |---------|----------------|
 | **Lag velocity** | Know if lag is growing or shrinking — catch problems before they escalate |
+| **Time-based lag estimation** | See lag in seconds/minutes, not just message counts |
 | **Hot partition detection** | Find partitions with uneven load causing bottlenecks |
 | **Consumer group state tracking** | Alert on Rebalancing, Dead, or Empty states |
 | **Request batching** | Safely monitor large clusters without overwhelming brokers |
@@ -53,6 +54,8 @@ Metrics available at `http://localhost:8888/metrics`
 |--------|-------------|
 | `klag.consumer.lag` | Current lag per partition (also `.sum`, `.max`, `.min` aggregations) |
 | `klag.consumer.lag.velocity` | Rate of change — positive means falling behind |
+| `klag.consumer.lag.time_ms` | Estimated time (ms) to process current lag at current rate |
+| `klag.consumer.lag.time_to_close_seconds` | Estimated seconds until lag reaches zero (only when catching up) |
 | `klag.consumer.group.state` | Group health: Stable, Rebalancing, Dead, Empty |
 | `klag.hot_partition` | Partitions with statistically abnormal throughput |
 | `klag.hot_partition.lag` | Lag on hot partitions specifically |
