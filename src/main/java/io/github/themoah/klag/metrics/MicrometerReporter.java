@@ -6,6 +6,8 @@ import io.github.themoah.klag.model.ConsumerGroupState;
 import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.HotPartitionThroughput;
 import io.github.themoah.klag.model.LagVelocity;
+import io.github.themoah.klag.model.TimeLagEstimate;
+import io.github.themoah.klag.model.TimeToCloseEstimate;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -193,6 +195,46 @@ public class MicrometerReporter implements MetricsReporter {
       // Report throughput scaled by 100 to preserve 2 decimal places of precision
       long throughputScaled = Math.round(hot.throughput() * 100);
       trackKey(activeKeys, recordGauge("klag.hot_partition", tags, throughputScaled));
+    }
+  }
+
+  /**
+   * Reports time lag estimates in milliseconds.
+   * Only reports when lag exceeds minimum threshold and velocity data is available.
+   *
+   * @param estimates list of time lag estimates
+   * @param activeKeys set to populate with active gauge keys (can be null)
+   */
+  public void reportTimeLag(List<TimeLagEstimate> estimates, Set<String> activeKeys) {
+    log.debug("Reporting {} time lag estimates", estimates.size());
+
+    for (TimeLagEstimate estimate : estimates) {
+      Tags tags = Tags.of(
+        "consumer_group", estimate.consumerGroup(),
+        "topic", estimate.topic()
+      );
+
+      trackKey(activeKeys, recordGauge("klag.consumer.lag.time_ms", tags, estimate.estimatedTimeLagMs()));
+    }
+  }
+
+  /**
+   * Reports time-to-close estimates in seconds.
+   * Only reports when consumer is catching up (velocity < 0).
+   *
+   * @param estimates list of time-to-close estimates
+   * @param activeKeys set to populate with active gauge keys (can be null)
+   */
+  public void reportTimeToClose(List<TimeToCloseEstimate> estimates, Set<String> activeKeys) {
+    log.debug("Reporting {} time-to-close estimates", estimates.size());
+
+    for (TimeToCloseEstimate estimate : estimates) {
+      Tags tags = Tags.of(
+        "consumer_group", estimate.consumerGroup(),
+        "topic", estimate.topic()
+      );
+
+      trackKey(activeKeys, recordGauge("klag.consumer.lag.time_to_close_seconds", tags, estimate.estimatedTimeToCloseSeconds()));
     }
   }
 
