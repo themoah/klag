@@ -943,6 +943,339 @@
         "x": 0,
         "y": 34
       },
+      "id": 105,
+      "panels": [],
+      "title": "Time-Based Lag Estimation",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60000
+              },
+              {
+                "color": "red",
+                "value": 300000
+              }
+            ]
+          },
+          "unit": "ms",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 35
+      },
+      "id": 26,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["max"],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "max(klag_consumer_lag_time_ms{consumer_group=~\"$consumer_group\", topic=~\"$topic\"})",
+          "legendFormat": "Max Time Lag",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Max Time Lag",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 35
+      },
+      "id": 27,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "count(klag_consumer_lag_time_to_close_seconds{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}) or vector(0)",
+          "legendFormat": "Catching Up",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Groups Catching Up",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Estimated time in milliseconds to process current lag at current consumption rate",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Time (ms)",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "area"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60000
+              },
+              {
+                "color": "red",
+                "value": 300000
+              }
+            ]
+          },
+          "unit": "ms",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "id": 28,
+      "options": {
+        "legend": {
+          "calcs": ["last", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "klag_consumer_lag_time_ms{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
+          "legendFormat": "{{consumer_group}} - {{topic}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Time Lag by Consumer Group",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Estimated seconds until lag reaches zero (only shown when consumer is catching up)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Time (seconds)",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 39
+      },
+      "id": 29,
+      "options": {
+        "legend": {
+          "calcs": ["last"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "klag_consumer_lag_time_to_close_seconds{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
+          "legendFormat": "{{consumer_group}} - {{topic}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Time to Close Lag (Catching Up Only)",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
       "id": 104,
       "panels": [],
       "title": "Hot Partition Detection",
@@ -985,7 +1318,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 35
+        "y": 44
       },
       "id": 21,
       "options": {
@@ -1054,7 +1387,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 35
+        "y": 44
       },
       "id": 22,
       "options": {
@@ -1144,7 +1477,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 35
+        "y": 44
       },
       "id": 23,
       "options": {
@@ -1273,7 +1606,7 @@
         "h": 4,
         "w": 12,
         "x": 0,
-        "y": 39
+        "y": 48
       },
       "id": 24,
       "options": {
@@ -1364,7 +1697,7 @@
         "h": 4,
         "w": 12,
         "x": 12,
-        "y": 43
+        "y": 52
       },
       "id": 25,
       "options": {
@@ -1401,7 +1734,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 56
       },
       "id": 102,
       "panels": [],
@@ -1457,7 +1790,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 35
+        "y": 57
       },
       "id": 7,
       "options": {
@@ -1557,7 +1890,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 35
+        "y": 57
       },
       "id": 8,
       "options": {
@@ -1655,7 +1988,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 35
+        "y": 57
       },
       "id": 9,
       "options": {
@@ -1692,7 +2025,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 65
       },
       "id": 103,
       "panels": [],
@@ -1778,7 +2111,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 44
+        "y": 66
       },
       "id": 13,
       "options": {
@@ -1898,7 +2231,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 44
+        "y": 66
       },
       "id": 14,
       "options": {
@@ -1988,7 +2321,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 52
+        "y": 74
       },
       "id": 15,
       "options": {
@@ -2091,7 +2424,7 @@
         "h": 4,
         "w": 8,
         "x": 8,
-        "y": 52
+        "y": 74
       },
       "id": 16,
       "options": {
@@ -2156,7 +2489,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 52
+        "y": 74
       },
       "id": 17,
       "options": {
@@ -2247,7 +2580,7 @@
         "h": 4,
         "w": 8,
         "x": 8,
-        "y": 56
+        "y": 78
       },
       "id": 18,
       "options": {
@@ -2307,7 +2640,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 56
+        "y": 78
       },
       "id": 19,
       "options": {

@@ -28,7 +28,8 @@ src/main/java/io/github/themoah/klag/
 ├── kafka/                     # KafkaClientService[Impl], KafkaClientConfig
 ├── metrics/                   # MetricsCollector, MicrometerReporter, PrometheusHandler
 │   ├── velocity/              # LagVelocityTracker, TopicLagHistory
-│   └── hotpartition/          # HotPartitionDetector, HotPartitionConfig, StatisticalUtils
+│   ├── hotpartition/          # HotPartitionDetector, HotPartitionConfig, StatisticalUtils
+│   └── timelag/               # TimeLagEstimator, TimeLagConfig
 └── model/                     # Records: ConsumerGroupLag, ConsumerGroupState, PartitionOffsets, LagVelocity, etc.
 ```
 
@@ -54,6 +55,10 @@ src/main/java/io/github/themoah/klag/
 - `HOT_PARTITION_MIN_PARTITIONS` (3) - Minimum partitions per topic for detection
 - `HOT_PARTITION_MIN_SAMPLES` (3) - Minimum samples for throughput calculation
 - `HOT_PARTITION_BUFFER_SIZE` (20) - Samples to retain per partition
+
+**Time-Based Lag Estimation:**
+- `TIME_LAG_ENABLED` (true) - Enable/disable time-based lag estimation
+- `TIME_LAG_MIN_MESSAGES` (100) - Minimum lag messages required for time-to-close estimates
 
 **Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`
 
@@ -104,8 +109,13 @@ OTEL_RESOURCE_ATTRIBUTES=environment=development,cluster=local
 - `klag.hot_partition.lag` - Partition lag when statistically high (outlier)
 - `klag.hot_partition` - Partition throughput × 100 when statistically high (outlier)
 
+**Time-Based Lag Metrics:**
+- `klag.consumer.lag.time_ms` - Estimated lag in milliseconds (reported when velocity data available)
+- `klag.consumer.lag.time_to_close_seconds` - Estimated seconds until lag reaches zero (only when catching up and lag > threshold)
+
 Tags: `consumer_group`, `topic`, `partition`
 Note: `klag.hot_partition` only has `topic` and `partition` tags (throughput is partition-level, independent of consumers)
+Note: Time-based lag metrics only have `consumer_group` and `topic` tags (per-topic granularity)
 
 ## Grafana Dashboard
 
@@ -130,6 +140,7 @@ A pre-built comprehensive Grafana dashboard is available in `dashboard/demo-dash
 - Topic throughput (log end offset rate)
 - Top 10 partition offset gaps
 - Hot Partition Detection (count, table, time series)
+- Time-Based Lag Estimation (max time lag, groups catching up, time lag chart, time-to-close chart)
 - JVM Memory Usage (heap/non-heap)
 - JVM GC Pause Time
 - JVM Thread States (stacked)
