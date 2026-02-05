@@ -69,6 +69,14 @@ public interface KafkaClientService {
   Future<Map<String, ConsumerGroupState>> describeConsumerGroups(Set<String> groupIds);
 
   /**
+   * Gets the retention.ms configuration for the specified topics.
+   *
+   * @param topics set of topic names
+   * @return Future containing map of topic name to retention in milliseconds
+   */
+  Future<Map<String, Long>> getTopicRetentionMs(Set<String> topics);
+
+  /**
    * Closes the underlying Kafka admin client and releases resources.
    *
    * @return Future that completes when the client is closed

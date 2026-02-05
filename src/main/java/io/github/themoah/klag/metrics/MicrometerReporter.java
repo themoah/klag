@@ -5,8 +5,9 @@ import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import io.github.themoah.klag.model.ConsumerGroupState;
 import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.HotPartitionThroughput;
+import io.github.themoah.klag.model.LagMs;
 import io.github.themoah.klag.model.LagVelocity;
-import io.github.themoah.klag.model.TimeLagEstimate;
+import io.github.themoah.klag.model.RetentionRisk;
 import io.github.themoah.klag.model.TimeToCloseEstimate;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;
@@ -199,22 +200,21 @@ public class MicrometerReporter implements MetricsReporter {
   }
 
   /**
-   * Reports time lag estimates in milliseconds.
-   * Only reports when lag exceeds minimum threshold and velocity data is available.
+   * Reports lag in milliseconds based on actual message timestamps.
    *
-   * @param estimates list of time lag estimates
+   * @param lagMsData list of lag in milliseconds data
    * @param activeKeys set to populate with active gauge keys (can be null)
    */
-  public void reportTimeLag(List<TimeLagEstimate> estimates, Set<String> activeKeys) {
-    log.debug("Reporting {} time lag estimates", estimates.size());
+  public void reportLagMs(List<LagMs> lagMsData, Set<String> activeKeys) {
+    log.debug("Reporting {} lag_ms metrics", lagMsData.size());
 
-    for (TimeLagEstimate estimate : estimates) {
+    for (LagMs lagMs : lagMsData) {
       Tags tags = Tags.of(
-        "consumer_group", estimate.consumerGroup(),
-        "topic", estimate.topic()
+        "consumer_group", lagMs.consumerGroup(),
+        "topic", lagMs.topic()
       );
 
-      trackKey(activeKeys, recordGauge("klag.consumer.lag.time_ms", tags, estimate.estimatedTimeLagMs()));
+      trackKey(activeKeys, recordGauge("klag.consumer.lag.ms", tags, lagMs.lagMs()));
     }
   }
 
@@ -235,6 +235,29 @@ public class MicrometerReporter implements MetricsReporter {
       );
 
       trackKey(activeKeys, recordGauge("klag.consumer.lag.time_to_close_seconds", tags, estimate.estimatedTimeToCloseSeconds()));
+    }
+  }
+
+  /**
+   * Reports retention risk percentage metrics (DLP).
+   * Shows what percentage of topic retention is consumed by consumer lag.
+   *
+   * @param risks list of retention risk data
+   * @param activeKeys set to populate with active gauge keys (can be null)
+   */
+  @Override
+  public void reportRetentionPercent(List<RetentionRisk> risks, Set<String> activeKeys) {
+    log.debug("Reporting {} retention risk metrics", risks.size());
+
+    for (RetentionRisk risk : risks) {
+      Tags tags = Tags.of(
+        "consumer_group", risk.consumerGroup(),
+        "topic", risk.topic()
+      );
+
+      // Store as integer (percent * 100) to preserve 2 decimal places
+      long percentScaled = Math.round(risk.percent() * 100);
+      trackKey(activeKeys, recordGauge("klag.consumer.lag.retention_percent", tags, percentScaled));
     }
   }
 

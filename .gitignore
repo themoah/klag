@@ -188,3 +188,5 @@ nbdist/
 
 ### Environment Variables ###
 .env
+
+.mcp.json
