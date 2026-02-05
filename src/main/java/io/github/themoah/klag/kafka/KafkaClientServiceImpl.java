@@ -7,10 +7,13 @@ import io.github.themoah.klag.model.PartitionInfo;
 import io.github.themoah.klag.model.PartitionOffsets;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.kafka.admin.Config;
+import io.vertx.kafka.admin.ConfigEntry;
 import io.vertx.kafka.admin.KafkaAdminClient;
 import io.vertx.kafka.admin.ListOffsetsResultInfo;
 import io.vertx.kafka.admin.OffsetSpec;
 import io.vertx.kafka.admin.TopicDescription;
+import io.vertx.kafka.client.common.ConfigResource;
 import io.vertx.kafka.client.common.TopicPartition;
 import io.vertx.kafka.client.common.TopicPartitionInfo;
 import java.util.ArrayList;
@@ -83,6 +86,10 @@ public class KafkaClientServiceImpl implements KafkaClientService {
       .onFailure(err -> log.error("Failed to list partitions for topic: {}", topic, err));
   }
 
+  // Kafka 3.0+ MAX_TIMESTAMP spec value (not exposed by Vert.x wrapper)
+  // Returns the offset with the highest timestamp in the partition
+  private static final long MAX_TIMESTAMP_SPEC = -3L;
+
   @Override
   public Future<List<PartitionOffsets>> getLogEndOffsets(String topic) {
     Objects.requireNonNull(topic, "topic cannot be null");
@@ -90,35 +97,83 @@ public class KafkaClientServiceImpl implements KafkaClientService {
 
     return listPartitions(topic)
       .compose(partitions -> {
-        Map<TopicPartition, OffsetSpec> latestRequest = new HashMap<>();
-        Map<TopicPartition, OffsetSpec> earliestRequest = new HashMap<>();
+        // Use MAX_TIMESTAMP to get the offset with highest timestamp (Kafka 3.0+)
+        // Use TIMESTAMP(0) to get earliest offset with its timestamp
+        // Use LATEST as fallback for offset if MAX_TIMESTAMP fails
+        Map<TopicPartition, OffsetSpec> maxTimestampRequest = new HashMap<>();
+        Map<TopicPartition, OffsetSpec> earliestTimestampRequest = new HashMap<>();
+        Map<TopicPartition, OffsetSpec> latestOffsetRequest = new HashMap<>();
 
         for (PartitionInfo partition : partitions) {
           TopicPartition tp = new TopicPartition(topic, partition.partition());
-          latestRequest.put(tp, OffsetSpec.LATEST);
-          earliestRequest.put(tp, OffsetSpec.EARLIEST);
+          maxTimestampRequest.put(tp, new OffsetSpec(MAX_TIMESTAMP_SPEC));
+          earliestTimestampRequest.put(tp, OffsetSpec.TIMESTAMP(0));
+          latestOffsetRequest.put(tp, OffsetSpec.LATEST);
         }
 
-        Future<Map<TopicPartition, ListOffsetsResultInfo>> latestFuture =
-          adminClient.listOffsets(latestRequest);
-        Future<Map<TopicPartition, ListOffsetsResultInfo>> earliestFuture =
-          adminClient.listOffsets(earliestRequest);
+        // Three queries:
+        // 1. MAX_TIMESTAMP - returns offset with highest timestamp (Kafka 3.0+)
+        // 2. TIMESTAMP(0) - returns earliest offset with its timestamp
+        // 3. LATEST - fallback for actual latest offset
+        Future<Map<TopicPartition, ListOffsetsResultInfo>> maxTimestampFuture =
+          adminClient.listOffsets(maxTimestampRequest);
+        Future<Map<TopicPartition, ListOffsetsResultInfo>> earliestTimestampFuture =
+          adminClient.listOffsets(earliestTimestampRequest);
+        Future<Map<TopicPartition, ListOffsetsResultInfo>> latestOffsetFuture =
+          adminClient.listOffsets(latestOffsetRequest);
 
-        return Future.all(latestFuture, earliestFuture)
+        return Future.all(maxTimestampFuture, earliestTimestampFuture, latestOffsetFuture)
           .map(composite -> {
-            Map<TopicPartition, ListOffsetsResultInfo> latestOffsets = composite.resultAt(0);
-            Map<TopicPartition, ListOffsetsResultInfo> earliestOffsets = composite.resultAt(1);
+            Map<TopicPartition, ListOffsetsResultInfo> maxTimestampOffsets = composite.resultAt(0);
+            Map<TopicPartition, ListOffsetsResultInfo> earliestTimestampOffsets = composite.resultAt(1);
+            Map<TopicPartition, ListOffsetsResultInfo> latestOffsets = composite.resultAt(2);
 
-            List<PartitionOffsets> result = partitions.stream()
-              .map(partition -> {
-                TopicPartition tp = new TopicPartition(topic, partition.partition());
-                long logEndOffset = latestOffsets.get(tp).getOffset();
-                long logStartOffset = earliestOffsets.get(tp).getOffset();
-                log.debug("Topic {} partition {}: logStart={}, logEnd={}",
-                  topic, partition.partition(), logStartOffset, logEndOffset);
-                return new PartitionOffsets(topic, partition.partition(), logEndOffset, logStartOffset);
-              })
-              .collect(Collectors.toList());
+            List<PartitionOffsets> result = new ArrayList<>();
+            boolean loggedSampleTimestamp = false;
+
+            for (PartitionInfo partition : partitions) {
+              TopicPartition tp = new TopicPartition(topic, partition.partition());
+
+              // Get earliest offset and timestamp from TIMESTAMP(0)
+              long logStartOffset = earliestTimestampOffsets.get(tp).getOffset();
+              long logStartTimestamp = earliestTimestampOffsets.get(tp).getTimestamp();
+
+              // Get latest offset and timestamp - prefer MAX_TIMESTAMP if valid
+              ListOffsetsResultInfo maxTimestampResult = maxTimestampOffsets.get(tp);
+              ListOffsetsResultInfo latestOffsetResult = latestOffsets.get(tp);
+
+              long logEndOffset;
+              long logEndTimestamp;
+
+              if (maxTimestampResult.getOffset() >= 0 && maxTimestampResult.getTimestamp() > 0) {
+                // MAX_TIMESTAMP returned valid offset and timestamp
+                logEndOffset = maxTimestampResult.getOffset();
+                logEndTimestamp = maxTimestampResult.getTimestamp();
+              } else {
+                // MAX_TIMESTAMP failed (pre-3.0 broker or no timestamps) - use LATEST
+                logEndOffset = latestOffsetResult.getOffset();
+                logEndTimestamp = latestOffsetResult.getTimestamp();
+              }
+
+              // Handle edge case: if earliest also returns -1, topic may be empty
+              if (logStartOffset < 0) {
+                logStartOffset = 0;
+                logStartTimestamp = -1;
+              }
+
+              // Log first partition's timestamps at INFO level for debugging
+              if (!loggedSampleTimestamp) {
+                log.info("Topic {} sample timestamps: partition {} logStart={} (ts={}), logEnd={} (ts={})",
+                  topic, partition.partition(), logStartOffset, logStartTimestamp, logEndOffset, logEndTimestamp);
+                loggedSampleTimestamp = true;
+              } else {
+                log.debug("Topic {} partition {}: logStart={} (ts={}), logEnd={} (ts={})",
+                  topic, partition.partition(), logStartOffset, logStartTimestamp, logEndOffset, logEndTimestamp);
+              }
+
+              result.add(new PartitionOffsets(topic, partition.partition(), logEndOffset, logStartOffset,
+                logEndTimestamp, logStartTimestamp));
+            }
 
             log.info("Retrieved offsets for {} partitions of topic {}", result.size(), topic);
             return result;
@@ -189,6 +244,46 @@ public class KafkaClientServiceImpl implements KafkaClientService {
         return result;
       })
       .onFailure(err -> log.error("Failed to describe consumer groups", err));
+  }
+
+  @Override
+  public Future<Map<String, Long>> getTopicRetentionMs(Set<String> topics) {
+    if (topics == null || topics.isEmpty()) {
+      log.debug("No topics to get retention for");
+      return Future.succeededFuture(Map.of());
+    }
+
+    log.debug("Getting retention.ms for {} topics", topics.size());
+
+    List<ConfigResource> resources = topics.stream()
+      .map(topic -> new ConfigResource(
+        org.apache.kafka.common.config.ConfigResource.Type.TOPIC, topic))
+      .collect(Collectors.toList());
+
+    return adminClient.describeConfigs(resources)
+      .map(configs -> {
+        Map<String, Long> result = new HashMap<>();
+        for (Map.Entry<ConfigResource, Config> entry : configs.entrySet()) {
+          String topic = entry.getKey().getName();
+          Config config = entry.getValue();
+
+          for (ConfigEntry configEntry : config.getEntries()) {
+            if ("retention.ms".equals(configEntry.getName())) {
+              try {
+                long retention = Long.parseLong(configEntry.getValue());
+                result.put(topic, retention);
+                log.debug("Topic {} retention.ms: {}", topic, retention);
+              } catch (NumberFormatException e) {
+                log.warn("Invalid retention.ms value for topic {}: {}", topic, configEntry.getValue());
+              }
+              break;
+            }
+          }
+        }
+        log.info("Retrieved retention.ms for {} topics", result.size());
+        return result;
+      })
+      .onFailure(err -> log.error("Failed to get topic retention configs", err));
   }
 
   @Override

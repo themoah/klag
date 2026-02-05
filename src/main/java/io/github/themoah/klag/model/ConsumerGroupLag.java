@@ -21,6 +21,8 @@ public record ConsumerGroupLag(
     int partition,
     long logEndOffset,
     long logStartOffset,
+    long logEndTimestamp,
+    long logStartTimestamp,
     long committedOffset,
     long lag
   ) {
@@ -29,10 +31,13 @@ public record ConsumerGroupLag(
       int partition,
       long logEndOffset,
       long logStartOffset,
+      long logEndTimestamp,
+      long logStartTimestamp,
       long committedOffset
     ) {
       long lag = Math.max(0, logEndOffset - committedOffset);
-      return new PartitionLag(topic, partition, logEndOffset, logStartOffset, committedOffset, lag);
+      return new PartitionLag(topic, partition, logEndOffset, logStartOffset,
+        logEndTimestamp, logStartTimestamp, committedOffset, lag);
     }
   }
 
