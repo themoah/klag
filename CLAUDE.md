@@ -29,7 +29,7 @@ src/main/java/io/github/themoah/klag/
 ├── metrics/                   # MetricsCollector, MicrometerReporter, PrometheusHandler
 │   ├── velocity/              # LagVelocityTracker, TopicLagHistory
 │   ├── hotpartition/          # HotPartitionDetector, HotPartitionConfig, StatisticalUtils
-│   └── timelag/               # TimeLagEstimator, TimeLagConfig
+│   └── timelag/               # TimeLagEstimator, TimeLagConfig, OffsetTimestampTracker, PartitionOffsetHistory
 └── model/                     # Records: ConsumerGroupLag, ConsumerGroupState, PartitionOffsets, LagVelocity, etc.
 ```
 
@@ -59,6 +59,8 @@ src/main/java/io/github/themoah/klag/
 **Time-Based Lag Estimation:**
 - `TIME_LAG_ENABLED` (true) - Enable/disable time-based lag estimation
 - `TIME_LAG_MIN_MESSAGES` (100) - Minimum lag messages required for time-to-close estimates
+- `TIME_LAG_INTERPOLATION_BUFFER_SIZE` (60) - Number of offset/timestamp points per partition for interpolation
+- `TIME_LAG_STALE_PRODUCER_THRESHOLD_MS` (180000) - Time in ms before a producer with no offset progress is considered stale
 
 **Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`
 
@@ -110,12 +112,15 @@ OTEL_RESOURCE_ATTRIBUTES=environment=development,cluster=local
 - `klag.hot_partition` - Partition throughput × 100 when statistically high (outlier)
 
 **Time-Based Lag Metrics:**
-- `klag.consumer.lag.time_ms` - Estimated lag in milliseconds (reported when velocity data available)
+- `klag.consumer.lag.ms` - Lag in milliseconds using interpolation from recorded offset/timestamp history. For each partition, records `(logEndOffset, systemTime)` pairs at each poll interval, then interpolates the timestamp for the committed offset to determine how old unconsumed messages are. Formula: `lag_ms = currentTime - interpolatedTimestamp`. Note: Requires 2 poll intervals (warmup) before data is available.
 - `klag.consumer.lag.time_to_close_seconds` - Estimated seconds until lag reaches zero (only when catching up and lag > threshold)
 
-Tags: `consumer_group`, `topic`, `partition`
+**Data Loss Prevention (DLP) Metrics:**
+- `klag.consumer.lag.retention_percent` - Percentage of retention window consumed by lag (value × 100 for precision); enables alerting before data loss. Formula: `(lag / (logEndOffset - logStartOffset)) * 100`. Value of 100% means data loss has occurred (consumer behind logStartOffset). Excludes empty partitions.
+
 Note: `klag.hot_partition` only has `topic` and `partition` tags (throughput is partition-level, independent of consumers)
 Note: Time-based lag metrics only have `consumer_group` and `topic` tags (per-topic granularity)
+Note: DLP metrics only have `consumer_group` and `topic` tags (per-topic granularity)
 
 ## Grafana Dashboard
 
@@ -141,6 +146,7 @@ A pre-built comprehensive Grafana dashboard is available in `dashboard/demo-dash
 - Top 10 partition offset gaps
 - Hot Partition Detection (count, table, time series)
 - Time-Based Lag Estimation (max time lag, groups catching up, time lag chart, time-to-close chart)
+- Data Loss Prevention (max retention risk, at-risk topics count, retention percent chart, at-risk table)
 - JVM Memory Usage (heap/non-heap)
 - JVM GC Pause Time
 - JVM Thread States (stacked)

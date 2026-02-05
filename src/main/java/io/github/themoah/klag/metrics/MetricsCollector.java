@@ -5,6 +5,7 @@ import io.github.themoah.klag.kafka.ChunkProcessor;
 import io.github.themoah.klag.kafka.KafkaClientService;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionConfig;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionDetector;
+import io.github.themoah.klag.metrics.timelag.OffsetTimestampTracker;
 import io.github.themoah.klag.metrics.timelag.TimeLagConfig;
 import io.github.themoah.klag.metrics.timelag.TimeLagEstimator;
 import io.github.themoah.klag.metrics.velocity.LagVelocityTracker;
@@ -15,9 +16,10 @@ import io.github.themoah.klag.model.ConsumerGroupOffsets.TopicPartitionKey;
 import io.github.themoah.klag.model.ConsumerGroupState;
 import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.HotPartitionThroughput;
+import io.github.themoah.klag.model.LagMs;
 import io.github.themoah.klag.model.LagVelocity;
 import io.github.themoah.klag.model.PartitionOffsets;
-import io.github.themoah.klag.model.TimeLagEstimate;
+import io.github.themoah.klag.model.RetentionRisk;
 import io.github.themoah.klag.model.TimeToCloseEstimate;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
@@ -49,6 +51,7 @@ public class MetricsCollector {
   private final LagVelocityTracker velocityTracker;
   private final HotPartitionDetector hotPartitionDetector;
   private final TimeLagEstimator timeLagEstimator;
+  private final OffsetTimestampTracker offsetTimestampTracker;
   private final ChunkConfig chunkConfig;
 
   private final Map<String, Integer> cachedGroupPartitionCounts = new ConcurrentHashMap<>();
@@ -106,6 +109,10 @@ public class MetricsCollector {
       : null;
     this.timeLagEstimator = timeLagConfig.enabled()
       ? new TimeLagEstimator(timeLagConfig)
+      : null;
+    this.offsetTimestampTracker = timeLagConfig.enabled()
+      ? new OffsetTimestampTracker(timeLagConfig.interpolationBufferSize(),
+                                   timeLagConfig.staleProducerThresholdMs())
       : null;
     this.chunkConfig = chunkConfig;
   }
@@ -175,9 +182,10 @@ public class MetricsCollector {
         kafkaClient.describeConsumerGroups(filteredGroups);
 
     return Future.all(lagFuture, stateFuture)
-      .compose(composite -> {
+      .map(composite -> {
         List<ConsumerGroupLag> lagData = composite.resultAt(0);
         Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
+
         Set<String> activeKeys = new HashSet<>();
         Set<String> velocityKeys = new HashSet<>();
         reportMetrics(lagData, stateData, activeKeys, velocityKeys);
@@ -185,7 +193,7 @@ public class MetricsCollector {
         if (reporter instanceof MicrometerReporter micrometerReporter) {
           micrometerReporter.cleanupStaleGauges(activeKeys);
         }
-        return Future.succeededFuture();
+        return (Void) null;
       });
   }
 
@@ -236,7 +244,7 @@ public class MetricsCollector {
         kafkaClient.describeConsumerGroups(new HashSet<>(chunk));
 
     return Future.all(lagFuture, stateFuture)
-      .compose(composite -> {
+      .map(composite -> {
         List<ConsumerGroupLag> lagData = composite.resultAt(0);
         Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
 
@@ -247,7 +255,7 @@ public class MetricsCollector {
           cachedGroupPartitionCounts.put(lag.consumerGroup(), lag.partitions().size());
         }
 
-        return Future.<Void>succeededFuture();
+        return (Void) null;
       })
       .onFailure(err -> log.warn("Failed to process group chunk: {}", err.getMessage()));
   }
@@ -397,7 +405,11 @@ public class MetricsCollector {
       List<LagVelocity> velocities = velocityTracker.calculateVelocities();
       micrometerReporter.reportVelocity(velocities, activeKeys);
 
-      // Time lag estimation (based on velocity data)
+      // Calculate lag in ms from timestamps
+      List<LagMs> lagMsData = calculateLagMs(lagData);
+      micrometerReporter.reportLagMs(lagMsData, activeKeys);
+
+      // Time-to-close estimation (based on velocity data)
       if (timeLagEstimator != null && timeLagEstimator.isEnabled()) {
         // Build lag map: group -> topic -> totalLag
         Map<String, Map<String, Long>> lagByGroupTopic = new HashMap<>();
@@ -408,11 +420,14 @@ public class MetricsCollector {
           )
         );
 
-        List<TimeLagEstimate> timeLagEstimates = timeLagEstimator.calculateTimeLags(velocities, lagByGroupTopic);
-        micrometerReporter.reportTimeLag(timeLagEstimates, activeKeys);
-
         List<TimeToCloseEstimate> timeToCloseEstimates = timeLagEstimator.calculateTimeToClose(velocities, lagByGroupTopic);
         micrometerReporter.reportTimeToClose(timeToCloseEstimates, activeKeys);
+      }
+
+      // Retention risk percentage calculation (offset-based)
+      List<RetentionRisk> retentionRisks = calculateRetentionRisks(lagData);
+      if (!retentionRisks.isEmpty()) {
+        micrometerReporter.reportRetentionPercent(retentionRisks, activeKeys);
       }
 
       // Report lag and state metrics
@@ -489,6 +504,8 @@ public class MetricsCollector {
           key.partition(),
           po.logEndOffset(),
           po.logStartOffset(),
+          po.logEndTimestamp(),
+          po.logStartTimestamp(),
           committedOffset
         );
         partitionLags.add(lag);
@@ -545,6 +562,182 @@ public class MetricsCollector {
       agg.totalCommittedOffset(),
       agg.totalLag()
     );
+  }
+
+  /**
+   * Calculates retention risk percentages from offsets.
+   * Formula: (lag / (logEndOffset - logStartOffset)) * 100
+   *
+   * <p>Per-partition calculation, aggregated to max per topic.
+   *
+   * @param lagData list of consumer group lag data
+   * @return list of retention risks
+   */
+  private List<RetentionRisk> calculateRetentionRisks(List<ConsumerGroupLag> lagData) {
+    List<RetentionRisk> risks = new ArrayList<>();
+
+    for (ConsumerGroupLag group : lagData) {
+      // Group partitions by topic and calculate max percentage
+      Map<String, Double> topicMaxPercent = new HashMap<>();
+
+      for (PartitionLag p : group.partitions()) {
+        long retentionWindow = p.logEndOffset() - p.logStartOffset();
+
+        // Skip empty partitions (no messages to lose)
+        if (retentionWindow <= 0) {
+          continue;
+        }
+
+        double percent;
+        if (p.committedOffset() < p.logStartOffset()) {
+          // Consumer is behind log start - data loss already occurred
+          percent = 100.0;
+        } else if (p.lag() <= 0) {
+          // Consumer caught up
+          percent = 0.0;
+        } else {
+          percent = (p.lag() / (double) retentionWindow) * 100.0;
+        }
+
+        topicMaxPercent.merge(p.topic(), percent, Math::max);
+      }
+
+      // Create RetentionRisk for each topic
+      for (var entry : topicMaxPercent.entrySet()) {
+        risks.add(new RetentionRisk(group.consumerGroup(), entry.getKey(), entry.getValue()));
+        log.debug("Retention risk for {}:{}: {:.2f}%",
+          group.consumerGroup(), entry.getKey(), entry.getValue());
+      }
+    }
+
+    if (!risks.isEmpty()) {
+      log.debug("Calculated {} retention risk metrics", risks.size());
+    }
+
+    return risks;
+  }
+
+  /**
+   * Calculates lag in milliseconds using interpolation from recorded offset/timestamp history.
+   * For each partition, records the current log end offset, then interpolates the timestamp
+   * for the committed offset to determine how old the unconsumed messages are.
+   *
+   * <p>This approach uses system time instead of Kafka message timestamps, avoiding issues
+   * where Kafka doesn't provide logStartTimestamp (returns 0).
+   *
+   * @param lagData list of consumer group lag data
+   * @return list of lag in milliseconds per consumer group and topic
+   */
+  private List<LagMs> calculateLagMs(List<ConsumerGroupLag> lagData) {
+    if (offsetTimestampTracker == null) {
+      return List.of();
+    }
+
+    List<LagMs> lagMsList = new ArrayList<>();
+    int skippedDueToWarmup = 0;
+    long currentTime = System.currentTimeMillis();
+    Set<String> trackedPartitions = new HashSet<>();
+
+    for (ConsumerGroupLag group : lagData) {
+      // First pass: record all partition offsets to the tracker
+      for (PartitionLag p : group.partitions()) {
+        offsetTimestampTracker.recordOffset(p.topic(), p.partition(), p.logEndOffset());
+        trackedPartitions.add(p.topic() + ":" + p.partition());
+      }
+
+      // Second pass: aggregate lag_ms by topic using max lag_ms across partitions
+      Map<String, TopicLagMsAggregates> topicAggregates = new HashMap<>();
+
+      for (PartitionLag p : group.partitions()) {
+        // Consumer is caught up - no lag
+        if (p.lag() <= 0) {
+          topicAggregates.computeIfAbsent(p.topic(), k -> new TopicLagMsAggregates())
+            .add(0, p.lag());
+          continue;
+        }
+
+        // Check if we have interpolation data for this partition
+        if (!offsetTimestampTracker.hasInterpolationData(p.topic(), p.partition())) {
+          skippedDueToWarmup++;
+          log.trace("Skipping lag_ms for {}:{}:{}: insufficient interpolation data (warmup)",
+            group.consumerGroup(), p.topic(), p.partition());
+          continue;
+        }
+
+        // Interpolate timestamp for the committed offset
+        var interpolatedTs = offsetTimestampTracker.getInterpolatedTimestamp(
+          p.topic(), p.partition(), p.committedOffset());
+
+        if (interpolatedTs.isPresent()) {
+          long lagMs = Math.max(0, currentTime - interpolatedTs.getAsLong());
+          topicAggregates.computeIfAbsent(p.topic(), k -> new TopicLagMsAggregates())
+            .add(lagMs, p.lag());
+          log.trace("Partition {}:{}:{} lag_ms={} (committed={}, interpolated_ts={})",
+            group.consumerGroup(), p.topic(), p.partition(), lagMs,
+            p.committedOffset(), interpolatedTs.getAsLong());
+        } else {
+          skippedDueToWarmup++;
+        }
+      }
+
+      // Create LagMs records for topics that have data
+      for (Map.Entry<String, TopicLagMsAggregates> entry : topicAggregates.entrySet()) {
+        String topic = entry.getKey();
+        TopicLagMsAggregates agg = entry.getValue();
+
+        if (agg.hasData()) {
+          lagMsList.add(new LagMs(group.consumerGroup(), topic, agg.totalLag(), agg.maxLagMs()));
+          log.debug("Lag in ms for {}:{}: {} ms (lag_messages={}, partitions_sampled={})",
+            group.consumerGroup(), topic, agg.maxLagMs(), agg.totalLag(), agg.count());
+        }
+      }
+    }
+
+    // Cleanup stale partitions
+    offsetTimestampTracker.cleanupStalePartitions(trackedPartitions);
+
+    if (skippedDueToWarmup > 0) {
+      log.debug("Skipped {} partitions due to warmup (insufficient interpolation data)", skippedDueToWarmup);
+    }
+    if (!lagMsList.isEmpty()) {
+      log.info("Calculated lag_ms for {} consumer-group/topic pairs using interpolation", lagMsList.size());
+    }
+
+    return lagMsList;
+  }
+
+  /**
+   * Helper class for topic-level lag_ms aggregation.
+   * Uses max lag_ms across partitions as the topic-level value.
+   */
+  private static class TopicLagMsAggregates {
+    private long maxLagMs = 0;
+    private long totalLag = 0;
+    private int count = 0;
+
+    void add(long lagMs, long lag) {
+      if (lagMs > maxLagMs) {
+        maxLagMs = lagMs;
+      }
+      totalLag += lag;
+      count++;
+    }
+
+    boolean hasData() {
+      return count > 0;
+    }
+
+    long maxLagMs() {
+      return maxLagMs;
+    }
+
+    long totalLag() {
+      return totalLag;
+    }
+
+    int count() {
+      return count;
+    }
   }
 
   /**

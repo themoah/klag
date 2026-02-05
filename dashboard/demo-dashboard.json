@@ -1008,7 +1008,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "max(klag_consumer_lag_time_ms{consumer_group=~\"$consumer_group\", topic=~\"$topic\"})",
+          "expr": "max(klag_consumer_lag_ms{consumer_group=~\"$consumer_group\", topic=~\"$topic\"})",
           "legendFormat": "Max Time Lag",
           "range": true,
           "refId": "A"
@@ -1083,7 +1083,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Estimated time in milliseconds to process current lag at current consumption rate",
+      "description": "Lag in milliseconds based on Kafka message timestamps",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1168,7 +1168,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "klag_consumer_lag_time_ms{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
+          "expr": "klag_consumer_lag_ms{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
           "legendFormat": "{{consumer_group}} - {{topic}}",
           "range": true,
           "refId": "A"
@@ -1276,6 +1276,387 @@
         "x": 0,
         "y": 43
       },
+      "id": 106,
+      "panels": [],
+      "title": "Data Loss Prevention (DLP)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5000
+              },
+              {
+                "color": "orange",
+                "value": 7500
+              },
+              {
+                "color": "red",
+                "value": 10000
+              }
+            ]
+          },
+          "unit": "percent",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 44
+      },
+      "id": 30,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["max"],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "max(klag_consumer_lag_retention_percent{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}) / 100",
+          "legendFormat": "Max Retention Risk",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Max Retention Risk",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 3
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 44
+      },
+      "id": 31,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "count(klag_consumer_lag_retention_percent{consumer_group=~\"$consumer_group\", topic=~\"$topic\"} > 5000) or vector(0)",
+          "legendFormat": "At Risk",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Topics At Risk (>50%)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Percentage of topic retention consumed by consumer lag. High values indicate risk of data loss.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Retention %",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "area"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 75
+              }
+            ]
+          },
+          "unit": "percent",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 44
+      },
+      "id": 32,
+      "options": {
+        "legend": {
+          "calcs": ["last", "max"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "klag_consumer_lag_retention_percent{consumer_group=~\"$consumer_group\", topic=~\"$topic\"} / 100",
+          "legendFormat": "{{consumer_group}} - {{topic}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Retention Percent by Consumer Group",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Topics where consumer lag exceeds 50% of retention period. These are at risk of data loss.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "yellow",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Retention %"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      },
+      "id": 33,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": ["sum"],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Retention %"
+          }
+        ]
+      },
+      "pluginVersion": "10.2.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "klag_consumer_lag_retention_percent{consumer_group=~\"$consumer_group\", topic=~\"$topic\"} / 100 > 50",
+          "format": "table",
+          "legendFormat": "__auto",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "At Risk Topics (>50% Retention Used)",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "job": true,
+              "service_name": true
+            },
+            "indexByName": {
+              "Time": 0,
+              "consumer_group": 1,
+              "topic": 2,
+              "Value": 3
+            },
+            "renameByName": {
+              "consumer_group": "Consumer Group",
+              "topic": "Topic",
+              "Value": "Retention %"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
       "id": 104,
       "panels": [],
       "title": "Hot Partition Detection",
@@ -1318,7 +1699,7 @@
         "h": 4,
         "w": 6,
         "x": 0,
-        "y": 44
+        "y": 53
       },
       "id": 21,
       "options": {
@@ -1387,7 +1768,7 @@
         "h": 4,
         "w": 6,
         "x": 6,
-        "y": 44
+        "y": 53
       },
       "id": 22,
       "options": {
@@ -1477,7 +1858,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 44
+        "y": 53
       },
       "id": 23,
       "options": {
@@ -1606,7 +1987,7 @@
         "h": 4,
         "w": 12,
         "x": 0,
-        "y": 48
+        "y": 57
       },
       "id": 24,
       "options": {
@@ -1697,7 +2078,7 @@
         "h": 4,
         "w": 12,
         "x": 12,
-        "y": 52
+        "y": 61
       },
       "id": 25,
       "options": {
@@ -1734,7 +2115,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 56
+        "y": 65
       },
       "id": 102,
       "panels": [],
@@ -1790,7 +2171,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 57
+        "y": 66
       },
       "id": 7,
       "options": {
@@ -1890,7 +2271,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 57
+        "y": 66
       },
       "id": 8,
       "options": {
@@ -1988,7 +2369,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 57
+        "y": 66
       },
       "id": 9,
       "options": {
@@ -2025,7 +2406,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 65
+        "y": 74
       },
       "id": 103,
       "panels": [],
@@ -2111,7 +2492,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 66
+        "y": 75
       },
       "id": 13,
       "options": {
@@ -2231,7 +2612,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 66
+        "y": 75
       },
       "id": 14,
       "options": {
@@ -2321,7 +2702,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 74
+        "y": 83
       },
       "id": 15,
       "options": {
@@ -2424,7 +2805,7 @@
         "h": 4,
         "w": 8,
         "x": 8,
-        "y": 74
+        "y": 83
       },
       "id": 16,
       "options": {
@@ -2489,7 +2870,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 74
+        "y": 83
       },
       "id": 17,
       "options": {
@@ -2580,7 +2961,7 @@
         "h": 4,
         "w": 8,
         "x": 8,
-        "y": 78
+        "y": 87
       },
       "id": 18,
       "options": {
@@ -2640,7 +3021,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 78
+        "y": 87
       },
       "id": 19,
       "options": {
