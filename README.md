@@ -44,7 +44,7 @@ Klag continuously monitors all consumer groups and exposes metrics to your obser
 docker run -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
            -e METRICS_REPORTER=prometheus \
            -p 8888:8888 \
-           themoah/klag
+           themoah/klag:latest
 ```
 
 Metrics available at `http://localhost:8888/metrics`
@@ -100,7 +100,7 @@ See [charts/klag/README.md](charts/klag/README.md) for full configuration option
 ### Docker with Environment File
 
 ```bash
-docker run --env-file .env themoah/klag
+docker run --env-file .env themoah/klag:latest
 ```
 
 <details>
