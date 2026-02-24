@@ -266,7 +266,7 @@ public class MetricsCollector {
   private Future<List<ConsumerGroupLag>> collectGroupLagsChunked(List<String> groups) {
     List<Future<ConsumerGroupLag>> futures = groups.stream()
       .map(this::collectGroupLagChunked)
-      .collect(Collectors.toList());
+      .toList();
 
     return Future.all(futures)
       .map(composite -> {
@@ -306,7 +306,7 @@ public class MetricsCollector {
           topicChunk -> {
             List<Future<List<PartitionOffsets>>> offsetFutures = topicChunk.stream()
               .map(kafkaClient::getLogEndOffsets)
-              .collect(Collectors.toList());
+              .toList();
 
             return Future.all(offsetFutures)
               .map(composite -> {
@@ -346,7 +346,7 @@ public class MetricsCollector {
   private Future<List<ConsumerGroupLag>> collectAllGroupLags(Set<String> groups) {
     List<Future<ConsumerGroupLag>> futures = groups.stream()
       .map(this::collectGroupLag)
-      .collect(Collectors.toList());
+      .toList();
 
     return Future.all(futures)
       .map(composite -> {
@@ -468,7 +468,7 @@ public class MetricsCollector {
         // Get log end offsets for all topics the group is consuming
         List<Future<List<PartitionOffsets>>> offsetFutures = topics.stream()
           .map(kafkaClient::getLogEndOffsets)
-          .collect(Collectors.toList());
+          .toList();
 
         return Future.all(offsetFutures)
           .map(composite -> {
@@ -493,7 +493,7 @@ public class MetricsCollector {
   ) {
     List<PartitionLag> partitionLags = new ArrayList<>();
 
-    for (Map.Entry<TopicPartitionKey, Long> entry : offsets.offsets().entrySet()) {
+    for (var entry : offsets.offsets().entrySet()) {
       TopicPartitionKey key = entry.getKey();
       long committedOffset = entry.getValue();
 
@@ -681,7 +681,7 @@ public class MetricsCollector {
       }
 
       // Create LagMs records for topics that have data
-      for (Map.Entry<String, TopicLagMsAggregates> entry : topicAggregates.entrySet()) {
+      for (var entry : topicAggregates.entrySet()) {
         String topic = entry.getKey();
         TopicLagMsAggregates agg = entry.getValue();
 

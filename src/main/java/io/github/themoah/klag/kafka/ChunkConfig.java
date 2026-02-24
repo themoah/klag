@@ -1,5 +1,6 @@
 package io.github.themoah.klag.kafka;
 
+import io.github.themoah.klag.config.EnvConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,8 +37,8 @@ public record ChunkConfig(
    * </ul>
    */
   public static ChunkConfig fromEnvironment() {
-    int chunkCount = parseInt("KAFKA_CHUNK_COUNT", DEFAULT_CHUNK_COUNT);
-    long chunkDelayMs = parseLong("KAFKA_CHUNK_DELAY_MS", DEFAULT_CHUNK_DELAY_MS);
+    int chunkCount = EnvConfig.getInt("KAFKA_CHUNK_COUNT", DEFAULT_CHUNK_COUNT);
+    long chunkDelayMs = EnvConfig.getLong("KAFKA_CHUNK_DELAY_MS", DEFAULT_CHUNK_DELAY_MS);
 
     if (chunkCount < 1) {
       log.warn("KAFKA_CHUNK_COUNT must be >= 1, using default: {}", DEFAULT_CHUNK_COUNT);
@@ -49,31 +50,5 @@ public record ChunkConfig(
       chunkCount, chunkDelayMs, config.isChunkingEnabled());
 
     return config;
-  }
-
-  private static int parseInt(String envVar, int defaultValue) {
-    String value = System.getenv(envVar);
-    if (value == null || value.isBlank()) {
-      return defaultValue;
-    }
-    try {
-      return Integer.parseInt(value);
-    } catch (NumberFormatException e) {
-      log.warn("Invalid value for {}: '{}', using default: {}", envVar, value, defaultValue);
-      return defaultValue;
-    }
-  }
-
-  private static long parseLong(String envVar, long defaultValue) {
-    String value = System.getenv(envVar);
-    if (value == null || value.isBlank()) {
-      return defaultValue;
-    }
-    try {
-      return Long.parseLong(value);
-    } catch (NumberFormatException e) {
-      log.warn("Invalid value for {}: '{}', using default: {}", envVar, value, defaultValue);
-      return defaultValue;
-    }
   }
 }

@@ -1,5 +1,7 @@
 package io.github.themoah.klag.metrics;
 
+import io.github.themoah.klag.config.EnvConfig;
+
 /**
  * Configuration for metrics collection and reporting.
  */
@@ -18,12 +20,10 @@ public record MetricsConfig(
    * Loads configuration from environment variables.
    */
   public static MetricsConfig fromEnvironment() {
-    String reporter = System.getenv().getOrDefault("METRICS_REPORTER", DEFAULT_REPORTER);
-    long interval = parseLong("METRICS_INTERVAL_MS", DEFAULT_INTERVAL_MS);
-    String filter = System.getenv().getOrDefault("METRICS_GROUP_FILTER", DEFAULT_FILTER);
-    boolean jvmEnabled = Boolean.parseBoolean(
-      System.getenv().getOrDefault("METRICS_JVM_ENABLED", "false")
-    );
+    String reporter = EnvConfig.getString("METRICS_REPORTER", DEFAULT_REPORTER);
+    long interval = EnvConfig.getLong("METRICS_INTERVAL_MS", DEFAULT_INTERVAL_MS);
+    String filter = EnvConfig.getString("METRICS_GROUP_FILTER", DEFAULT_FILTER);
+    boolean jvmEnabled = EnvConfig.getBoolean("METRICS_JVM_ENABLED", false);
 
     return new MetricsConfig(reporter, interval, filter, jvmEnabled);
   }
@@ -33,17 +33,5 @@ public record MetricsConfig(
    */
   public boolean isEnabled() {
     return reporterType != null && !reporterType.isBlank() && !reporterType.equals("none");
-  }
-
-  private static long parseLong(String envVar, long defaultValue) {
-    String value = System.getenv(envVar);
-    if (value == null || value.isBlank()) {
-      return defaultValue;
-    }
-    try {
-      return Long.parseLong(value);
-    } catch (NumberFormatException e) {
-      return defaultValue;
-    }
   }
 }

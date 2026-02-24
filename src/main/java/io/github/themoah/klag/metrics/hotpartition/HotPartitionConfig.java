@@ -1,5 +1,6 @@
 package io.github.themoah.klag.metrics.hotpartition;
 
+import io.github.themoah.klag.config.EnvConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,50 +42,16 @@ public record HotPartitionConfig(
    * </ul>
    */
   public static HotPartitionConfig fromEnvironment() {
-    boolean enabled = parseBoolean("HOT_PARTITION_ENABLED", DEFAULT_ENABLED);
-    double sigma = parseDouble("HOT_PARTITION_SIGMA_MULTIPLIER", DEFAULT_SIGMA_MULTIPLIER);
-    int minPartitions = parseInt("HOT_PARTITION_MIN_PARTITIONS", DEFAULT_MIN_PARTITIONS);
-    int minSamples = parseInt("HOT_PARTITION_MIN_SAMPLES", DEFAULT_MIN_SAMPLES);
-    int bufferSize = parseInt("HOT_PARTITION_BUFFER_SIZE", DEFAULT_BUFFER_SIZE);
+    boolean enabled = EnvConfig.getBoolean("HOT_PARTITION_ENABLED", DEFAULT_ENABLED);
+    double sigma = EnvConfig.getDouble("HOT_PARTITION_SIGMA_MULTIPLIER", DEFAULT_SIGMA_MULTIPLIER);
+    int minPartitions = EnvConfig.getInt("HOT_PARTITION_MIN_PARTITIONS", DEFAULT_MIN_PARTITIONS);
+    int minSamples = EnvConfig.getInt("HOT_PARTITION_MIN_SAMPLES", DEFAULT_MIN_SAMPLES);
+    int bufferSize = EnvConfig.getInt("HOT_PARTITION_BUFFER_SIZE", DEFAULT_BUFFER_SIZE);
 
     HotPartitionConfig config = new HotPartitionConfig(enabled, sigma, minPartitions, minSamples, bufferSize);
     log.info("Hot partition config: enabled={}, sigma={}, minPartitions={}, minSamples={}, bufferSize={}",
       enabled, sigma, minPartitions, minSamples, bufferSize);
 
     return config;
-  }
-
-  private static boolean parseBoolean(String envVar, boolean defaultValue) {
-    String value = System.getenv(envVar);
-    if (value == null || value.isBlank()) {
-      return defaultValue;
-    }
-    return Boolean.parseBoolean(value);
-  }
-
-  private static double parseDouble(String envVar, double defaultValue) {
-    String value = System.getenv(envVar);
-    if (value == null || value.isBlank()) {
-      return defaultValue;
-    }
-    try {
-      return Double.parseDouble(value);
-    } catch (NumberFormatException e) {
-      log.warn("Invalid value for {}: '{}', using default: {}", envVar, value, defaultValue);
-      return defaultValue;
-    }
-  }
-
-  private static int parseInt(String envVar, int defaultValue) {
-    String value = System.getenv(envVar);
-    if (value == null || value.isBlank()) {
-      return defaultValue;
-    }
-    try {
-      return Integer.parseInt(value);
-    } catch (NumberFormatException e) {
-      log.warn("Invalid value for {}: '{}', using default: {}", envVar, value, defaultValue);
-      return defaultValue;
-    }
   }
 }

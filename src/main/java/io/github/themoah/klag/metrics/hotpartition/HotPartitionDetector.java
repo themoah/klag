@@ -65,7 +65,7 @@ public class HotPartitionDetector {
       Map<String, List<PartitionLag>> partitionsByTopic = group.partitions().stream()
         .collect(Collectors.groupingBy(PartitionLag::topic));
 
-      for (Map.Entry<String, List<PartitionLag>> entry : partitionsByTopic.entrySet()) {
+      for (var entry : partitionsByTopic.entrySet()) {
         String topic = entry.getKey();
         List<PartitionLag> partitions = entry.getValue();
 
@@ -77,7 +77,7 @@ public class HotPartitionDetector {
         // Calculate statistics for this topic's partitions
         List<Long> lags = partitions.stream()
           .map(PartitionLag::lag)
-          .collect(Collectors.toList());
+          .toList();
 
         Stats stats = StatisticalUtils.calculateStats(lags);
 
@@ -139,7 +139,7 @@ public class HotPartitionDetector {
     }
 
     // Record snapshots
-    for (Map.Entry<String, Long> entry : partitionOffsets.entrySet()) {
+    for (var entry : partitionOffsets.entrySet()) {
       String[] parts = entry.getKey().split(":");
       String topic = parts[0];
       int partition = Integer.parseInt(parts[1]);
@@ -168,7 +168,7 @@ public class HotPartitionDetector {
 
     // Group by topic
     Map<String, Map<Integer, Double>> throughputsByTopic = new HashMap<>();
-    for (Map.Entry<String, Double> entry : allThroughputs.entrySet()) {
+    for (var entry : allThroughputs.entrySet()) {
       String[] parts = entry.getKey().split(":");
       String topic = parts[0];
       int partition = Integer.parseInt(parts[1]);
@@ -178,7 +178,7 @@ public class HotPartitionDetector {
     }
 
     // Analyze each topic
-    for (Map.Entry<String, Map<Integer, Double>> topicEntry : throughputsByTopic.entrySet()) {
+    for (var topicEntry : throughputsByTopic.entrySet()) {
       String topic = topicEntry.getKey();
       Map<Integer, Double> partitionThroughputs = topicEntry.getValue();
 
@@ -190,7 +190,7 @@ public class HotPartitionDetector {
       List<Double> throughputValues = new ArrayList<>(partitionThroughputs.values());
       Stats stats = StatisticalUtils.calculateStats(throughputValues);
 
-      for (Map.Entry<Integer, Double> partitionEntry : partitionThroughputs.entrySet()) {
+      for (var partitionEntry : partitionThroughputs.entrySet()) {
         int partition = partitionEntry.getKey();
         double throughput = partitionEntry.getValue();
 

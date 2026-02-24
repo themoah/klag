@@ -169,6 +169,13 @@ WHEN ADDING A NEW METRIC ALWAYS UPDATE GRAFANA DASHBOARD !
 
 ## Code Style
 
-- Async ops return `Future<T>`, Java 21 records for DTOs, SLF4J+Logback logging
-- Config priority: classpath → external file → env vars
-- Bump up the version in @build.gradle.kts after each minor or major change.
+- **Async:** All async ops return `Future<T>` (Vert.x). Chain with `.compose()`, `.map()`, `.onSuccess()`, `.onFailure()`.
+- **DTOs:** Use Java 21 records for all data transfer objects and value types (see `model/` package).
+- **Logging:** SLF4J + Logback. One logger per class: `private static final Logger log = LoggerFactory.getLogger(ClassName.class);`
+- **Config:** Environment variables parsed via `EnvConfig` utility (`config/EnvConfig.java`). Priority: classpath → external file → env vars.
+- **Collections:** Prefer `List.of()`, `Map.of()`, `Set.of()` factory methods. Use `Stream.toList()` instead of `collect(Collectors.toList())`.
+- **Type inference:** Use `var` for local variables in enhanced for-loops (`for (var entry : map.entrySet())`) and where the RHS type is obvious.
+- **Method references:** Prefer method references over trivial lambdas (`Node::getId` not `node -> node.getId()`).
+- **Pattern matching:** Use `instanceof` pattern matching (`if (x instanceof Foo foo)`) and switch expressions with arrow syntax.
+- **Null handling:** Use `Objects.requireNonNull()` for constructor/method preconditions. Prefer `Optional<T>` / `OptionalDouble` for methods that may not return a value.
+- **Versioning:** Bump version in `build.gradle.kts` after each minor or major change.

@@ -7,17 +7,19 @@ import io.github.themoah.klag.model.PartitionInfo;
 import io.github.themoah.klag.model.PartitionOffsets;
 import io.vertx.core.Future;
 import io.vertx.core.Vertx;
+import io.vertx.kafka.admin.ClusterDescription;
 import io.vertx.kafka.admin.Config;
 import io.vertx.kafka.admin.ConfigEntry;
+import io.vertx.kafka.admin.ConsumerGroupListing;
 import io.vertx.kafka.admin.KafkaAdminClient;
 import io.vertx.kafka.admin.ListOffsetsResultInfo;
 import io.vertx.kafka.admin.OffsetSpec;
 import io.vertx.kafka.admin.TopicDescription;
 import io.vertx.kafka.client.common.ConfigResource;
+import io.vertx.kafka.client.common.Node;
 import io.vertx.kafka.client.common.TopicPartition;
 import io.vertx.kafka.client.common.TopicPartitionInfo;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,7 +73,7 @@ public class KafkaClientServiceImpl implements KafkaClientService {
     Objects.requireNonNull(topic, "topic cannot be null");
     log.debug("Listing partitions for topic: {}", topic);
 
-    return adminClient.describeTopics(Collections.singletonList(topic))
+    return adminClient.describeTopics(List.of(topic))
       .map(descriptions -> {
         TopicDescription description = descriptions.get(topic);
         if (description == null) {
@@ -79,7 +81,7 @@ public class KafkaClientServiceImpl implements KafkaClientService {
         }
         List<PartitionInfo> partitions = description.getPartitions().stream()
           .map(partition -> toPartitionInfo(topic, partition))
-          .collect(Collectors.toList());
+          .toList();
         log.info("Topic {} has {} partitions", topic, partitions.size());
         return partitions;
       })
@@ -206,7 +208,7 @@ public class KafkaClientServiceImpl implements KafkaClientService {
   public Future<String> describeCluster() {
     log.debug("Describing cluster");
     return adminClient.describeCluster()
-      .map(description -> description.getClusterId())
+      .map(ClusterDescription::getClusterId)
       .onSuccess(clusterId -> log.debug("Cluster ID: {}", clusterId))
       .onFailure(err -> log.error("Failed to describe cluster", err));
   }
@@ -216,7 +218,7 @@ public class KafkaClientServiceImpl implements KafkaClientService {
     log.debug("Listing consumer groups");
     return adminClient.listConsumerGroups()
       .map(listings -> listings.stream()
-        .map(listing -> listing.getGroupId())
+        .map(ConsumerGroupListing::getGroupId)
         .collect(Collectors.toSet()))
       .onSuccess(groups -> log.info("Listed {} consumer groups", groups.size()))
       .onFailure(err -> log.error("Failed to list consumer groups", err));
@@ -258,12 +260,12 @@ public class KafkaClientServiceImpl implements KafkaClientService {
     List<ConfigResource> resources = topics.stream()
       .map(topic -> new ConfigResource(
         org.apache.kafka.common.config.ConfigResource.Type.TOPIC, topic))
-      .collect(Collectors.toList());
+      .toList();
 
     return adminClient.describeConfigs(resources)
       .map(configs -> {
         Map<String, Long> result = new HashMap<>();
-        for (Map.Entry<ConfigResource, Config> entry : configs.entrySet()) {
+        for (var entry : configs.entrySet()) {
           String topic = entry.getKey().getName();
           Config config = entry.getValue();
 
@@ -299,8 +301,8 @@ public class KafkaClientServiceImpl implements KafkaClientService {
       topic,
       tpi.getPartition(),
       tpi.getLeader().getId(),
-      tpi.getReplicas().stream().map(node -> node.getId()).collect(Collectors.toList()),
-      tpi.getIsr().stream().map(node -> node.getId()).collect(Collectors.toList())
+      tpi.getReplicas().stream().map(Node::getId).toList(),
+      tpi.getIsr().stream().map(Node::getId).toList()
     );
   }
 }

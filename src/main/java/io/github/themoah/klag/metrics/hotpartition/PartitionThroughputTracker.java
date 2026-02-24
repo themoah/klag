@@ -54,7 +54,7 @@ public class PartitionThroughputTracker {
   public Map<String, Double> calculateAllThroughputs() {
     Map<String, Double> result = new HashMap<>();
 
-    for (Map.Entry<String, PartitionThroughputHistory> entry : histories.entrySet()) {
+    for (var entry : histories.entrySet()) {
       Double throughput = entry.getValue().calculateThroughput();
       if (throughput != null && throughput >= 0) {
         result.put(entry.getKey(), throughput);
@@ -73,7 +73,7 @@ public class PartitionThroughputTracker {
   public Map<Integer, Double> getThroughputsForTopic(String topic) {
     Map<Integer, Double> result = new HashMap<>();
 
-    for (Map.Entry<String, PartitionThroughputHistory> entry : histories.entrySet()) {
+    for (var entry : histories.entrySet()) {
       PartitionThroughputHistory history = entry.getValue();
       if (history.topic().equals(topic)) {
         Double throughput = history.calculateThroughput();
