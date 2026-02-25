@@ -24,8 +24,8 @@ public class KafkaClientConfig {
   private static final String PROP_REQUEST_TIMEOUT_MS = "kafka.request.timeout.ms";
   private static final String PROP_PREFIX = "kafka.";
 
-  private static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
-  private static final int DEFAULT_REQUEST_TIMEOUT_MS = 30000;
+  private static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:6667";
+  private static final int DEFAULT_REQUEST_TIMEOUT_MS = 60000;
 
   private final String bootstrapServers;
   private final int requestTimeoutMs;

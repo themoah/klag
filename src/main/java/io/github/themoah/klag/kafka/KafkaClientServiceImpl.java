@@ -86,10 +86,6 @@ public class KafkaClientServiceImpl implements KafkaClientService {
       .onFailure(err -> log.error("Failed to list partitions for topic: {}", topic, err));
   }
 
-  // Kafka 3.0+ MAX_TIMESTAMP spec value (not exposed by Vert.x wrapper)
-  // Returns the offset with the highest timestamp in the partition
-  private static final long MAX_TIMESTAMP_SPEC = -3L;
-
   @Override
   public Future<List<PartitionOffsets>> getLogEndOffsets(String topic) {
     Objects.requireNonNull(topic, "topic cannot be null");
@@ -97,36 +93,29 @@ public class KafkaClientServiceImpl implements KafkaClientService {
 
     return listPartitions(topic)
       .compose(partitions -> {
-        // Use MAX_TIMESTAMP to get the offset with highest timestamp (Kafka 3.0+)
         // Use TIMESTAMP(0) to get earliest offset with its timestamp
-        // Use LATEST as fallback for offset if MAX_TIMESTAMP fails
-        Map<TopicPartition, OffsetSpec> maxTimestampRequest = new HashMap<>();
+        // Use LATEST to get the latest offset (timestamp may be -1 on older brokers)
         Map<TopicPartition, OffsetSpec> earliestTimestampRequest = new HashMap<>();
         Map<TopicPartition, OffsetSpec> latestOffsetRequest = new HashMap<>();
 
         for (PartitionInfo partition : partitions) {
           TopicPartition tp = new TopicPartition(topic, partition.partition());
-          maxTimestampRequest.put(tp, new OffsetSpec(MAX_TIMESTAMP_SPEC));
           earliestTimestampRequest.put(tp, OffsetSpec.TIMESTAMP(0));
           latestOffsetRequest.put(tp, OffsetSpec.LATEST);
         }
 
-        // Three queries:
-        // 1. MAX_TIMESTAMP - returns offset with highest timestamp (Kafka 3.0+)
-        // 2. TIMESTAMP(0) - returns earliest offset with its timestamp
-        // 3. LATEST - fallback for actual latest offset
-        Future<Map<TopicPartition, ListOffsetsResultInfo>> maxTimestampFuture =
-          adminClient.listOffsets(maxTimestampRequest);
+        // Two queries compatible with older Kafka brokers:
+        // 1. TIMESTAMP(0) - returns earliest offset with its timestamp
+        // 2. LATEST - returns the latest offset (timestamp may not be available)
         Future<Map<TopicPartition, ListOffsetsResultInfo>> earliestTimestampFuture =
           adminClient.listOffsets(earliestTimestampRequest);
         Future<Map<TopicPartition, ListOffsetsResultInfo>> latestOffsetFuture =
           adminClient.listOffsets(latestOffsetRequest);
 
-        return Future.all(maxTimestampFuture, earliestTimestampFuture, latestOffsetFuture)
+        return Future.all(earliestTimestampFuture, latestOffsetFuture)
           .map(composite -> {
-            Map<TopicPartition, ListOffsetsResultInfo> maxTimestampOffsets = composite.resultAt(0);
-            Map<TopicPartition, ListOffsetsResultInfo> earliestTimestampOffsets = composite.resultAt(1);
-            Map<TopicPartition, ListOffsetsResultInfo> latestOffsets = composite.resultAt(2);
+            Map<TopicPartition, ListOffsetsResultInfo> earliestTimestampOffsets = composite.resultAt(0);
+            Map<TopicPartition, ListOffsetsResultInfo> latestOffsets = composite.resultAt(1);
 
             List<PartitionOffsets> result = new ArrayList<>();
             boolean loggedSampleTimestamp = false;
@@ -138,22 +127,10 @@ public class KafkaClientServiceImpl implements KafkaClientService {
               long logStartOffset = earliestTimestampOffsets.get(tp).getOffset();
               long logStartTimestamp = earliestTimestampOffsets.get(tp).getTimestamp();
 
-              // Get latest offset and timestamp - prefer MAX_TIMESTAMP if valid
-              ListOffsetsResultInfo maxTimestampResult = maxTimestampOffsets.get(tp);
+              // Get latest offset and timestamp from LATEST
               ListOffsetsResultInfo latestOffsetResult = latestOffsets.get(tp);
-
-              long logEndOffset;
-              long logEndTimestamp;
-
-              if (maxTimestampResult.getOffset() >= 0 && maxTimestampResult.getTimestamp() > 0) {
-                // MAX_TIMESTAMP returned valid offset and timestamp
-                logEndOffset = maxTimestampResult.getOffset();
-                logEndTimestamp = maxTimestampResult.getTimestamp();
-              } else {
-                // MAX_TIMESTAMP failed (pre-3.0 broker or no timestamps) - use LATEST
-                logEndOffset = latestOffsetResult.getOffset();
-                logEndTimestamp = latestOffsetResult.getTimestamp();
-              }
+              long logEndOffset = latestOffsetResult.getOffset();
+              long logEndTimestamp = latestOffsetResult.getTimestamp();
 
               // Handle edge case: if earliest also returns -1, topic may be empty
               if (logStartOffset < 0) {
@@ -191,10 +168,16 @@ public class KafkaClientServiceImpl implements KafkaClientService {
       .map(offsets -> {
         Map<TopicPartitionKey, Long> offsetMap = new HashMap<>();
         offsets.forEach((tp, offsetAndMetadata) -> {
-          TopicPartitionKey key = new TopicPartitionKey(tp.getTopic(), tp.getPartition());
-          offsetMap.put(key, offsetAndMetadata.getOffset());
-          log.debug("Consumer group {} topic {} partition {}: offset={}",
-            groupId, tp.getTopic(), tp.getPartition(), offsetAndMetadata.getOffset());
+          // offsetAndMetadata can be null if no offset has been committed yet
+          if (offsetAndMetadata != null) {
+            TopicPartitionKey key = new TopicPartitionKey(tp.getTopic(), tp.getPartition());
+            offsetMap.put(key, offsetAndMetadata.getOffset());
+            log.debug("Consumer group {} topic {} partition {}: offset={}",
+              groupId, tp.getTopic(), tp.getPartition(), offsetAndMetadata.getOffset());
+          } else {
+            log.debug("Consumer group {} topic {} partition {}: no committed offset",
+              groupId, tp.getTopic(), tp.getPartition());
+          }
         });
         log.info("Retrieved {} partition offsets for consumer group {}", offsetMap.size(), groupId);
         return new ConsumerGroupOffsets(groupId, offsetMap);

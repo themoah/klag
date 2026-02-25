@@ -10,7 +10,7 @@ public record MetricsConfig(
   boolean jvmMetricsEnabled
 ) {
 
-  private static final String DEFAULT_REPORTER = "none";
+  private static final String DEFAULT_REPORTER = "prometheus";  // Enable metrics by default
   private static final long DEFAULT_INTERVAL_MS = 60_000L;
   private static final String DEFAULT_FILTER = "*";
 

@@ -1,7 +1,7 @@
 package io.github.themoah.klag.config;
 
 import io.vertx.core.DeploymentOptions;
-import io.vertx.core.ThreadingModel;
+// import io.vertx.core.ThreadingModel;  // Not available in Vert.x 4.4.x
 import io.vertx.core.VertxOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +24,8 @@ public class VertxConfig {
   public static DeploymentOptions createDeploymentOptions() {
     DeploymentOptions options = new DeploymentOptions();
     if (isVirtualThreadsEnabled()) {
-      log.info("Virtual threads enabled for verticle deployment");
-      options.setThreadingModel(ThreadingModel.VIRTUAL_THREAD);
+      log.warn("Virtual threads requested but not available in this Vert.x version");
+      // options.setThreadingModel(ThreadingModel.VIRTUAL_THREAD);
     } else {
       log.info("Using default event-loop threading model");
     }

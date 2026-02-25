@@ -14,7 +14,15 @@ repositories {
   mavenCentral()
 }
 
-val vertxVersion = "4.5.22"
+configurations.all {
+  resolutionStrategy {
+    // Force Kafka client 3.3.2 which supports older brokers
+    force("org.apache.kafka:kafka-clients:3.3.2")
+  }
+}
+
+// Use Vert.x 4.4.9 which has modern APIs but allows Kafka client override
+val vertxVersion = "4.4.9"
 val junitJupiterVersion = "5.9.1"
 val micrometerVersion = "1.12.0"
 

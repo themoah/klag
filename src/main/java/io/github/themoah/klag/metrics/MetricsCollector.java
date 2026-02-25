@@ -179,7 +179,11 @@ public class MetricsCollector {
   private Future<Void> collectAllGroupsParallel(Set<String> filteredGroups) {
     Future<List<ConsumerGroupLag>> lagFuture = collectAllGroupLags(filteredGroups);
     Future<Map<String, ConsumerGroupState>> stateFuture =
-        kafkaClient.describeConsumerGroups(filteredGroups);
+        kafkaClient.describeConsumerGroups(filteredGroups)
+          .recover(err -> {
+            log.warn("Failed to describe consumer groups (continuing without state data): {}", err.getMessage());
+            return Future.succeededFuture(Map.of());
+          });
 
     return Future.all(lagFuture, stateFuture)
       .map(composite -> {
@@ -241,7 +245,11 @@ public class MetricsCollector {
     }
 
     Future<Map<String, ConsumerGroupState>> stateFuture =
-        kafkaClient.describeConsumerGroups(new HashSet<>(chunk));
+        kafkaClient.describeConsumerGroups(new HashSet<>(chunk))
+          .recover(err -> {
+            log.warn("Failed to describe consumer group chunk (continuing without state data): {}", err.getMessage());
+            return Future.succeededFuture(Map.of());
+          });
 
     return Future.all(lagFuture, stateFuture)
       .map(composite -> {

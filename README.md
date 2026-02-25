@@ -47,6 +47,19 @@ docker run -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
            themoah/klag:latest
 ```
 
+Gov cloud example
+```bash
+docker run -d \
+  -p 8888:8888 \
+  --name klag-app \
+  -e KAFKA_BOOTSTRAP_SERVERS="kafka2-000-${ENV}$.mist.pvt:6667,kafka2-001-${ENV}$.mist.pvt:6667,kafka2-002-${ENV}$.mist.pvt:6667" \
+  -e KAFKA_REQUEST_TIMEOUT_MS=120000 \
+  -e KAFKA_CHUNK_COUNT=10 \
+  -e KAFKA_CHUNK_DELAY_MS=1000 \
+  -e METRICS_INTERVAL_MS=120000 \
+  klag:latest
+```
+
 Metrics available at `http://localhost:8888/metrics`
 
 ## Metrics Exposed

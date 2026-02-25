@@ -61,16 +61,29 @@ public class MainVerticle extends AbstractVerticle {
         .end("{\"error\": \"Not Found\"}");
     });
 
-    healthMonitor.start()
-      .compose(v -> startMetricsCollector())
-      .compose(v -> startHttpServer(router, appConfig.httpPort()))
+    // Start HTTP server first so application is responsive immediately
+    log.info("Starting HTTP server on port {}", appConfig.httpPort());
+    startHttpServer(router, appConfig.httpPort())
       .onSuccess(server -> {
         httpServer = server;
+        log.info("HTTP server started on port {}", appConfig.httpPort());
+
+        // Start background services asynchronously - fire and forget
+        log.info("Starting background services...");
+
+        healthMonitor.start()
+          .onSuccess(v -> log.info("Kafka health monitor started"))
+          .onFailure(err -> log.warn("Kafka health monitor start delayed: {}", err.getMessage()));
+
+        startMetricsCollector()
+          .onSuccess(v -> log.info("Metrics collector started"))
+          .onFailure(err -> log.warn("Metrics collector start delayed: {}", err.getMessage()));
+
         log.info("Klag started successfully on port {}", appConfig.httpPort());
         startPromise.complete();
       })
       .onFailure(err -> {
-        log.error("Failed to start Klag", err);
+        log.error("Failed to start HTTP server", err);
         startPromise.fail(err);
       });
   }
