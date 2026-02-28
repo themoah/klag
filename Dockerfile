@@ -32,6 +32,8 @@ WORKDIR /app
 # Copy fat JAR from builder
 COPY --from=builder /app/build/libs/*-fat.jar app.jar
 
+COPY --from=builder /app/build.gradle.kts .
+
 # Default port
 EXPOSE 8888
 

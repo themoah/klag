@@ -3,6 +3,7 @@ package io.github.themoah.klag;
 import io.github.themoah.klag.config.AppConfig;
 import io.github.themoah.klag.health.HealthCheckHandler;
 import io.github.themoah.klag.health.KafkaHealthMonitor;
+import io.github.themoah.klag.health.VersionHandler;
 import io.github.themoah.klag.kafka.KafkaClientConfig;
 import io.github.themoah.klag.kafka.KafkaClientService;
 import io.github.themoah.klag.kafka.KafkaClientServiceImpl;
@@ -50,6 +51,8 @@ public class MainVerticle extends AbstractVerticle {
     Router router = Router.router(vertx);
     HealthCheckHandler healthHandler = new HealthCheckHandler(healthMonitor);
     healthHandler.registerRoutes(router);
+    VersionHandler versionHandler = new VersionHandler();
+    versionHandler.registerRoutes(router);
 
     // Create metrics collector if enabled (also registers /metrics endpoint for Prometheus)
     metricsCollector = createMetricsCollector(metricsConfig, router);
