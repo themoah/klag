@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.themoah.klag.health.HealthCheckResponse;
 import io.github.themoah.klag.health.HealthStatus;
+import io.github.themoah.klag.health.VersionInfoResponse;
 import io.vertx.core.json.JsonObject;
 import org.junit.jupiter.api.Test;
 
@@ -69,5 +70,17 @@ public class TestMainVerticle {
     HealthCheckResponse readinessDown = HealthCheckResponse.readiness(false);
     assertTrue(readinessDown.toJson().encode().contains("\"status\":\"DOWN\""));
     assertTrue(readinessDown.toJson().encode().contains("\"kafka\":\"disconnected\""));
+  }
+
+  @Test
+  void versionInfoResponse_json_format() {
+    VersionInfoResponse response = new VersionInfoResponse(
+      "0.1.9",
+      "4.5.22",
+      "21");
+
+    assertTrue(response.toJson().encode().contains("\"version\":\"0.1.9\""));
+    assertTrue(response.toJson().encode().contains("\"vertxVersion\":\"4.5.22\""));
+    assertTrue(response.toJson().encode().contains("\"javaVersion\":\"21\""));
   }
 }

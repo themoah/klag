@@ -6,17 +6,41 @@ import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
 
 public class VersionHandler {
   private static final Logger log = LoggerFactory.getLogger(VersionHandler.class);
+  private static final String VERSION_PROPERTIES = "/version.properties";
   private static final String CONTENT_TYPE_JSON = "application/json";
-  private static final Pattern VERSION_PATTERN = Pattern.compile("version\\s*=\\s*\"([^\"]+)\"");
-  private static final Pattern VERTX_VERSION_PATTERN = Pattern.compile("(?:val|var|ext\\.)?\\s*vertxVersion\\s*(?:=|=)\\s*\"([^\"]+)\"");
+
+  private final Properties versionProperties;
+
+  public VersionHandler() {
+    this.versionProperties = loadVersionProperties();
+  }
+
+  private Properties loadVersionProperties() {
+    Properties props = new Properties();
+
+    try (InputStream is = VersionHandler.class.getResourceAsStream(VERSION_PROPERTIES)) {
+      props.load(is);
+      log.info("Successfully loaded version.properties from classpath");
+    } catch (IOException e) {
+      log.error("Failed to load version.properties, falling back to filesystem parsing", e);
+    }
+
+    return props;
+  }
+
+  private String getVersion() {
+    return versionProperties.getProperty("project.version", "unknown");
+  }
+
+  private String getVertxVersion() {
+    return versionProperties.getProperty("vertx.version", "unknown");
+  }
 
   public void registerRoutes(Router router) {
     router.get("/version").handler(this::handleGetVersionInfo);
@@ -35,25 +59,6 @@ public class VersionHandler {
   private VersionInfoResponse getVersionInfo() {
     String javaVersion = System.getProperty("java.version");
 
-    String version = null;
-    String vertxVersion = null;
-    try {
-      Path gradlePath = Paths.get("build.gradle.kts").normalize();
-      if (Files.exists(gradlePath)) {
-        String content = Files.readString(gradlePath);
-        Matcher matcher = VERSION_PATTERN.matcher(content);
-        if (matcher.find()) {
-          version = matcher.group(1);
-        }
-        Matcher vertxMatcher = VERTX_VERSION_PATTERN.matcher(content);
-        if (vertxMatcher.find()) {
-          vertxVersion = vertxMatcher.group(1);
-        }
-      }
-    } catch (Exception e) {
-      log.error("Error reading build.gradle.kts", e);
-    }
-
-    return new VersionInfoResponse(version, vertxVersion, javaVersion);
+    return new VersionInfoResponse(getVersion(), getVertxVersion(), javaVersion);
   }
 }
