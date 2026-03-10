@@ -14,6 +14,7 @@ public class VersionHandler {
   private static final Logger log = LoggerFactory.getLogger(VersionHandler.class);
   private static final String VERSION_PROPERTIES = "/version.properties";
   private static final String CONTENT_TYPE_JSON = "application/json";
+  private static final String READ_FAIL_MESSAGE = "Failed to load version.properties, falling back to defaults";
 
   private final Properties versionProperties;
 
@@ -25,10 +26,14 @@ public class VersionHandler {
     Properties props = new Properties();
 
     try (InputStream is = VersionHandler.class.getResourceAsStream(VERSION_PROPERTIES)) {
+      if (is == null) {
+        log.error(READ_FAIL_MESSAGE);
+        return props;
+      }
       props.load(is);
       log.info("Successfully loaded version.properties from classpath");
     } catch (IOException e) {
-      log.error("Failed to load version.properties, falling back to filesystem parsing", e);
+      log.error(READ_FAIL_MESSAGE, e);
     }
 
     return props;
