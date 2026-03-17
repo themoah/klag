@@ -60,6 +60,8 @@ tasks.withType<ShadowJar> {
     ))
   }
   mergeServiceFiles()
+
+  from(sourceSets.main.get().output)
 }
 
 tasks.withType<Test> {
@@ -82,5 +84,14 @@ tasks.withType<JavaExec> {
         val (key, value) = line.split("=", limit = 2)
         environment(key.trim(), value.trim())
       }
+  }
+}
+
+tasks.withType<ProcessResources> {
+  filesMatching("version.properties") {
+    expand(
+      "vertxVersion" to vertxVersion,
+      "projectVersion" to version
+    )
   }
 }

@@ -24,7 +24,7 @@ Vert.x reactive framework with `Future<T>`-based async API.
 src/main/java/io/github/themoah/klag/
 ├── MainVerticle.java          # Entry point, HTTP router, lifecycle
 ├── config/AppConfig.java      # HTTP_PORT, KAFKA_HEALTH_CHECK_INTERVAL_MS
-├── health/                    # KafkaHealthMonitor, HealthCheckHandler, HealthStatus
+├── health/                    # KafkaHealthMonitor, HealthCheckHandler, HealthStatus, VersionHandler
 ├── kafka/                     # KafkaClientService[Impl], KafkaClientConfig
 ├── metrics/                   # MetricsCollector, MicrometerReporter, PrometheusHandler
 │   ├── velocity/              # LagVelocityTracker, TopicLagHistory
@@ -40,6 +40,7 @@ src/main/java/io/github/themoah/klag/
 | `/healthz` | Liveness probe (always 200) |
 | `/readyz` | Readiness probe (200 if Kafka UP, 503 if DOWN) |
 | `/metrics` | Prometheus scrape endpoint (if enabled) |
+| `/version` | Build information |
 
 ## Environment Variables
 
