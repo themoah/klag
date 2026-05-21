@@ -39,7 +39,8 @@ public class MainVerticle extends AbstractVerticle {
 
   @Override
   public void start(Promise<Void> startPromise) {
-    log.info("Starting Klag MainVerticle");
+    log.info("Starting Klag version {}, Vert.x version {}, Java version {}",
+      VersionHandler.getVersion(), VersionHandler.getVertxVersion(), VersionHandler.getJavaVersion());
 
     AppConfig appConfig = AppConfig.fromEnvironment();
     MetricsConfig metricsConfig = MetricsConfig.fromEnvironment();
