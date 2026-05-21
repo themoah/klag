@@ -190,12 +190,26 @@ public class KafkaClientServiceImpl implements KafkaClientService {
     return adminClient.listConsumerGroupOffsets(groupId)
       .map(offsets -> {
         Map<TopicPartitionKey, Long> offsetMap = new HashMap<>();
+        Map<String, Integer> missingByTopic = new HashMap<>();
+
         offsets.forEach((tp, offsetAndMetadata) -> {
+          if (offsetAndMetadata == null) {
+            missingByTopic.merge(tp.getTopic(), 1, Integer::sum);
+            log.debug("Consumer group {} has no committed offset for topic {} partition {} — skipping",
+              groupId, tp.getTopic(), tp.getPartition());
+            return;
+          }
           TopicPartitionKey key = new TopicPartitionKey(tp.getTopic(), tp.getPartition());
           offsetMap.put(key, offsetAndMetadata.getOffset());
           log.debug("Consumer group {} topic {} partition {}: offset={}",
             groupId, tp.getTopic(), tp.getPartition(), offsetAndMetadata.getOffset());
         });
+
+        if (!missingByTopic.isEmpty()) {
+          log.warn("Consumer group {} has uncommitted partitions (skipped): {}",
+            groupId, missingByTopic);
+        }
+
         log.info("Retrieved {} partition offsets for consumer group {}", offsetMap.size(), groupId);
         return new ConsumerGroupOffsets(groupId, offsetMap);
       })
