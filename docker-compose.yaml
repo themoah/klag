@@ -1,0 +1,116 @@
+services:
+  kafka:
+    image: confluentinc/cp-kafka:8.1.1
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+  klag:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: klag:local
+    pull_policy: build
+    ports:
+      - "8888:8888"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      METRICS_REPORTER: prometheus
+      METRICS_INTERVAL_MS: 10000
+      LOG_LEVEL: DEBUG
+      LOG_LEVEL_KLAG: DEBUG
+      LOG_LEVEL_KAFKA: DEBUG
+      LOG_LEVEL_HEALTH: DEBUG
+      LOG_LEVEL_METRICS: DEBUG
+    depends_on:
+      - kafka
+
+  # Produces messages to test-topic at 5/sec, creating visible lag
+  producer:
+    image: confluentinc/cp-kafka:7.7.8
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo 'Waiting for Kafka...'
+        cub kafka-ready -b kafka:29092 1 60
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic test-topic --partitions 6 --replication-factor 1
+        echo 'Producing messages...'
+        while true; do
+          for i in $$(seq 1 5); do
+            echo "msg-$$(date +%s%N)" | kafka-console-producer --bootstrap-server kafka:29092 --topic test-topic 2>/dev/null
+          done
+          sleep 1
+        done
+
+  # Slow consumer — commits only 1 message every 10 seconds, so lag builds up
+  slow-consumer:
+    image: confluentinc/cp-kafka:7.7.8
+    depends_on:
+      - producer
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo 'Waiting for Kafka...'
+        cub kafka-ready -b kafka:29092 1 60
+        echo 'Consuming slowly...'
+        while true; do
+          kafka-console-consumer --bootstrap-server kafka:29092 --topic test-topic --group slow-consumer-group --max-messages 1 2>/dev/null
+          sleep 10
+        done
+
+  # Active consumer that never commits — Kafka returns null OffsetAndMetadata per
+  # partition; exercises klag null-offset handling (issue #27) without NPE
+  no-commit-consumer:
+    image: confluentinc/cp-kafka:7.7.8
+    depends_on:
+      - producer
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo 'Waiting for Kafka...'
+        cub kafka-ready -b kafka:29092 1 60
+        echo 'Consuming without committing (no-commit-consumer-group)...'
+        kafka-console-consumer \
+          --bootstrap-server kafka:29092 \
+          --topic test-topic \
+          --group no-commit-consumer-group \
+          --consumer-property enable.auto.commit=false \
+          --consumer-property auto.offset.reset=earliest
+
+  # Consumes for 150s without committing, then restarts with auto-commit — exercises
+  # klag WARN → "all partitions now committed" recovery (processOffsets)
+  delayed-commit-consumer:
+    image: confluentinc/cp-kafka:7.7.8
+    depends_on:
+      - producer
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo 'Waiting for Kafka...'
+        cub kafka-ready -b kafka:29092 1 60
+        echo 'Consuming without commits for 150s (delayed-commit-consumer-group)...'
+        timeout 150 kafka-console-consumer \
+          --bootstrap-server kafka:29092 \
+          --topic test-topic \
+          --group delayed-commit-consumer-group \
+          --consumer-property enable.auto.commit=false \
+          --consumer-property auto.offset.reset=earliest || true
+        echo 'Starting offset commits after 150s delay...'
+        kafka-console-consumer \
+          --bootstrap-server kafka:29092 \
+          --topic test-topic \
+          --group delayed-commit-consumer-group \
+          --consumer-property auto.offset.reset=earliest

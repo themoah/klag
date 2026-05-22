@@ -12,20 +12,28 @@ import java.util.Properties;
 
 public class VersionHandler {
   private static final Logger log = LoggerFactory.getLogger(VersionHandler.class);
-  private static final String VERSION_PROPERTIES = "/version.properties";
+  private static final String VERSION_PROPERTIES_PATH = "/version.properties";
   private static final String CONTENT_TYPE_JSON = "application/json";
   private static final String READ_FAIL_MESSAGE = "Failed to load version.properties, falling back to defaults";
 
-  private final Properties versionProperties;
+  private static final Properties VERSION_PROPERTIES = loadVersionProperties();
 
-  public VersionHandler() {
-    this.versionProperties = loadVersionProperties();
+  public static String getVersion() {
+    return VERSION_PROPERTIES.getProperty("project.version", "unknown");
   }
 
-  private Properties loadVersionProperties() {
+  public static String getVertxVersion() {
+    return VERSION_PROPERTIES.getProperty("vertx.version", "unknown");
+  }
+
+  public static String getJavaVersion() {
+    return System.getProperty("java.version", "unknown");
+  }
+
+  private static Properties loadVersionProperties() {
     Properties props = new Properties();
 
-    try (InputStream is = VersionHandler.class.getResourceAsStream(VERSION_PROPERTIES)) {
+    try (InputStream is = VersionHandler.class.getResourceAsStream(VERSION_PROPERTIES_PATH)) {
       if (is == null) {
         log.error(READ_FAIL_MESSAGE);
         return props;
@@ -37,14 +45,6 @@ public class VersionHandler {
     }
 
     return props;
-  }
-
-  private String getVersion() {
-    return versionProperties.getProperty("project.version", "unknown");
-  }
-
-  private String getVertxVersion() {
-    return versionProperties.getProperty("vertx.version", "unknown");
   }
 
   public void registerRoutes(Router router) {
@@ -62,8 +62,6 @@ public class VersionHandler {
   }
 
   private VersionInfoResponse getVersionInfo() {
-    String javaVersion = System.getProperty("java.version");
-
-    return new VersionInfoResponse(getVersion(), getVertxVersion(), javaVersion);
+    return new VersionInfoResponse(getVersion(), getVertxVersion(), getJavaVersion());
   }
 }

@@ -16,6 +16,7 @@ import io.vertx.kafka.admin.TopicDescription;
 import io.vertx.kafka.client.common.ConfigResource;
 import io.vertx.kafka.client.common.TopicPartition;
 import io.vertx.kafka.client.common.TopicPartitionInfo;
+import io.vertx.kafka.client.consumer.OffsetAndMetadata;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +37,11 @@ public class KafkaClientServiceImpl implements KafkaClientService {
   private static final Logger log = LoggerFactory.getLogger(KafkaClientServiceImpl.class);
 
   private final KafkaAdminClient adminClient;
+
+  // Per-group signature of the last logged "missing offsets" map. Used to dedupe
+  // the WARN emitted by processOffsets so steady-state idle/new groups do not
+  // produce repeated WARN noise on each collection cycle.
+  final Map<String, Map<String, Integer>> lastMissingByGroup = new ConcurrentHashMap<>();
 
   /**
    * Creates a new KafkaClientServiceImpl.
@@ -56,6 +63,12 @@ public class KafkaClientServiceImpl implements KafkaClientService {
    */
   KafkaClientServiceImpl(KafkaAdminClient adminClient) {
     this.adminClient = Objects.requireNonNull(adminClient, "adminClient cannot be null");
+  }
+
+  // Test-only: admin client is unused. Use this when exercising pure logic
+  // (e.g., processOffsets) without a real Kafka cluster or admin client.
+  KafkaClientServiceImpl() {
+    this.adminClient = null;
   }
 
   @Override
@@ -188,18 +201,50 @@ public class KafkaClientServiceImpl implements KafkaClientService {
     log.debug("Getting committed offsets for consumer group: {}", groupId);
 
     return adminClient.listConsumerGroupOffsets(groupId)
-      .map(offsets -> {
-        Map<TopicPartitionKey, Long> offsetMap = new HashMap<>();
-        offsets.forEach((tp, offsetAndMetadata) -> {
-          TopicPartitionKey key = new TopicPartitionKey(tp.getTopic(), tp.getPartition());
-          offsetMap.put(key, offsetAndMetadata.getOffset());
-          log.debug("Consumer group {} topic {} partition {}: offset={}",
-            groupId, tp.getTopic(), tp.getPartition(), offsetAndMetadata.getOffset());
-        });
-        log.info("Retrieved {} partition offsets for consumer group {}", offsetMap.size(), groupId);
-        return new ConsumerGroupOffsets(groupId, offsetMap);
-      })
+      .map(offsets -> processOffsets(groupId, offsets))
       .onFailure(err -> log.error("Failed to get offsets for consumer group: {}", groupId, err));
+  }
+
+  // Package-private for unit testing.
+  // Builds the ConsumerGroupOffsets result, tolerates null OffsetAndMetadata
+  // entries (Kafka returns null for partitions a group has subscribed to but
+  // not yet committed), and dedupes the WARN log by per-group signature so
+  // unchanged "missing offsets" state does not spam every collection cycle.
+  ConsumerGroupOffsets processOffsets(String groupId, Map<TopicPartition, OffsetAndMetadata> offsets) {
+    Map<TopicPartitionKey, Long> offsetMap = new HashMap<>();
+    Map<String, Integer> missingByTopic = new HashMap<>();
+
+    offsets.forEach((tp, offsetAndMetadata) -> {
+      if (offsetAndMetadata == null) {
+        missingByTopic.merge(tp.getTopic(), 1, Integer::sum);
+        log.debug("Consumer group {} has no committed offset for topic {} partition {} — skipping",
+          groupId, tp.getTopic(), tp.getPartition());
+        return;
+      }
+      TopicPartitionKey key = new TopicPartitionKey(tp.getTopic(), tp.getPartition());
+      offsetMap.put(key, offsetAndMetadata.getOffset());
+      log.debug("Consumer group {} topic {} partition {}: offset={}",
+        groupId, tp.getTopic(), tp.getPartition(), offsetAndMetadata.getOffset());
+    });
+
+    Map<String, Integer> prev = lastMissingByGroup.get(groupId);
+    if (!missingByTopic.isEmpty()) {
+      if (!missingByTopic.equals(prev)) {
+        log.warn("Consumer group {} has uncommitted partitions (skipped): {}",
+          groupId, missingByTopic);
+        lastMissingByGroup.put(groupId, Map.copyOf(missingByTopic));
+      } else {
+        log.debug("Consumer group {} uncommitted partitions unchanged: {}",
+          groupId, missingByTopic);
+      }
+    } else if (prev != null) {
+      log.info("Consumer group {} all partitions now committed (previously missing: {})",
+        groupId, prev);
+      lastMissingByGroup.remove(groupId);
+    }
+
+    log.info("Retrieved {} partition offsets for consumer group {}", offsetMap.size(), groupId);
+    return new ConsumerGroupOffsets(groupId, offsetMap);
   }
 
   @Override
