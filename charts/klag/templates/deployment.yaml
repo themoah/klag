@@ -70,6 +70,8 @@ spec:
               value: {{ .Values.metrics.intervalMs | quote }}
             - name: METRICS_GROUP_FILTER
               value: {{ .Values.metrics.groupFilter | quote }}
+            - name: METRICS_GROUP_EXCLUDE
+              value: {{ .Values.metrics.groupExclude | quote }}
             - name: METRICS_JVM_ENABLED
               value: {{ .Values.metrics.jvmEnabled | quote }}
             # OTLP configuration (when reporter is otlp)

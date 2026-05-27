@@ -64,8 +64,10 @@ metrics:
   reporter: "prometheus"
   # Metrics collection interval in milliseconds
   intervalMs: 60000
-  # Glob pattern to filter consumer groups (e.g., "app-*", "*-prod")
+  # Comma-separated glob patterns for consumer groups to include (e.g., "app-*", "ingest*,categorize*")
   groupFilter: "*"
+  # Comma-separated glob patterns for consumer groups to exclude (e.g., "debug-*,canary-*,*-shadow"); evaluated after groupFilter
+  groupExclude: ""
   # Enable JVM metrics (memory, GC, threads, CPU)
   jvmEnabled: false
 
