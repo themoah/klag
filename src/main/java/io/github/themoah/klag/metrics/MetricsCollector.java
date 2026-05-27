@@ -5,6 +5,7 @@ import io.github.themoah.klag.kafka.ChunkProcessor;
 import io.github.themoah.klag.kafka.KafkaClientService;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionConfig;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionDetector;
+import io.github.themoah.klag.metrics.timelag.LagMsCalculator;
 import io.github.themoah.klag.metrics.timelag.OffsetTimestampTracker;
 import io.github.themoah.klag.metrics.timelag.TimeLagConfig;
 import io.github.themoah.klag.metrics.timelag.TimeLagEstimator;
@@ -618,12 +619,11 @@ public class MetricsCollector {
   }
 
   /**
-   * Calculates lag in milliseconds using interpolation from recorded offset/timestamp history.
-   * For each partition, records the current log end offset, then interpolates the timestamp
-   * for the committed offset to determine how old the unconsumed messages are.
+   * Calculates lag in milliseconds per consumer group and topic.
    *
-   * <p>This approach uses system time instead of Kafka message timestamps, avoiding issues
-   * where Kafka doesn't provide logStartTimestamp (returns 0).
+   * <p>Primary path: linear interpolation between Kafka {@code listOffsets} log start/end
+   * timestamps. Fallback: poll-time {@code (logEndOffset, systemTime)} history when Kafka
+   * timestamps are unavailable; fallback does not extrapolate beyond the oldest retained sample.
    *
    * @param lagData list of consumer group lag data
    * @return list of lag in milliseconds per consumer group and topic
@@ -634,53 +634,33 @@ public class MetricsCollector {
     }
 
     List<LagMs> lagMsList = new ArrayList<>();
-    int skippedDueToWarmup = 0;
+    int skippedPartitions = 0;
     long currentTime = System.currentTimeMillis();
     Set<String> trackedPartitions = new HashSet<>();
 
     for (ConsumerGroupLag group : lagData) {
-      // First pass: record all partition offsets to the tracker
       for (PartitionLag p : group.partitions()) {
         offsetTimestampTracker.recordOffset(p.topic(), p.partition(), p.logEndOffset());
         trackedPartitions.add(p.topic() + ":" + p.partition());
       }
 
-      // Second pass: aggregate lag_ms by topic using max lag_ms across partitions
       Map<String, TopicLagMsAggregates> topicAggregates = new HashMap<>();
 
       for (PartitionLag p : group.partitions()) {
-        // Consumer is caught up - no lag
-        if (p.lag() <= 0) {
-          topicAggregates.computeIfAbsent(p.topic(), k -> new TopicLagMsAggregates())
-            .add(0, p.lag());
-          continue;
-        }
+        var lagMs = LagMsCalculator.estimatePartitionLagMs(p, offsetTimestampTracker, currentTime);
 
-        // Check if we have interpolation data for this partition
-        if (!offsetTimestampTracker.hasInterpolationData(p.topic(), p.partition())) {
-          skippedDueToWarmup++;
-          log.trace("Skipping lag_ms for {}:{}:{}: insufficient interpolation data (warmup)",
+        if (lagMs.isPresent()) {
+          topicAggregates.computeIfAbsent(p.topic(), k -> new TopicLagMsAggregates())
+            .add(lagMs.getAsLong(), p.lag());
+          log.trace("Partition {}:{}:{} lag_ms={} (committed={})",
+            group.consumerGroup(), p.topic(), p.partition(), lagMs.getAsLong(), p.committedOffset());
+        } else if (p.lag() > 0) {
+          skippedPartitions++;
+          log.trace("Skipping lag_ms for {}:{}:{}: no Kafka anchors and insufficient poll history",
             group.consumerGroup(), p.topic(), p.partition());
-          continue;
-        }
-
-        // Interpolate timestamp for the committed offset
-        var interpolatedTs = offsetTimestampTracker.getInterpolatedTimestamp(
-          p.topic(), p.partition(), p.committedOffset());
-
-        if (interpolatedTs.isPresent()) {
-          long lagMs = Math.max(0, currentTime - interpolatedTs.getAsLong());
-          topicAggregates.computeIfAbsent(p.topic(), k -> new TopicLagMsAggregates())
-            .add(lagMs, p.lag());
-          log.trace("Partition {}:{}:{} lag_ms={} (committed={}, interpolated_ts={})",
-            group.consumerGroup(), p.topic(), p.partition(), lagMs,
-            p.committedOffset(), interpolatedTs.getAsLong());
-        } else {
-          skippedDueToWarmup++;
         }
       }
 
-      // Create LagMs records for topics that have data
       for (Map.Entry<String, TopicLagMsAggregates> entry : topicAggregates.entrySet()) {
         String topic = entry.getKey();
         TopicLagMsAggregates agg = entry.getValue();
@@ -693,14 +673,13 @@ public class MetricsCollector {
       }
     }
 
-    // Cleanup stale partitions
     offsetTimestampTracker.cleanupStalePartitions(trackedPartitions);
 
-    if (skippedDueToWarmup > 0) {
-      log.debug("Skipped {} partitions due to warmup (insufficient interpolation data)", skippedDueToWarmup);
+    if (skippedPartitions > 0) {
+      log.debug("Skipped {} partitions with no lag_ms estimate", skippedPartitions);
     }
     if (!lagMsList.isEmpty()) {
-      log.info("Calculated lag_ms for {} consumer-group/topic pairs using interpolation", lagMsList.size());
+      log.info("Calculated lag_ms for {} consumer-group/topic pairs", lagMsList.size());
     }
 
     return lagMsList;
