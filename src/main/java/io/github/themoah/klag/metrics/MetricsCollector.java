@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +46,7 @@ public class MetricsCollector {
   private final KafkaClientService kafkaClient;
   private final MetricsReporter reporter;
   private final long intervalMs;
-  private final Pattern groupPattern;
+  private final GroupFilter groupFilter;
   private final LagVelocityTracker velocityTracker;
   private final HotPartitionDetector hotPartitionDetector;
   private final TimeLagEstimator timeLagEstimator;
@@ -66,7 +65,7 @@ public class MetricsCollector {
     long intervalMs,
     String groupFilter
   ) {
-    this(vertx, kafkaClient, reporter, intervalMs, groupFilter,
+    this(vertx, kafkaClient, reporter, intervalMs, groupFilter, "",
       new LagVelocityTracker(), HotPartitionConfig.fromEnvironment(),
       TimeLagConfig.fromEnvironment(), ChunkConfig.fromEnvironment());
   }
@@ -79,7 +78,21 @@ public class MetricsCollector {
     String groupFilter,
     HotPartitionConfig hotPartitionConfig
   ) {
-    this(vertx, kafkaClient, reporter, intervalMs, groupFilter,
+    this(vertx, kafkaClient, reporter, intervalMs, groupFilter, "",
+      new LagVelocityTracker(), hotPartitionConfig,
+      TimeLagConfig.fromEnvironment(), ChunkConfig.fromEnvironment());
+  }
+
+  public MetricsCollector(
+    Vertx vertx,
+    KafkaClientService kafkaClient,
+    MetricsReporter reporter,
+    long intervalMs,
+    String groupFilter,
+    String groupExclude,
+    HotPartitionConfig hotPartitionConfig
+  ) {
+    this(vertx, kafkaClient, reporter, intervalMs, groupFilter, groupExclude,
       new LagVelocityTracker(), hotPartitionConfig,
       TimeLagConfig.fromEnvironment(), ChunkConfig.fromEnvironment());
   }
@@ -93,6 +106,7 @@ public class MetricsCollector {
     MetricsReporter reporter,
     long intervalMs,
     String groupFilter,
+    String groupExclude,
     LagVelocityTracker velocityTracker,
     HotPartitionConfig hotPartitionConfig,
     TimeLagConfig timeLagConfig,
@@ -102,7 +116,7 @@ public class MetricsCollector {
     this.kafkaClient = kafkaClient;
     this.reporter = reporter;
     this.intervalMs = intervalMs;
-    this.groupPattern = compileGlobPattern(groupFilter);
+    this.groupFilter = new GroupFilter(groupFilter, groupExclude);
     this.velocityTracker = velocityTracker;
     this.hotPartitionDetector = hotPartitionConfig.enabled()
       ? new HotPartitionDetector(hotPartitionConfig)
@@ -121,8 +135,8 @@ public class MetricsCollector {
    * Starts the metrics collector with periodic collection.
    */
   public Future<Void> start() {
-    log.info("Starting metrics collector with interval: {}ms, filter: {}",
-      intervalMs, groupPattern != null ? groupPattern.pattern() : "*");
+    log.info("Starting metrics collector with interval: {}ms, filter: {}, exclude: {}",
+      intervalMs, groupFilter.includeDescription(), groupFilter.excludeDescription());
 
     return reporter.start()
       .compose(v -> collectAndReport())
@@ -516,35 +530,7 @@ public class MetricsCollector {
   }
 
   private boolean matchesFilter(String groupId) {
-    if (groupPattern == null) {
-      return true;
-    }
-    return groupPattern.matcher(groupId).matches();
-  }
-
-  /**
-   * Converts a simple glob pattern to a regex pattern.
-   * Supports * as wildcard for any characters.
-   */
-  private static Pattern compileGlobPattern(String glob) {
-    if (glob == null || glob.isBlank() || glob.equals("*")) {
-      return null;
-    }
-
-    StringBuilder regex = new StringBuilder("^");
-    for (char c : glob.toCharArray()) {
-      switch (c) {
-        case '*' -> regex.append(".*");
-        case '?' -> regex.append(".");
-        case '.' -> regex.append("\\.");
-        case '\\' -> regex.append("\\\\");
-        case '[', ']', '(', ')', '{', '}', '^', '$', '|', '+' -> regex.append("\\").append(c);
-        default -> regex.append(c);
-      }
-    }
-    regex.append("$");
-
-    return Pattern.compile(regex.toString());
+    return groupFilter.matches(groupId);
   }
 
   /**

@@ -103,7 +103,8 @@ helm install klag ./charts/klag \
 |-----------|-------------|---------|
 | `metrics.reporter` | Metrics backend (none, prometheus, datadog, otlp) | `prometheus` |
 | `metrics.intervalMs` | Metrics collection interval (ms) | `60000` |
-| `metrics.groupFilter` | Glob pattern for consumer groups | `*` |
+| `metrics.groupFilter` | Comma-separated glob patterns for consumer groups to include | `*` |
+| `metrics.groupExclude` | Comma-separated glob patterns to exclude (evaluated after `groupFilter`) | `""` |
 | `metrics.jvmEnabled` | Enable JVM metrics | `false` |
 
 ### OTLP Configuration

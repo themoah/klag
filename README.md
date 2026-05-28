@@ -117,6 +117,7 @@ KAFKA_SASL_JAAS_CONFIG="org.apache.kafka.common.security.plain.PlainLoginModule 
 METRICS_REPORTER=prometheus
 METRICS_INTERVAL_MS=30000
 METRICS_GROUP_FILTER=*
+METRICS_GROUP_EXCLUDE=
 
 # Optional: JVM metrics
 METRICS_JVM_ENABLED=true
@@ -138,7 +139,8 @@ Configure via `src/main/resources/application.properties` or environment variabl
 | `KAFKA_CHUNK_DELAY_MS` | `0` | Delay (ms) between batches |
 | `METRICS_REPORTER` | `none` | `prometheus`, `datadog`, or `otlp` |
 | `METRICS_INTERVAL_MS` | `60000` | How often to collect metrics |
-| `METRICS_GROUP_FILTER` | `*` | Glob pattern to filter consumer groups |
+| `METRICS_GROUP_FILTER` | `*` | Comma-separated glob patterns. A group is included if it matches any segment (e.g. `ingest*,categorize*`). |
+| `METRICS_GROUP_EXCLUDE` | _(empty)_ | Comma-separated glob patterns to exclude even if included by the filter (e.g. `debug-*,canary-*,*-shadow`). |
 
 See [CLAUDE.md](CLAUDE.md) for the complete configuration reference.
 
@@ -253,7 +255,7 @@ confluent kafka acl create --allow --service-account $SERVICE_ACCOUNT \
 
 </details>
 
-> **Note:** The `METRICS_GROUP_FILTER` environment variable provides application-level filtering, but cluster DESCRIBE permission is always required since `listConsumerGroups()` queries all groups before filtering.
+> **Note:** `METRICS_GROUP_FILTER` and `METRICS_GROUP_EXCLUDE` provide application-level filtering, but cluster DESCRIBE permission is always required since `listConsumerGroups()` queries all groups before filtering.
 
 ---
 

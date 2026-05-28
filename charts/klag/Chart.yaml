@@ -2,8 +2,8 @@ apiVersion: v2
 name: klag
 description: A Helm chart for Klag - Kafka Lag Exporter built with Vert.x
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 0.1.11
+appVersion: "0.1.11"
 home: https://github.com/themoah/klag
 sources:
   - https://github.com/themoah/klag
