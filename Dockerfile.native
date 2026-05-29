@@ -4,27 +4,30 @@
 FROM ghcr.io/graalvm/native-image-community:21-ol9 AS builder
 
 ARG GRADLE_VERSION=8.14.3
+ARG GRADLE_SHA256=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531
 WORKDIR /app
 
-# Install Gradle (GraalVM image ships no build tool)
+# Install Gradle (GraalVM image ships no build tool). Checksum-verified download.
 # Image already ships the C toolchain; native-image needs xargs (findutils) and
 # zlib-static for the mostly-static link (-PnativeStatic).
 RUN microdnf install -y unzip findutils zlib-static && \
     curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip && \
+    echo "${GRADLE_SHA256}  /tmp/gradle.zip" | sha256sum -c - && \
     unzip -d /opt/gradle /tmp/gradle.zip && \
     ln -s "/opt/gradle/gradle-${GRADLE_VERSION}/bin/gradle" /usr/bin/gradle && \
     rm -f /tmp/gradle.zip
 
-# Cache dependencies
+# Cache dependencies (fail fast on resolution/config errors)
 COPY build.gradle.kts settings.gradle.kts ./
-RUN gradle dependencies --no-daemon || true
+RUN gradle dependencies --no-daemon
 
 # Build the native binary (mostly-static: only libc dynamic -> runs on distroless/base)
 COPY src src
 RUN gradle nativeCompile --no-daemon -PnativeStatic
 
 # ---- Runtime stage ----
-# distroless/base provides glibc + libz, no JVM, minimal attack surface.
+# distroless/base provides glibc only (no JVM, minimal attack surface). The binary
+# is mostly-static (-PnativeStatic) so it needs no libz.so.1 / libstdc++ at runtime.
 FROM gcr.io/distroless/base-debian12
 
 WORKDIR /app

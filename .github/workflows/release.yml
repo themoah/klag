@@ -183,9 +183,12 @@ jobs:
       - name: Create and push manifests
         working-directory: /tmp/digests
         run: |
+          # Per-arch digests were pushed to Docker Hub only. imagetools reads those
+          # source digests and copies the manifest to each target registry.
+          sources=$(printf "themoah/klag@sha256:%s " *)
           for repo in themoah/klag ghcr.io/themoah/klag; do
             docker buildx imagetools create \
               -t "${repo}:${VERSION}-native" \
               -t "${repo}:native" \
-              $(printf "${repo}@sha256:%s " *)
+              $sources
           done

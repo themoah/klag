@@ -34,11 +34,17 @@ run_once() {
   fi
   pid=$!
   start=$(python3 -c 'import time;print(int(time.time()*1000))')
+  local i=0 max_iters=$(( ${STARTUP_TIMEOUT_S:-120} * 20 ))   # 0.05s per iteration
   while :; do
     grep -q "$marker" "$logf" && break
     if ! kill -0 "$pid" 2>/dev/null; then
       echo "DIED" >&2; tail -5 "$logf" >&2; rm -f "$logf"; return 1
     fi
+    if (( ++i > max_iters )); then
+      echo "TIMEOUT after ${STARTUP_TIMEOUT_S:-120}s" >&2; tail -5 "$logf" >&2
+      kill "$pid" 2>/dev/null || true; rm -f "$logf"; return 1
+    fi
+    sleep 0.05
   done
   end=$(python3 -c 'import time;print(int(time.time()*1000))')
   sleep 3
