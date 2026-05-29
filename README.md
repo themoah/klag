@@ -49,6 +49,23 @@ docker run -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
 
 Metrics available at `http://localhost:8888/metrics`
 
+### Native image (faster startup, lower memory)
+
+A GraalVM native build is published alongside the JVM image, tagged `:native` and
+`:<version>-native`:
+
+```bash
+docker run -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+           -e METRICS_REPORTER=prometheus \
+           -p 8888:8888 \
+           themoah/klag:native
+```
+
+The native binary starts in ~70-100 ms using ~44 MB RSS, versus ~500 ms / ~119 MB for
+the JVM image — ideal for fast scaling and low-footprint deployments. Same config,
+endpoints, and metrics. Build locally with `gradle nativeCompile` (needs a GraalVM
+JDK 21) or `docker build -f Dockerfile.native -t klag:native .`.
+
 ## Metrics Exposed
 
 | Metric | Description                                                          |
