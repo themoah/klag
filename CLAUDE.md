@@ -113,7 +113,7 @@ OTEL_RESOURCE_ATTRIBUTES=environment=development,cluster=local
 - `klag.hot_partition` - Partition throughput × 100 when statistically high (outlier)
 
 **Time-Based Lag Metrics:**
-- `klag.consumer.lag.ms` - Lag in milliseconds using interpolation from recorded offset/timestamp history. For each partition, records `(logEndOffset, systemTime)` pairs at each poll interval, then interpolates the timestamp for the committed offset to determine how old unconsumed messages are. Formula: `lag_ms = currentTime - interpolatedTimestamp`. Note: Requires 2 poll intervals (warmup) before data is available.
+- `klag.consumer.lag.ms` - Lag in milliseconds (`lag_ms = currentTime - committedMessageTimestamp`). **Primary:** linear interpolation between Kafka `listOffsets` log start/end timestamps and offsets. **Fallback:** poll-time `(logEndOffset, systemTime)` history when Kafka timestamps are invalid (e.g. `logStartTimestamp=0`); requires 2+ poll intervals and does not extrapolate beyond the oldest retained sample (`TIME_LAG_INTERPOLATION_BUFFER_SIZE`).
 - `klag.consumer.lag.time_to_close_seconds` - Estimated seconds until lag reaches zero (only when catching up and lag > threshold)
 
 **Data Loss Prevention (DLP) Metrics:**

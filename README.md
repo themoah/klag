@@ -55,7 +55,7 @@ Metrics available at `http://localhost:8888/metrics`
 |--------|----------------------------------------------------------------------|
 | `klag.consumer.lag` | Current lag per partition (also `.sum`, `.max`, `.min` aggregations) |
 | `klag.consumer.lag.velocity` | Rate of change — positive means falling behind                       |
-| `klag.consumer.lag.ms` | Lag in milliseconds based on message timestamps                      |
+| `klag.consumer.lag.ms` | Lag in ms from Kafka log timestamps; poll-history fallback when unavailable |
 | `klag.consumer.lag.time_to_close_seconds` | Estimated seconds until lag reaches zero (only when catching up)     |
 | `klag.consumer.lag.retention_percent` | Lag as percentage of available messages. Use to prevent data loss.   |
 | `klag.consumer.group.state` | Group health: Stable, Rebalancing, Dead, Empty                       |

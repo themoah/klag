@@ -16,8 +16,8 @@ import org.slf4j.LoggerFactory;
  *   <li>Time to close (seconds) - estimated time until lag reaches zero (only when catching up)</li>
  * </ul>
  *
- * <p>Note: Lag in milliseconds (klag.consumer.lag.ms) is now calculated directly from
- * Kafka message timestamps in MetricsCollector, not from velocity.
+ * <p>Note: Lag in milliseconds ({@code klag.consumer.lag.ms}) is calculated in
+ * {@link LagMsCalculator} / {@link MetricsCollector}, not from velocity.
  */
 public class TimeLagEstimator {
 

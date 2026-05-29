@@ -10,11 +10,11 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Per-partition interpolation table for converting message offsets to timestamps.
- * Records (logEndOffset, systemTimestamp) pairs at each poll interval.
+ * Records (logEndOffset, systemTimestamp) pairs at each poll interval for fallback
+ * lag.ms estimation when Kafka log timestamps are unavailable.
  *
- * <p>This enables interpolation/extrapolation to estimate when a given offset
- * was produced, which is used to calculate lag in milliseconds without relying
- * on Kafka message timestamps (which are often unavailable).
+ * <p>Interpolates only within the retained sample window; does not extrapolate
+ * backward beyond the oldest sample.
  */
 public class PartitionOffsetHistory {
 
@@ -75,7 +75,6 @@ public class PartitionOffsetHistory {
     }
 
     List<OffsetTimestampPoint> pointsList = new ArrayList<>(points);
-    OffsetTimestampPoint oldest = pointsList.get(0);
     OffsetTimestampPoint latest = pointsList.get(pointsList.size() - 1);
 
     // Consumer is caught up or ahead
@@ -103,13 +102,7 @@ public class PartitionOffsetHistory {
       return OptionalLong.of(linearInterpolate(lower, upper, targetOffset));
     }
 
-    // Target offset is older than our oldest point - extrapolate backward
-    if (targetOffset < oldest.offset() && pointsList.size() >= 2) {
-      OffsetTimestampPoint p1 = pointsList.get(0);
-      OffsetTimestampPoint p2 = pointsList.get(1);
-      return OptionalLong.of(linearInterpolate(p1, p2, targetOffset));
-    }
-
+    // Target offset is older than retained history — do not extrapolate backward
     return OptionalLong.empty();
   }
 
@@ -174,5 +167,15 @@ public class PartitionOffsetHistory {
       return OptionalLong.empty();
     }
     return OptionalLong.of(points.getLast().offset());
+  }
+
+  /**
+   * Returns the oldest retained offset, or empty if no points exist.
+   */
+  public OptionalLong getOldestOffset() {
+    if (points.isEmpty()) {
+      return OptionalLong.empty();
+    }
+    return OptionalLong.of(points.getFirst().offset());
   }
 }
