@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1
+# ---- Native build stage ----
+# GraalVM CE community image with native-image, JDK 21 (LTS).
+FROM ghcr.io/graalvm/native-image-community:21-ol9 AS builder
+
+ARG GRADLE_VERSION=8.14.3
+WORKDIR /app
+
+# Install Gradle (GraalVM image ships no build tool)
+# Image already ships the C toolchain; native-image needs xargs (findutils) and
+# zlib-static for the mostly-static link (-PnativeStatic).
+RUN microdnf install -y unzip findutils zlib-static && \
+    curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip && \
+    unzip -d /opt/gradle /tmp/gradle.zip && \
+    ln -s "/opt/gradle/gradle-${GRADLE_VERSION}/bin/gradle" /usr/bin/gradle && \
+    rm -f /tmp/gradle.zip
+
+# Cache dependencies
+COPY build.gradle.kts settings.gradle.kts ./
+RUN gradle dependencies --no-daemon || true
+
+# Build the native binary (mostly-static: only libc dynamic -> runs on distroless/base)
+COPY src src
+RUN gradle nativeCompile --no-daemon -PnativeStatic
+
+# ---- Runtime stage ----
+# distroless/base provides glibc + libz, no JVM, minimal attack surface.
+FROM gcr.io/distroless/base-debian12
+
+WORKDIR /app
+COPY --from=builder /app/build/native/nativeCompile/klag /app/klag
+
+EXPOSE 8888
+ENTRYPOINT ["/app/klag"]

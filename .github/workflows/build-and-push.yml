@@ -66,3 +66,25 @@ jobs:
 
       - name: Build fat JAR
         run: gradle shadowJar
+
+  # Validates the GraalVM native build (metadata hints stay correct).
+  native-build:
+    runs-on: ubuntu-latest
+    needs: [changes, test-helm-chart]
+    if: always() && (needs.test-helm-chart.result == 'success' || needs.test-helm-chart.result == 'skipped')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up GraalVM (JDK 21)
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '21'
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile native image
+        run: gradle nativeCompile --no-daemon
