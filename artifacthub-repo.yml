@@ -1,0 +1,10 @@
+# ArtifactHub repository ownership verification.
+# See: https://artifacthub.io/docs/topics/ownership-claim/
+#
+# SETUP REQUIRED: After registering on https://artifacthub.io,
+# replace the placeholder below with the repositoryID UUID from
+# your repository settings page.
+repositoryID: REPLACE-WITH-UUID-FROM-ARTIFACTHUB-SETTINGS
+owners:
+  - name: themoah
+    homeURL: https://github.com/themoah
