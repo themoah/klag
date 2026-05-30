@@ -4,8 +4,13 @@ import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import java.util.OptionalLong;
 
 /**
- * Estimates committed-offset message time from Kafka {@code listOffsets} anchor points
- * ({@code logStartOffset/logStartTimestamp} and {@code logEndOffset/logEndTimestamp}).
+ * Estimates committed-offset message time from Kafka {@code listOffsets} anchor points.
+ *
+ * <p>Anchors are {@code (logStartOffset, logStartTimestamp)} and
+ * {@code (maxTimestampOffset, logEndTimestamp)}. The end anchor uses {@code maxTimestampOffset}
+ * (the offset of the MAX_TIMESTAMP record), NOT {@code logEndOffset} (the true end-of-log),
+ * because only the former is the offset that actually carries {@code logEndTimestamp}. The two
+ * can differ; conflating them would skip interpolation or skew the timestamp.
  */
 public final class KafkaOffsetTimestampInterpolator {
 
@@ -13,7 +18,7 @@ public final class KafkaOffsetTimestampInterpolator {
 
   /**
    * Returns true when partition log boundaries have usable Kafka message timestamps
-   * and the committed offset lies within the log span (or at log end).
+   * and the committed offset lies within the log span (or at/after the timestamp anchor).
    */
   public static boolean hasValidAnchors(PartitionLag partition) {
     if (partition.logStartTimestamp() <= 0 || partition.logEndTimestamp() <= 0) {
@@ -22,12 +27,14 @@ public final class KafkaOffsetTimestampInterpolator {
     if (partition.logEndTimestamp() < partition.logStartTimestamp()) {
       return false;
     }
-    if (partition.logEndOffset() <= partition.logStartOffset()) {
+    if (partition.maxTimestampOffset() <= partition.logStartOffset()) {
       return false;
     }
     if (partition.committedOffset() < partition.logStartOffset()) {
       return false;
     }
+    // Committed may sit between the max-timestamp record and the true end of the log;
+    // bound it by the true end offset, not the timestamp anchor.
     return partition.committedOffset() <= partition.logEndOffset();
   }
 
@@ -41,13 +48,14 @@ public final class KafkaOffsetTimestampInterpolator {
       return OptionalLong.empty();
     }
 
-    if (partition.committedOffset() >= partition.logEndOffset()) {
+    // At or beyond the highest-timestamp record: the newest known timestamp applies.
+    if (partition.committedOffset() >= partition.maxTimestampOffset()) {
       return OptionalLong.of(partition.logEndTimestamp());
     }
 
     return OptionalLong.of(linearInterpolate(
       partition.logStartOffset(), partition.logStartTimestamp(),
-      partition.logEndOffset(), partition.logEndTimestamp(),
+      partition.maxTimestampOffset(), partition.logEndTimestamp(),
       partition.committedOffset()));
   }
 

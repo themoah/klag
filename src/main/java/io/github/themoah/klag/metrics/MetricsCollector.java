@@ -506,6 +506,7 @@ public class MetricsCollector {
           po.logEndOffset(),
           po.logStartOffset(),
           po.logEndTimestamp(),
+          po.maxTimestampOffset(),
           po.logStartTimestamp(),
           committedOffset
         );
