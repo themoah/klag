@@ -1,0 +1,44 @@
+name: E2E (Helm + k3d)
+
+# Runs the full end-to-end test: builds the Klag image, spins up a k3d cluster
+# with a real single-node Kafka, installs the Helm chart, generates consumer
+# lag, and asserts Klag scrapes and exposes it. Gates changes to the chart,
+# the app source, or the container build.
+
+on:
+  pull_request:
+    paths:
+      - 'charts/**'
+      - 'src/**'
+      - 'Dockerfile'
+      - 'build.gradle.kts'
+      - 'scripts/e2e-test.sh'
+      - '.github/workflows/e2e.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'charts/**'
+      - 'src/**'
+      - 'Dockerfile'
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Install k3d
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+
+      - name: Run e2e test
+        run: ./scripts/e2e-test.sh
