@@ -77,20 +77,39 @@ All metrics tagged with `consumer_group`, `topic`, `partition` where applicable.
 
 ### Helm Chart
 
+The chart is published to a Helm repository served from GitHub Pages and indexed on
+[Artifact Hub](https://artifacthub.io/packages/helm/klag/klag).
+
 ```bash
-helm install klag ./charts/klag \
+helm repo add klag https://themoah.github.io/klag
+helm repo update
+helm search repo klag   # find the latest version
+
+helm install klag klag/klag \
   --set kafka.bootstrapServers="kafka-broker:9092"
 ```
+
+Pin a specific version with `--version`, e.g. `helm install klag klag/klag --version 0.1.12 ...`.
 
 <details>
 <summary>With SASL authentication</summary>
 
 ```bash
-helm install klag ./charts/klag \
+helm install klag klag/klag \
   --set kafka.bootstrapServers="kafka:9092" \
   --set kafka.securityProtocol="SASL_SSL" \
   --set kafka.saslMechanism="PLAIN" \
   --set kafka.saslJaasConfig="org.apache.kafka.common.security.plain.PlainLoginModule required username='user' password='pass';"
+```
+
+</details>
+
+<details>
+<summary>Install from a local checkout (development)</summary>
+
+```bash
+helm install klag ./charts/klag \
+  --set kafka.bootstrapServers="kafka-broker:9092"
 ```
 
 </details>
