@@ -2,11 +2,11 @@ name: Release
 
 on:
   push:
+    # chart-releaser tags the chart as klag-<version>; plain semver tags are
+    # also supported. Any tag triggers a build of the matching image.
     tags:
-      - 'v*'
-      # chart-releaser tags the Helm chart as klag-<version>; build the image too
-      # so the appVersion image referenced by the chart always exists.
       - 'klag-*'
+      - '[0-9]+.[0-9]+.[0-9]+*'
   workflow_dispatch:
     inputs:
       version:
@@ -42,13 +42,12 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          if [[ "${{ github.event_name }}" == "push" && "${GITHUB_REF_NAME}" == klag-* ]]; then
-            # Chart tag (klag-<chartVersion>): use appVersion from build.gradle.kts.
-            VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' build.gradle.kts)
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
-            VERSION="${GITHUB_REF_NAME#v}"
-          elif [[ -n "${{ inputs.version }}" ]]; then
+          if [[ -n "${{ inputs.version }}" ]]; then
             VERSION="${{ inputs.version }}"
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            # Strip any tag prefix (klag-, v, ...) leaving the bare semver.
+            VERSION="${GITHUB_REF_NAME##*-}"
+            VERSION="${VERSION#v}"
           else
             VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' build.gradle.kts)
           fi
@@ -93,6 +92,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Klag v${{ steps.version.outputs.version }}
-          tag_name: v${{ steps.version.outputs.version }}
+          tag_name: ${{ steps.version.outputs.version }}
           generate_release_notes: true
           files: build/libs/klag-${{ steps.version.outputs.version }}-fat.jar
