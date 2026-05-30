@@ -151,20 +151,26 @@ public class KafkaClientServiceImpl implements KafkaClientService {
               long logStartOffset = earliestTimestampOffsets.get(tp).getOffset();
               long logStartTimestamp = earliestTimestampOffsets.get(tp).getTimestamp();
 
-              // Get latest offset and timestamp - prefer MAX_TIMESTAMP if valid
               ListOffsetsResultInfo maxTimestampResult = maxTimestampOffsets.get(tp);
               ListOffsetsResultInfo latestOffsetResult = latestOffsets.get(tp);
 
-              long logEndOffset;
+              // logEndOffset is ALWAYS the true end-of-log (LATEST). This is the boundary
+              // for lag = logEndOffset - committedOffset, throughput, and retention.
+              long logEndOffset = latestOffsetResult.getOffset();
+
+              // The timestamp anchor comes from MAX_TIMESTAMP (offset of the highest-timestamp
+              // record). This offset can be < logEndOffset, so carry it separately rather than
+              // overwriting logEndOffset, otherwise interpolation anchors and lag disagree.
               long logEndTimestamp;
+              long maxTimestampOffset;
 
               if (maxTimestampResult.getOffset() >= 0 && maxTimestampResult.getTimestamp() > 0) {
-                // MAX_TIMESTAMP returned valid offset and timestamp
-                logEndOffset = maxTimestampResult.getOffset();
+                // MAX_TIMESTAMP returned a valid offset/timestamp anchor
+                maxTimestampOffset = maxTimestampResult.getOffset();
                 logEndTimestamp = maxTimestampResult.getTimestamp();
               } else {
-                // MAX_TIMESTAMP failed (pre-3.0 broker or no timestamps) - use LATEST
-                logEndOffset = latestOffsetResult.getOffset();
+                // MAX_TIMESTAMP failed (pre-3.0 broker or no timestamps) - fall back to LATEST
+                maxTimestampOffset = latestOffsetResult.getOffset();
                 logEndTimestamp = latestOffsetResult.getTimestamp();
               }
 
@@ -176,16 +182,16 @@ public class KafkaClientServiceImpl implements KafkaClientService {
 
               // Log first partition's timestamps at INFO level for debugging
               if (!loggedSampleTimestamp) {
-                log.info("Topic {} sample timestamps: partition {} logStart={} (ts={}), logEnd={} (ts={})",
-                  topic, partition.partition(), logStartOffset, logStartTimestamp, logEndOffset, logEndTimestamp);
+                log.info("Topic {} sample timestamps: partition {} logStart={} (ts={}), logEnd={}, maxTsOffset={} (ts={})",
+                  topic, partition.partition(), logStartOffset, logStartTimestamp, logEndOffset, maxTimestampOffset, logEndTimestamp);
                 loggedSampleTimestamp = true;
               } else {
-                log.debug("Topic {} partition {}: logStart={} (ts={}), logEnd={} (ts={})",
-                  topic, partition.partition(), logStartOffset, logStartTimestamp, logEndOffset, logEndTimestamp);
+                log.debug("Topic {} partition {}: logStart={} (ts={}), logEnd={}, maxTsOffset={} (ts={})",
+                  topic, partition.partition(), logStartOffset, logStartTimestamp, logEndOffset, maxTimestampOffset, logEndTimestamp);
               }
 
               result.add(new PartitionOffsets(topic, partition.partition(), logEndOffset, logStartOffset,
-                logEndTimestamp, logStartTimestamp));
+                logEndTimestamp, maxTimestampOffset, logStartTimestamp));
             }
 
             log.info("Retrieved offsets for {} partitions of topic {}", result.size(), topic);

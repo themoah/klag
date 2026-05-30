@@ -18,8 +18,8 @@ public class MetricsCollectorTest {
   @Test
   void topicAggregates_singlePartition() {
     // Test TopicAggregates aggregation logic with single partition
-    // PartitionLag: topic, partition, logEndOffset, logStartOffset, logEndTimestamp, logStartTimestamp, committedOffset, lag
-    PartitionLag partition = new PartitionLag("topic1", 0, 1000, 0, 1000000L, 0L, 800, 200);
+    // PartitionLag: topic, partition, logEndOffset, logStartOffset, logEndTimestamp, maxTimestampOffset, logStartTimestamp, committedOffset, lag
+    PartitionLag partition = new PartitionLag("topic1", 0, 1000, 0, 1000000L, 1000, 0L, 800, 200);
 
     long totalLogEnd = partition.logEndOffset();
     long totalCommitted = partition.committedOffset();
@@ -33,10 +33,10 @@ public class MetricsCollectorTest {
   @Test
   void topicAggregates_multiplePartitions_sumsCorrectly() {
     // Test aggregation across multiple partitions of same topic
-    // PartitionLag: topic, partition, logEndOffset, logStartOffset, logEndTimestamp, logStartTimestamp, committedOffset, lag
-    PartitionLag p1 = new PartitionLag("topic1", 0, 1000, 0, 1000000L, 0L, 800, 200);
-    PartitionLag p2 = new PartitionLag("topic1", 1, 1500, 0, 1000000L, 0L, 1200, 300);
-    PartitionLag p3 = new PartitionLag("topic1", 2, 2000, 0, 1000000L, 0L, 1800, 200);
+    // PartitionLag: topic, partition, logEndOffset, logStartOffset, logEndTimestamp, maxTimestampOffset, logStartTimestamp, committedOffset, lag
+    PartitionLag p1 = new PartitionLag("topic1", 0, 1000, 0, 1000000L, 1000, 0L, 800, 200);
+    PartitionLag p2 = new PartitionLag("topic1", 1, 1500, 0, 1000000L, 1500, 0L, 1200, 300);
+    PartitionLag p3 = new PartitionLag("topic1", 2, 2000, 0, 1000000L, 2000, 0L, 1800, 200);
 
     // Simulate aggregation as done in MetricsCollector
     long totalLogEnd = p1.logEndOffset() + p2.logEndOffset() + p3.logEndOffset();
@@ -193,7 +193,7 @@ public class MetricsCollectorTest {
     // retention_window = 35000 - 31000 = 4000
     // lag = 35000 - 34300 = 700
     // percent = (700 / 4000) * 100 = 17.5%
-    PartitionLag partition = new PartitionLag("topic1", 0, 35000, 31000, 0L, 0L, 34300, 700);
+    PartitionLag partition = new PartitionLag("topic1", 0, 35000, 31000, 0L, 35000, 0L, 34300, 700);
 
     long retentionWindow = partition.logEndOffset() - partition.logStartOffset();
     double percent = (partition.lag() / (double) retentionWindow) * 100.0;
@@ -207,7 +207,7 @@ public class MetricsCollectorTest {
   void retentionRisk_emptyPartitionSkipped() {
     // Empty partition: logEndOffset == logStartOffset
     // Should skip (retentionWindow = 0)
-    PartitionLag partition = new PartitionLag("topic1", 0, 1000, 1000, 0L, 0L, 1000, 0);
+    PartitionLag partition = new PartitionLag("topic1", 0, 1000, 1000, 0L, 1000, 0L, 1000, 0);
 
     long retentionWindow = partition.logEndOffset() - partition.logStartOffset();
 
@@ -218,7 +218,7 @@ public class MetricsCollectorTest {
   void retentionRisk_consumerCaughtUp_zeroPercent() {
     // Consumer caught up: committedOffset >= logEndOffset
     // Should report 0%
-    PartitionLag partition = new PartitionLag("topic1", 0, 5000, 1000, 0L, 0L, 5000, 0);
+    PartitionLag partition = new PartitionLag("topic1", 0, 5000, 1000, 0L, 5000, 0L, 5000, 0);
 
     long retentionWindow = partition.logEndOffset() - partition.logStartOffset();
     double percent = partition.lag() <= 0 ? 0.0 : (partition.lag() / (double) retentionWindow) * 100.0;
@@ -232,7 +232,7 @@ public class MetricsCollectorTest {
   void retentionRisk_consumerBehindLogStart_100Percent() {
     // Consumer behind log_start: committedOffset < logStartOffset
     // Data loss already occurred - should report 100%
-    PartitionLag partition = new PartitionLag("topic1", 0, 5000, 2000, 0L, 0L, 1500, 3500);
+    PartitionLag partition = new PartitionLag("topic1", 0, 5000, 2000, 0L, 5000, 0L, 1500, 3500);
 
     boolean dataLossOccurred = partition.committedOffset() < partition.logStartOffset();
 
@@ -248,9 +248,9 @@ public class MetricsCollectorTest {
     // Partition 2: lag=100, window=5000 -> 2%
     // Max should be 26.3%
 
-    PartitionLag p0 = new PartitionLag("topic1", 0, 35000, 31000, 0L, 0L, 34300, 700);
-    PartitionLag p1 = new PartitionLag("topic1", 1, 35300, 31500, 0L, 0L, 34300, 1000);
-    PartitionLag p2 = new PartitionLag("topic1", 2, 40000, 35000, 0L, 0L, 39900, 100);
+    PartitionLag p0 = new PartitionLag("topic1", 0, 35000, 31000, 0L, 35000, 0L, 34300, 700);
+    PartitionLag p1 = new PartitionLag("topic1", 1, 35300, 31500, 0L, 35300, 0L, 34300, 1000);
+    PartitionLag p2 = new PartitionLag("topic1", 2, 40000, 35000, 0L, 40000, 0L, 39900, 100);
 
     double percent0 = (p0.lag() / (double)(p0.logEndOffset() - p0.logStartOffset())) * 100.0;
     double percent1 = (p1.lag() / (double)(p1.logEndOffset() - p1.logStartOffset())) * 100.0;
@@ -270,8 +270,8 @@ public class MetricsCollectorTest {
     // Poll 1: lag=1000, window=4000 -> 25%
     // Poll 2: consumer processed 500 messages, lag=500, window=4000 -> 12.5%
 
-    PartitionLag poll1 = new PartitionLag("topic1", 0, 35000, 31000, 0L, 0L, 34000, 1000);
-    PartitionLag poll2 = new PartitionLag("topic1", 0, 35000, 31000, 0L, 0L, 34500, 500);
+    PartitionLag poll1 = new PartitionLag("topic1", 0, 35000, 31000, 0L, 35000, 0L, 34000, 1000);
+    PartitionLag poll2 = new PartitionLag("topic1", 0, 35000, 31000, 0L, 35000, 0L, 34500, 500);
 
     double percent1 = (poll1.lag() / (double)(poll1.logEndOffset() - poll1.logStartOffset())) * 100.0;
     double percent2 = (poll2.lag() / (double)(poll2.logEndOffset() - poll2.logStartOffset())) * 100.0;
@@ -287,8 +287,8 @@ public class MetricsCollectorTest {
     // Poll 1: lag=1000, window=4000 (logEnd=35000, logStart=31000) -> 25%
     // Poll 2: retention cleaned up 500 messages, lag=1000, window=3500 (logEnd=35000, logStart=31500) -> 28.57%
 
-    PartitionLag poll1 = new PartitionLag("topic1", 0, 35000, 31000, 0L, 0L, 34000, 1000);
-    PartitionLag poll2 = new PartitionLag("topic1", 0, 35000, 31500, 0L, 0L, 34000, 1000);
+    PartitionLag poll1 = new PartitionLag("topic1", 0, 35000, 31000, 0L, 35000, 0L, 34000, 1000);
+    PartitionLag poll2 = new PartitionLag("topic1", 0, 35000, 31500, 0L, 35000, 0L, 34000, 1000);
 
     double percent1 = (poll1.lag() / (double)(poll1.logEndOffset() - poll1.logStartOffset())) * 100.0;
     double percent2 = (poll2.lag() / (double)(poll2.logEndOffset() - poll2.logStartOffset())) * 100.0;

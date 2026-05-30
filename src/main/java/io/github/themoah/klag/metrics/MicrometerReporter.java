@@ -200,7 +200,7 @@ public class MicrometerReporter implements MetricsReporter {
   }
 
   /**
-   * Reports lag in milliseconds based on actual message timestamps.
+   * Reports lag in milliseconds (Kafka timestamps or poll-history fallback).
    *
    * @param lagMsData list of lag in milliseconds data
    * @param activeKeys set to populate with active gauge keys (can be null)

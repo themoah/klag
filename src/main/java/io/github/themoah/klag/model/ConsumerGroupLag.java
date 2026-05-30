@@ -15,6 +15,11 @@ public record ConsumerGroupLag(
 
   /**
    * Lag details for a single partition.
+   *
+   * <p>{@code logEndOffset} is the true end-of-log (LATEST) offset and is the basis for
+   * {@code lag}, throughput, and retention. {@code maxTimestampOffset} is the offset of the
+   * record carrying {@code logEndTimestamp} (the MAX_TIMESTAMP record); it can be less than
+   * {@code logEndOffset} and is the correct end anchor for time-based interpolation.
    */
   public record PartitionLag(
     String topic,
@@ -22,10 +27,14 @@ public record ConsumerGroupLag(
     long logEndOffset,
     long logStartOffset,
     long logEndTimestamp,
+    long maxTimestampOffset,
     long logStartTimestamp,
     long committedOffset,
     long lag
   ) {
+    /**
+     * Convenience factory where the max-timestamp anchor coincides with the true end offset.
+     */
     public static PartitionLag of(
       String topic,
       int partition,
@@ -35,9 +44,23 @@ public record ConsumerGroupLag(
       long logStartTimestamp,
       long committedOffset
     ) {
+      return of(topic, partition, logEndOffset, logStartOffset, logEndTimestamp,
+        logEndOffset, logStartTimestamp, committedOffset);
+    }
+
+    public static PartitionLag of(
+      String topic,
+      int partition,
+      long logEndOffset,
+      long logStartOffset,
+      long logEndTimestamp,
+      long maxTimestampOffset,
+      long logStartTimestamp,
+      long committedOffset
+    ) {
       long lag = Math.max(0, logEndOffset - committedOffset);
       return new PartitionLag(topic, partition, logEndOffset, logStartOffset,
-        logEndTimestamp, logStartTimestamp, committedOffset, lag);
+        logEndTimestamp, maxTimestampOffset, logStartTimestamp, committedOffset, lag);
     }
   }
 
