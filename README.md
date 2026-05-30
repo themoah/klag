@@ -77,20 +77,39 @@ All metrics tagged with `consumer_group`, `topic`, `partition` where applicable.
 
 ### Helm Chart
 
+The chart is published to a Helm repository served from GitHub Pages and indexed on
+[Artifact Hub](https://artifacthub.io/packages/helm/klag/klag).
+
 ```bash
-helm install klag ./charts/klag \
+helm repo add klag https://themoah.github.io/klag
+helm repo update
+helm search repo klag   # find the latest version
+
+helm install klag klag/klag \
   --set kafka.bootstrapServers="kafka-broker:9092"
 ```
+
+Pin a specific version with `--version`, e.g. `helm install klag klag/klag --version 0.1.12 ...`.
 
 <details>
 <summary>With SASL authentication</summary>
 
 ```bash
-helm install klag ./charts/klag \
+helm install klag klag/klag \
   --set kafka.bootstrapServers="kafka:9092" \
   --set kafka.securityProtocol="SASL_SSL" \
   --set kafka.saslMechanism="PLAIN" \
   --set kafka.saslJaasConfig="org.apache.kafka.common.security.plain.PlainLoginModule required username='user' password='pass';"
+```
+
+</details>
+
+<details>
+<summary>Install from a local checkout (development)</summary>
+
+```bash
+helm install klag ./charts/klag \
+  --set kafka.bootstrapServers="kafka-broker:9092"
 ```
 
 </details>
@@ -117,6 +136,7 @@ KAFKA_SASL_JAAS_CONFIG="org.apache.kafka.common.security.plain.PlainLoginModule 
 METRICS_REPORTER=prometheus
 METRICS_INTERVAL_MS=30000
 METRICS_GROUP_FILTER=*
+METRICS_GROUP_EXCLUDE=
 
 # Optional: JVM metrics
 METRICS_JVM_ENABLED=true
@@ -138,7 +158,8 @@ Configure via `src/main/resources/application.properties` or environment variabl
 | `KAFKA_CHUNK_DELAY_MS` | `0` | Delay (ms) between batches |
 | `METRICS_REPORTER` | `none` | `prometheus`, `datadog`, or `otlp` |
 | `METRICS_INTERVAL_MS` | `60000` | How often to collect metrics |
-| `METRICS_GROUP_FILTER` | `*` | Glob pattern to filter consumer groups |
+| `METRICS_GROUP_FILTER` | `*` | Comma-separated glob patterns. A group is included if it matches any segment (e.g. `ingest*,categorize*`). |
+| `METRICS_GROUP_EXCLUDE` | _(empty)_ | Comma-separated glob patterns to exclude even if included by the filter (e.g. `debug-*,canary-*,*-shadow`). |
 
 See [CLAUDE.md](CLAUDE.md) for the complete configuration reference.
 
@@ -253,7 +274,7 @@ confluent kafka acl create --allow --service-account $SERVICE_ACCOUNT \
 
 </details>
 
-> **Note:** The `METRICS_GROUP_FILTER` environment variable provides application-level filtering, but cluster DESCRIBE permission is always required since `listConsumerGroups()` queries all groups before filtering.
+> **Note:** `METRICS_GROUP_FILTER` and `METRICS_GROUP_EXCLUDE` provide application-level filtering, but cluster DESCRIBE permission is always required since `listConsumerGroups()` queries all groups before filtering.
 
 ---
 
@@ -271,29 +292,72 @@ Requires Java 21.
 
 ## Development
 
-### Testing Helm Chart
+### Helm Chart Template Tests
+
+Fast, offline. Lints the chart and renders every values permutation:
 
 ```bash
 ./scripts/test-helm-chart.sh
 ```
 
-### Local Kubernetes Testing (macOS)
+### End-to-End Test (k3d + real Kafka)
+
+The canonical integration test. Spins up a disposable [k3d](https://k3d.io)
+cluster, deploys a real single-node Kafka (KRaft), builds the Klag image from
+the local `Dockerfile`, installs the Helm chart, generates real consumer-group
+lag, and asserts Klag connects to Kafka and exposes the lag via `/metrics`.
+Nothing is mocked — Klag's readiness probe only passes once it can reach Kafka.
 
 ```bash
-# Full test: create cluster, install chart, validate, cleanup
-./scripts/local-k8s-test.sh
+# Full e2e: cluster -> Kafka -> build+deploy Klag -> assert lag -> cleanup
+./scripts/e2e-test.sh
 
-# Auto-install dependencies (kind, helm, kubectl) via Homebrew
-./scripts/local-k8s-test.sh --auto-install
+# Install missing deps (k3d, kubectl, helm) via Homebrew
+./scripts/e2e-test.sh --auto-install
 
-# Keep cluster running after test
-./scripts/local-k8s-test.sh --skip-cleanup
+# Keep the cluster running afterwards (inspect / debug)
+./scripts/e2e-test.sh --skip-cleanup
 
-# Cleanup only
-./scripts/local-k8s-test.sh --cleanup
+# Test a published image instead of building locally
+KLAG_IMAGE=themoah/klag:0.1.12 ./scripts/e2e-test.sh
+
+# Test against an older Kafka broker
+KAFKA_IMAGE=apache/kafka:3.7.0 ./scripts/e2e-test.sh
+
+# Delete the test cluster
+./scripts/e2e-test.sh --cleanup
 ```
 
-Prerequisites: Docker Desktop, kind, helm, kubectl (use `--auto-install` to install via Homebrew).
+### Strimzi Compatibility
+
+Klag works with Kafka clusters managed by the [Strimzi](https://strimzi.io)
+operator (the common production way to run Kafka on Kubernetes). A dedicated
+e2e installs the Strimzi operator, provisions a real KRaft Kafka cluster via
+Strimzi CRDs, points the chart at the `*-kafka-bootstrap` service, and asserts
+Klag scrapes the lag.
+
+```bash
+# Single version (defaults to a Strimzi-supported Kafka version)
+./scripts/e2e-strimzi-test.sh
+
+# Specific Kafka version
+KAFKA_VERSION=4.1.0 ./scripts/e2e-strimzi-test.sh
+
+# Matrix across all supported versions
+./scripts/e2e-strimzi-matrix.sh 4.1.0 4.2.0
+```
+
+Verified against Strimzi-managed Kafka **4.1.0** and **4.2.0** (the versions the
+current Strimzi operator supports). Connecting to Strimzi needs no special chart
+config — just set `kafka.bootstrapServers` to the Strimzi bootstrap service,
+e.g. `--set kafka.bootstrapServers=my-cluster-kafka-bootstrap:9092`. Both e2e
+suites run in CI on every PR (`.github/workflows/e2e.yml`).
+
+Prerequisites: Docker, k3d, helm, kubectl (use `--auto-install` to install via
+Homebrew). This same script runs in CI on every PR (`.github/workflows/e2e.yml`).
+
+> The legacy `scripts/local-k8s-test.sh` (kind-based smoke test) is superseded
+> by `e2e-test.sh` and kept only for quick kind users.
 
 ---
 
@@ -304,7 +368,8 @@ Prerequisites: Docker Desktop, kind, helm, kubectl (use `--auto-install` to inst
 3. Run tests before submitting:
    ```bash
    ./gradlew test                # Java tests
-   ./scripts/test-helm-chart.sh  # Helm chart tests
+   ./scripts/test-helm-chart.sh  # Helm chart template tests
+   ./scripts/e2e-test.sh         # End-to-end (k3d + real Kafka)
    ```
 4. Submit a pull request
 

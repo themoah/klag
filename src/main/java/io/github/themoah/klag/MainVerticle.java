@@ -164,6 +164,7 @@ public class MainVerticle extends AbstractVerticle {
       reporter,
       config.collectionIntervalMs(),
       config.consumerGroupFilter(),
+      config.consumerGroupExclude(),
       hotPartitionConfig
     );
   }

@@ -1,0 +1,62 @@
+name: E2E (Helm + k3d)
+
+# Full end-to-end test against a PLAIN apache/kafka broker: builds the Klag
+# image, spins up a k3d cluster with real Kafka, installs the Helm chart,
+# generates consumer lag, and asserts Klag scrapes and exposes it. Matrixed
+# across Kafka versions.
+#
+# Triggers only on changes that can affect this test: app code, the chart, the
+# plain-Kafka e2e script, or this workflow. Strimzi compatibility lives in its
+# own workflow (e2e-strimzi.yml) so each test runs only when relevant.
+
+on:
+  pull_request:
+    paths:
+      - 'charts/**'
+      - 'src/**'
+      - 'Dockerfile'
+      - 'build.gradle.kts'
+      - 'scripts/e2e-test.sh'
+      - '.github/workflows/e2e.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'charts/**'
+      - 'src/**'
+      - 'Dockerfile'
+      - 'build.gradle.kts'
+      - 'scripts/e2e-test.sh'
+      - '.github/workflows/e2e.yml'
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kafka: ['3.7.0', '3.8.0', '3.9.0']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+      - name: Install k3d
+        env:
+          K3D_VERSION: v5.7.5
+          K3D_SHA256: 5d3f22817d9e163ab6ed43572189dd49fe724d7a6948075b570067747eca8d3f
+        run: |
+          curl -fsSL -o /tmp/k3d \
+            "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
+          echo "${K3D_SHA256}  /tmp/k3d" | sha256sum -c -
+          chmod +x /tmp/k3d
+          sudo mv /tmp/k3d /usr/local/bin/k3d
+          k3d version
+      - name: Run e2e test (Kafka ${{ matrix.kafka }})
+        env:
+          KAFKA_IMAGE: apache/kafka:${{ matrix.kafka }}
+        run: ./scripts/e2e-test.sh

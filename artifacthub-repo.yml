@@ -1,0 +1,6 @@
+# ArtifactHub repository ownership verification.
+# See: https://artifacthub.io/docs/topics/ownership-claim/
+repositoryID: 56cbf9e0-4059-46f4-b85a-bab2cf3fca9b
+owners:
+  - name: themoah
+    homeURL: https://github.com/themoah

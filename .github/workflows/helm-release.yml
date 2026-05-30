@@ -1,0 +1,67 @@
+name: Release Helm Chart
+
+# Publishes the Klag Helm chart to the gh-pages branch so it is served as a
+# Helm repository at https://themoah.github.io/klag and can be indexed by
+# Artifact Hub. Runs when the chart changes on main (chart-releaser only cuts a
+# new release when charts/klag/Chart.yaml `version` is bumped).
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'charts/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Lint chart
+        run: helm lint charts/klag
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.6.0
+        with:
+          charts_dir: charts
+        env:
+          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Artifact Hub looks for artifacthub-repo.yml at the ROOT of the served
+      # Helm repo (the gh-pages branch), not the default branch. Sync it there.
+      - name: Sync artifacthub-repo.yml to gh-pages
+        run: |
+          if [ ! -f artifacthub-repo.yml ]; then
+            echo "artifacthub-repo.yml not found at repo root; skipping."
+            exit 0
+          fi
+          cp artifacthub-repo.yml /tmp/artifacthub-repo.yml
+          git fetch origin gh-pages
+          git worktree add /tmp/gh-pages gh-pages
+          cp /tmp/artifacthub-repo.yml /tmp/gh-pages/artifacthub-repo.yml
+          cd /tmp/gh-pages
+          git add artifacthub-repo.yml
+          if git diff --cached --quiet; then
+            echo "artifacthub-repo.yml already up to date on gh-pages."
+          else
+            git commit -m "chore: sync artifacthub-repo.yml to gh-pages"
+            git push origin gh-pages
+          fi

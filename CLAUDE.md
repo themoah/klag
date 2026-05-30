@@ -14,6 +14,11 @@ Klag is a Kafka Lag Exporter built with Vert.x 4.5.22. Monitors consumer lag and
 ./gradlew test                 # Run tests
 ./gradlew assemble             # Package (creates fat JAR)
 ./gradlew run                  # Run with hot-reload
+
+./scripts/test-helm-chart.sh   # Helm chart template tests (offline)
+./scripts/e2e-test.sh          # Full e2e: k3d + real Kafka + chart + lag asserts
+./scripts/e2e-strimzi-test.sh  # e2e against Strimzi-operator-managed Kafka (KRaft)
+./scripts/e2e-strimzi-matrix.sh # Strimzi e2e across supported Kafka versions
 ```
 
 ## Architecture
@@ -48,7 +53,7 @@ src/main/java/io/github/themoah/klag/
 
 **Kafka:** `KAFKA_BOOTSTRAP_SERVERS` (localhost:9092), `KAFKA_REQUEST_TIMEOUT_MS` (30000), `KAFKA_CHUNK_COUNT` (1), `KAFKA_CHUNK_DELAY_MS` (0)
 
-**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (glob pattern), `METRICS_JVM_ENABLED` (false)
+**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false). A group is monitored iff it matches any include segment AND no exclude segment.
 
 **Hot Partition Detection:**
 - `HOT_PARTITION_ENABLED` (true) - Enable/disable hot partition detection
