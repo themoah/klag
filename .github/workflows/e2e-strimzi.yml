@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kafka: ['3.7.0', '4.2.0']
+        kafka: ['4.1.0', '4.2.0']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
