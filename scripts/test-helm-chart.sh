@@ -145,7 +145,7 @@ if helm template test-release "${CHART_DIR}" -f "${TESTS_DIR}/test-values.yaml" 
     echo -e "${GREEN}PASSED${NC}"
     ((passed++))
 else
-    echo -e "${YELLOW}SKIPPED${NC} (kubectl not configured or cluster not available)"
+    echo -e "${YELLOW}SKIPPED${NC} (no cluster — run ./scripts/e2e-test.sh for full server-side validation against a live k3d cluster)"
 fi
 
 echo ""

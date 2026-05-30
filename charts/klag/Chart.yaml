@@ -1,10 +1,11 @@
 apiVersion: v2
 name: klag
-description: A Helm chart for Klag - Kafka Lag Exporter built with Vert.x
+description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter with pluggable metrics sinks.
 type: application
-version: 0.1.11
-appVersion: "0.1.11"
+version: 0.1.12
+appVersion: "0.1.12"
 home: https://github.com/themoah/klag
+icon: https://avatars.githubusercontent.com/themoah
 sources:
   - https://github.com/themoah/klag
 keywords:
@@ -16,3 +17,25 @@ keywords:
   - consumer-groups
 maintainers:
   - name: themoah
+    email: aviv@dozorets.com
+    url: https://github.com/themoah
+annotations:
+  artifacthub.io/category: monitoring-logging
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/links: |
+    - name: source
+      url: https://github.com/themoah/klag
+    - name: issues
+      url: https://github.com/themoah/klag/issues
+    - name: documentation
+      url: https://github.com/themoah/klag/blob/main/README.md
+  artifacthub.io/images: |
+    - name: klag
+      image: themoah/klag:0.1.12
+  artifacthub.io/maintainers: |
+    - name: themoah
+      email: aviv@dozorets.com
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial publication of the Klag Helm chart to Artifact Hub

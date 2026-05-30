@@ -120,6 +120,22 @@ public class OffsetTimestampTracker {
   }
 
   /**
+   * Returns the oldest retained offset for a partition, if available.
+   *
+   * @param topic the topic name
+   * @param partition the partition number
+   * @return the oldest offset in poll history, or empty if no history exists
+   */
+  public OptionalLong getOldestOffset(String topic, int partition) {
+    String key = makeKey(topic, partition);
+    PartitionOffsetHistory history = histories.get(key);
+    if (history == null) {
+      return OptionalLong.empty();
+    }
+    return history.getOldestOffset();
+  }
+
+  /**
    * Returns the latest recorded offset for a partition, if available.
    *
    * @param topic the topic name

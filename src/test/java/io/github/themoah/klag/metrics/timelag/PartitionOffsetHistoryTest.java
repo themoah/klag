@@ -116,39 +116,31 @@ public class PartitionOffsetHistoryTest {
   }
 
   @Test
-  void interpolateTimestamp_extrapolatesBackward_whenOffsetOlderThanHistory() {
+  void interpolateTimestamp_returnsEmpty_whenOffsetOlderThanHistory() {
     PartitionOffsetHistory history = new PartitionOffsetHistory("topic", 0, 10);
 
-    // Record: offset 100 at time 1000, offset 200 at time 2000
     history.addPoint(100, 1000);
     history.addPoint(200, 2000);
 
-    // Target offset 50 should extrapolate backward: time 500
-    // Using slope from first two points: (2000-1000)/(200-100) = 10 ms/offset
-    // t = 1000 + (50-100) * 10 = 1000 - 500 = 500
     OptionalLong result = history.interpolateTimestamp(50);
 
-    assertTrue(result.isPresent());
-    assertEquals(500, result.getAsLong());
+    assertTrue(result.isEmpty(), "Should not extrapolate beyond oldest retained sample");
   }
 
   @Test
-  void interpolateTimestamp_extrapolatesBackward_toNegativeTimestamp() {
+  void interpolateTimestamp_returnsEmpty_whenOffsetWellBeforeHistory() {
     PartitionOffsetHistory history = new PartitionOffsetHistory("topic", 0, 10);
 
-    // Record: offset 100 at time 1000, offset 200 at time 2000
     history.addPoint(100, 1000);
     history.addPoint(200, 2000);
 
-    // Target offset 0 should extrapolate to: 1000 + (0-100) * 10 = 0
     OptionalLong result = history.interpolateTimestamp(0);
 
-    assertTrue(result.isPresent());
-    assertEquals(0, result.getAsLong());
+    assertTrue(result.isEmpty());
   }
 
   @Test
-  void bufferSize_evictsOldestPoints() {
+  void bufferSize_evictsOldestPoints_andRejectsOutOfRangeInterpolation() {
     PartitionOffsetHistory history = new PartitionOffsetHistory("topic", 0, 3);
 
     history.addPoint(100, 1000);
@@ -156,17 +148,11 @@ public class PartitionOffsetHistoryTest {
     history.addPoint(300, 3000);
     assertEquals(3, history.size());
 
-    // Adding 4th point should evict the oldest
     history.addPoint(400, 4000);
     assertEquals(3, history.size());
 
-    // Now the oldest point is (200, 2000)
-    // Extrapolating to offset 100 should use points (200,2000) and (300,3000)
-    // slope = (3000-2000)/(300-200) = 10
-    // t = 2000 + (100-200) * 10 = 2000 - 1000 = 1000
     OptionalLong result = history.interpolateTimestamp(100);
-    assertTrue(result.isPresent());
-    assertEquals(1000, result.getAsLong());
+    assertTrue(result.isEmpty(), "Offset evicted from buffer must not be extrapolated");
   }
 
   @Test

@@ -186,6 +186,9 @@ nbdist/
 !.vscode/launch.json
 !.vscode/extensions.json
 
+### Internal / non-git docs ###
+ARTIFACTHUB_PUBLISHING_MEMO.md
+
 ### Environment Variables ###
 .env
 
