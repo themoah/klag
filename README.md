@@ -273,29 +273,72 @@ Requires Java 21.
 
 ## Development
 
-### Testing Helm Chart
+### Helm Chart Template Tests
+
+Fast, offline. Lints the chart and renders every values permutation:
 
 ```bash
 ./scripts/test-helm-chart.sh
 ```
 
-### Local Kubernetes Testing (macOS)
+### End-to-End Test (k3d + real Kafka)
+
+The canonical integration test. Spins up a disposable [k3d](https://k3d.io)
+cluster, deploys a real single-node Kafka (KRaft), builds the Klag image from
+the local `Dockerfile`, installs the Helm chart, generates real consumer-group
+lag, and asserts Klag connects to Kafka and exposes the lag via `/metrics`.
+Nothing is mocked — Klag's readiness probe only passes once it can reach Kafka.
 
 ```bash
-# Full test: create cluster, install chart, validate, cleanup
-./scripts/local-k8s-test.sh
+# Full e2e: cluster -> Kafka -> build+deploy Klag -> assert lag -> cleanup
+./scripts/e2e-test.sh
 
-# Auto-install dependencies (kind, helm, kubectl) via Homebrew
-./scripts/local-k8s-test.sh --auto-install
+# Install missing deps (k3d, kubectl, helm) via Homebrew
+./scripts/e2e-test.sh --auto-install
 
-# Keep cluster running after test
-./scripts/local-k8s-test.sh --skip-cleanup
+# Keep the cluster running afterwards (inspect / debug)
+./scripts/e2e-test.sh --skip-cleanup
 
-# Cleanup only
-./scripts/local-k8s-test.sh --cleanup
+# Test a published image instead of building locally
+KLAG_IMAGE=themoah/klag:0.1.12 ./scripts/e2e-test.sh
+
+# Test against an older Kafka broker
+KAFKA_IMAGE=apache/kafka:3.7.0 ./scripts/e2e-test.sh
+
+# Delete the test cluster
+./scripts/e2e-test.sh --cleanup
 ```
 
-Prerequisites: Docker Desktop, kind, helm, kubectl (use `--auto-install` to install via Homebrew).
+### Strimzi Compatibility
+
+Klag works with Kafka clusters managed by the [Strimzi](https://strimzi.io)
+operator (the common production way to run Kafka on Kubernetes). A dedicated
+e2e installs the Strimzi operator, provisions a real KRaft Kafka cluster via
+Strimzi CRDs, points the chart at the `*-kafka-bootstrap` service, and asserts
+Klag scrapes the lag.
+
+```bash
+# Single version (defaults to a Strimzi-supported Kafka version)
+./scripts/e2e-strimzi-test.sh
+
+# Specific Kafka version
+KAFKA_VERSION=4.1.0 ./scripts/e2e-strimzi-test.sh
+
+# Matrix across all supported versions
+./scripts/e2e-strimzi-matrix.sh 4.1.0 4.2.0
+```
+
+Verified against Strimzi-managed Kafka **4.1.0** and **4.2.0** (the versions the
+current Strimzi operator supports). Connecting to Strimzi needs no special chart
+config — just set `kafka.bootstrapServers` to the Strimzi bootstrap service,
+e.g. `--set kafka.bootstrapServers=my-cluster-kafka-bootstrap:9092`. Both e2e
+suites run in CI on every PR (`.github/workflows/e2e.yml`).
+
+Prerequisites: Docker, k3d, helm, kubectl (use `--auto-install` to install via
+Homebrew). This same script runs in CI on every PR (`.github/workflows/e2e.yml`).
+
+> The legacy `scripts/local-k8s-test.sh` (kind-based smoke test) is superseded
+> by `e2e-test.sh` and kept only for quick kind users.
 
 ---
 
@@ -306,7 +349,8 @@ Prerequisites: Docker Desktop, kind, helm, kubectl (use `--auto-install` to inst
 3. Run tests before submitting:
    ```bash
    ./gradlew test                # Java tests
-   ./scripts/test-helm-chart.sh  # Helm chart tests
+   ./scripts/test-helm-chart.sh  # Helm chart template tests
+   ./scripts/e2e-test.sh         # End-to-end (k3d + real Kafka)
    ```
 4. Submit a pull request
 
