@@ -42,7 +42,16 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
       - name: Install k3d
-        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+        env:
+          K3D_VERSION: v5.7.5
+          K3D_SHA256: 5d3f22817d9e163ab6ed43572189dd49fe724d7a6948075b570067747eca8d3f
+        run: |
+          curl -fsSL -o /tmp/k3d \
+            "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
+          echo "${K3D_SHA256}  /tmp/k3d" | sha256sum -c -
+          chmod +x /tmp/k3d
+          sudo mv /tmp/k3d /usr/local/bin/k3d
+          k3d version
       - name: Run e2e test (Kafka ${{ matrix.kafka }})
         env:
           KAFKA_IMAGE: apache/kafka:${{ matrix.kafka }}
@@ -64,7 +73,16 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
       - name: Install k3d
-        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+        env:
+          K3D_VERSION: v5.7.5
+          K3D_SHA256: 5d3f22817d9e163ab6ed43572189dd49fe724d7a6948075b570067747eca8d3f
+        run: |
+          curl -fsSL -o /tmp/k3d \
+            "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/k3d-linux-amd64"
+          echo "${K3D_SHA256}  /tmp/k3d" | sha256sum -c -
+          chmod +x /tmp/k3d
+          sudo mv /tmp/k3d /usr/local/bin/k3d
+          k3d version
       - name: Run Strimzi e2e (Kafka ${{ matrix.kafka }})
         env:
           KAFKA_VERSION: ${{ matrix.kafka }}
