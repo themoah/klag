@@ -302,9 +302,37 @@ Nothing is mocked — Klag's readiness probe only passes once it can reach Kafka
 # Test a published image instead of building locally
 KLAG_IMAGE=themoah/klag:0.1.12 ./scripts/e2e-test.sh
 
+# Test against an older Kafka broker
+KAFKA_IMAGE=apache/kafka:3.7.0 ./scripts/e2e-test.sh
+
 # Delete the test cluster
 ./scripts/e2e-test.sh --cleanup
 ```
+
+### Strimzi Compatibility
+
+Klag works with Kafka clusters managed by the [Strimzi](https://strimzi.io)
+operator (the common production way to run Kafka on Kubernetes). A dedicated
+e2e installs the Strimzi operator, provisions a real KRaft Kafka cluster via
+Strimzi CRDs, points the chart at the `*-kafka-bootstrap` service, and asserts
+Klag scrapes the lag.
+
+```bash
+# Single version (defaults to a Strimzi-supported Kafka version)
+./scripts/e2e-strimzi-test.sh
+
+# Specific Kafka version
+KAFKA_VERSION=4.1.0 ./scripts/e2e-strimzi-test.sh
+
+# Matrix across all supported versions
+./scripts/e2e-strimzi-matrix.sh 4.1.0 4.2.0
+```
+
+Verified against Strimzi-managed Kafka **4.1.0** and **4.2.0** (the versions the
+current Strimzi operator supports). Connecting to Strimzi needs no special chart
+config — just set `kafka.bootstrapServers` to the Strimzi bootstrap service,
+e.g. `--set kafka.bootstrapServers=my-cluster-kafka-bootstrap:9092`. Both e2e
+suites run in CI on every PR (`.github/workflows/e2e.yml`).
 
 Prerequisites: Docker, k3d, helm, kubectl (use `--auto-install` to install via
 Homebrew). This same script runs in CI on every PR (`.github/workflows/e2e.yml`).

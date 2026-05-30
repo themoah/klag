@@ -1,9 +1,11 @@
 name: E2E (Helm + k3d)
 
-# Runs the full end-to-end test: builds the Klag image, spins up a k3d cluster
-# with a real single-node Kafka, installs the Helm chart, generates consumer
-# lag, and asserts Klag scrapes and exposes it. Gates changes to the chart,
-# the app source, or the container build.
+# Runs the full end-to-end tests: builds the Klag image, spins up a k3d cluster
+# with a real Kafka, installs the Helm chart, generates consumer lag, and
+# asserts Klag scrapes and exposes it. Two jobs:
+#   * e2e      - plain apache/kafka broker, matrixed across Kafka versions
+#   * strimzi  - Kafka provisioned by the Strimzi operator, matrixed across the
+#                Kafka versions Strimzi supports (verifies chart/Strimzi compat)
 
 on:
   pull_request:
@@ -13,6 +15,7 @@ on:
       - 'Dockerfile'
       - 'build.gradle.kts'
       - 'scripts/e2e-test.sh'
+      - 'scripts/e2e-strimzi-test.sh'
       - '.github/workflows/e2e.yml'
   push:
     branches: [main]
@@ -25,20 +28,44 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kafka: ['3.7.0', '3.8.0', '3.9.0']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Helm
         uses: azure/setup-helm@v4
         with:
           version: v3.14.0
-
       - name: Set up kubectl
         uses: azure/setup-kubectl@v4
-
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-
-      - name: Run e2e test
+      - name: Run e2e test (Kafka ${{ matrix.kafka }})
+        env:
+          KAFKA_IMAGE: apache/kafka:${{ matrix.kafka }}
         run: ./scripts/e2e-test.sh
+
+  strimzi:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kafka: ['3.7.0', '4.2.0']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+      - name: Install k3d
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+      - name: Run Strimzi e2e (Kafka ${{ matrix.kafka }})
+        env:
+          KAFKA_VERSION: ${{ matrix.kafka }}
+        run: ./scripts/e2e-strimzi-test.sh

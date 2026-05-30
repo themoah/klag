@@ -34,14 +34,14 @@ CHART_DIR="charts/klag"
 RELEASE="klag"
 KAFKA_CLUSTER="my-cluster"
 BOOTSTRAP="my-cluster-kafka-bootstrap:9092"
-CLIENT_IMAGE="apache/kafka:3.9.0"     # used only as a Kafka CLI client
+CLIENT_IMAGE="apache/kafka:4.2.0"     # used only as a Kafka CLI client
 LOCAL_IMAGE="klag:e2e"
 TOPIC="strimzi-topic"
 GROUP="strimzi-group"
 MESSAGES=1000
 CONSUME=100
 LOCAL_PORT=18889
-KAFKA_VERSION="${KAFKA_VERSION:-3.9.0}"
+KAFKA_VERSION="${KAFKA_VERSION:-4.2.0}"
 STRIMZI_VERSION="${STRIMZI_VERSION:-latest}"
 PF_PID=""
 
@@ -89,6 +89,23 @@ need() {
 kc()   { kubectl --context "k3d-${CLUSTER_NAME}" -n "$NAMESPACE" "$@"; }
 kcli() { kc exec deploy/kafka-client -- /opt/kafka/bin/"$@"; }
 
+# kubectl caches API discovery on disk (10-min TTL); after installing the
+# Strimzi CRDs a fresh `apply` may not yet resolve the new kinds. Drop the cache
+# so the next call rebuilds discovery from the live API server.
+refresh_discovery(){ rm -rf "${HOME}/.kube/cache/discovery" "${HOME}/.kube/cache/http" 2>/dev/null || true; }
+
+# Apply a manifest, retrying while the API still reports "no matches for kind"
+# (new CRD not yet visible to the client).
+apply_retry(){
+  local manifest="$1" i out
+  for i in $(seq 1 18); do
+    if out="$(printf '%s' "$manifest" | kc apply -f - 2>&1)"; then return 0; fi
+    grep -q "no matches for kind\|ensure CRDs" <<<"$out" || { echo "$out" >&2; return 1; }
+    refresh_discovery; sleep 5
+  done
+  echo "$out" >&2; return 1
+}
+
 # ----------------------------------------------------------------------------
 [[ "$CLEANUP_ONLY" == true ]] && delete_cluster_only
 
@@ -131,12 +148,13 @@ ok "Strimzi operator ready"
 kubectl --context "k3d-${CLUSTER_NAME}" wait --for=condition=Established --timeout=120s \
   crd/kafkas.kafka.strimzi.io crd/kafkanodepools.kafka.strimzi.io >/dev/null \
   || die "Strimzi CRDs not established"
+refresh_discovery
 ok "Strimzi CRDs established"
 
 # ----------------------------------------------------------------------------
 log "Creating Strimzi Kafka cluster '${KAFKA_CLUSTER}' (KRaft, Kafka ${KAFKA_VERSION})"
-cat <<EOF | kubectl --context "k3d-${CLUSTER_NAME}" -n "$NAMESPACE" apply -f - >/dev/null
-apiVersion: kafka.strimzi.io/v1beta2
+KAFKA_CR="$(cat <<EOF
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaNodePool
 metadata:
   name: dual-role
@@ -148,7 +166,7 @@ spec:
   storage:
     type: ephemeral
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: Kafka
 metadata:
   name: ${KAFKA_CLUSTER}
@@ -173,6 +191,9 @@ spec:
     topicOperator: {}
     userOperator: {}
 EOF
+)"
+apply_retry "$KAFKA_CR" >/dev/null || die "Failed to apply Strimzi Kafka CRs"
+ok "Kafka CRs applied"
 
 log "Waiting for Strimzi Kafka to become Ready (operator provisions pods)"
 if ! kc wait "kafka/${KAFKA_CLUSTER}" --for=condition=Ready --timeout=600s >/dev/null 2>&1; then

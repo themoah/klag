@@ -14,6 +14,11 @@ Klag is a Kafka Lag Exporter built with Vert.x 4.5.22. Monitors consumer lag and
 ./gradlew test                 # Run tests
 ./gradlew assemble             # Package (creates fat JAR)
 ./gradlew run                  # Run with hot-reload
+
+./scripts/test-helm-chart.sh   # Helm chart template tests (offline)
+./scripts/e2e-test.sh          # Full e2e: k3d + real Kafka + chart + lag asserts
+./scripts/e2e-strimzi-test.sh  # e2e against Strimzi-operator-managed Kafka (KRaft)
+./scripts/e2e-strimzi-matrix.sh # Strimzi e2e across supported Kafka versions
 ```
 
 ## Architecture

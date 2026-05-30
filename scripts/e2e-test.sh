@@ -18,7 +18,9 @@
 #   -h, --help           Show this help
 #
 # Environment:
-#   KLAG_IMAGE   Use this image instead of building locally (e.g. themoah/klag:0.1.12)
+#   KLAG_IMAGE    Use this image instead of building locally (e.g. themoah/klag:0.1.12)
+#   KAFKA_IMAGE   Kafka broker image to test against (default apache/kafka:3.9.0;
+#                 e.g. apache/kafka:3.7.0 / 3.8.0 to verify older brokers)
 #
 set -euo pipefail
 
@@ -26,7 +28,7 @@ CLUSTER_NAME="klag-e2e"
 NAMESPACE="klag-e2e"
 CHART_DIR="charts/klag"
 RELEASE="klag"
-KAFKA_IMAGE="apache/kafka:3.9.0"
+KAFKA_IMAGE="${KAFKA_IMAGE:-apache/kafka:3.9.0}"
 LOCAL_IMAGE="klag:e2e"
 TOPIC="e2e-topic"
 GROUP="e2e-group"
