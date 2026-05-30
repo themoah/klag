@@ -21,6 +21,27 @@ Klag is a Kafka Lag Exporter built with Vert.x 4.5.22. Monitors consumer lag and
 ./scripts/e2e-strimzi-matrix.sh # Strimzi e2e across supported Kafka versions
 ```
 
+### GraalVM Native Image (startup/memory optimized)
+
+Requires a GraalVM JDK 21 (LTS) with `native-image` (e.g. `sdk install java 21.0.2-graalce`).
+Run Gradle with that JDK as `JAVA_HOME`/`GRAALVM_HOME`.
+
+```bash
+gradle nativeCompile           # -> build/native/nativeCompile/klag (standalone binary)
+docker build -f Dockerfile.native -t klag:native .   # distroless runtime image
+scripts/benchmark-startup.sh native - build/native/nativeCompile/klag  # startup/RSS bench
+```
+
+Native config lives in `build.gradle.kts` (`graalvmNative` block) plus reachability
+hints in `src/main/resources/META-INF/native-image/`. Reflection metadata for Netty,
+kafka-clients, logback and micrometer comes from the GraalVM Reachability Metadata
+Repository (auto-enabled). Entry point is `KlagLauncher` (direct `new MainVerticle()`,
+no reflective Vert.x launcher).
+
+**Measured (macOS arm64, prometheus reporter, Kafka up):** native ≈ 70-100 ms startup /
+44 MB RSS vs JVM 21 ≈ 470-520 ms / 119 MB. JVM 25 (LTS) showed no startup/memory gain
+over 21 for this workload (slightly higher RSS), so the runtime stays on JDK 21.
+
 ## Architecture
 
 Vert.x reactive framework with `Future<T>`-based async API.

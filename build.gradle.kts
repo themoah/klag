@@ -5,6 +5,7 @@ plugins {
   java
   application
   id("com.gradleup.shadow") version "9.2.2"
+  id("org.graalvm.buildtools.native") version "0.10.6"
 }
 
 group = "io.github.themoah"
@@ -94,4 +95,33 @@ tasks.withType<ProcessResources> {
       "projectVersion" to version
     )
   }
+}
+
+// GraalVM native image configuration.
+// Entry point is KlagLauncher (direct `new MainVerticle()` - no reflective Vert.x launcher).
+// Reachability metadata for Netty, kafka-clients, logback, micrometer is pulled
+// from the GraalVM Reachability Metadata Repository; project-specific hints live
+// in src/main/resources/META-INF/native-image/.
+graalvmNative {
+  binaries {
+    named("main") {
+      imageName.set("klag")
+      mainClass.set(launcherClassName)
+      buildArgs.add("--no-fallback")
+      buildArgs.add("-H:+ReportExceptionStackTraces")
+      buildArgs.add("--enable-url-protocols=http,https")
+      // Vert.x/Netty/logback are not safe to initialize at build time.
+      buildArgs.add("--initialize-at-run-time=io.netty")
+      // -PnativeStatic (Linux/CI): statically link everything except libc so the
+      // binary runs on a distroless/base image with no libz.so.1 etc. Not used on
+      // macOS where static linking is unsupported.
+      if (project.hasProperty("nativeStatic")) {
+        buildArgs.add("-H:+StaticExecutableWithDynamicLibC")
+      }
+    }
+  }
+  metadataRepository {
+    enabled.set(true)
+  }
+  toolchainDetection.set(false)
 }
