@@ -4,10 +4,12 @@ import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.LagVelocity;
 import io.github.themoah.klag.model.MetricsSnapshot.GroupSnapshot;
 import io.github.themoah.klag.model.RetentionRisk;
+import io.github.themoah.klag.model.StateTransition;
 import io.github.themoah.klag.model.TimeToCloseEstimate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 /**
  * Rule-based diagnosis of a single consumer group from its snapshot.
@@ -47,6 +49,8 @@ public final class Diagnoser {
   private static final double RETENTION_WARN_PERCENT = 80.0;
   // Lag below this (messages) is treated as effectively caught up; trend is not noteworthy.
   private static final long NOTABLE_LAG = 100;
+  // Number of recent state transitions at/above which the group is flagged as churning.
+  private static final int CHURN_THRESHOLD = 3;
 
   /**
    * Diagnoses a consumer group.
@@ -58,6 +62,7 @@ public final class Diagnoser {
     List<Finding> findings = new ArrayList<>();
 
     addStateFinding(g, findings);
+    addStateChurnFinding(g, findings);
     addRetentionFinding(g, findings);
     addVelocityFindings(g, findings);
     addHotPartitionFinding(g, findings);
@@ -87,6 +92,21 @@ public final class Diagnoser {
         "Could not determine group state from the last collection."));
       default -> { /* STABLE: healthy baseline, no finding */ }
     }
+  }
+
+  private static void addStateChurnFinding(GroupSnapshot g, List<Finding> findings) {
+    List<StateTransition> history = g.recentTransitions();
+    if (history.size() < CHURN_THRESHOLD) {
+      return;
+    }
+    String trail = history.stream()
+      .map(t -> t.from().toMetricValue() + "→" + t.to().toMetricValue())
+      .collect(Collectors.joining(", "));
+    findings.add(new Finding(Severity.WARNING, "Frequent state changes",
+      String.format(Locale.ROOT,
+        "Group changed state %d times recently (%s). A rebalance storm or flapping members "
+        + "destabilises consumption; check for crashing/restarting consumers, session "
+        + "timeouts, or slow poll loops.", history.size(), trail)));
   }
 
   private static void addRetentionFinding(GroupSnapshot g, List<Finding> findings) {

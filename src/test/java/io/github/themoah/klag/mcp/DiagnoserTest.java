@@ -9,9 +9,11 @@ import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import io.github.themoah.klag.model.ConsumerGroupState.State;
 import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.LagMs;
+import io.github.themoah.klag.model.LagTrend.Direction;
 import io.github.themoah.klag.model.LagVelocity;
 import io.github.themoah.klag.model.MetricsSnapshot.GroupSnapshot;
 import io.github.themoah.klag.model.RetentionRisk;
+import io.github.themoah.klag.model.StateTransition;
 import io.github.themoah.klag.model.TimeToCloseEstimate;
 import java.util.List;
 import java.util.Locale;
@@ -135,6 +137,37 @@ class DiagnoserTest {
     // catching up is informational, not a problem
     assertEquals(Severity.INFO, d.overall());
     assertTrue(hasFindingContaining(d, "catching up"));
+  }
+
+  @Test
+  void frequentStateChangesWarn() {
+    PartitionLag p = PartitionLag.of("orders", 0, 1000, 0, 0, 0, 1000);
+    List<StateTransition> churn = List.of(
+      new StateTransition(State.STABLE, State.PREPARING_REBALANCE, 1L),
+      new StateTransition(State.PREPARING_REBALANCE, State.COMPLETING_REBALANCE, 2L),
+      new StateTransition(State.COMPLETING_REBALANCE, State.STABLE, 3L));
+    GroupSnapshot g = new GroupSnapshot("payments", State.STABLE, 0, 0, 0,
+      List.of(p), List.of(), List.of(), List.of(), List.of(), List.of(),
+      churn, List.of(), Direction.STABLE);
+
+    Diagnosis d = Diagnoser.diagnose(g);
+
+    assertEquals(Severity.WARNING, d.overall());
+    assertTrue(hasFindingContaining(d, "state change"));
+  }
+
+  @Test
+  void fewStateChangesDoNotWarn() {
+    PartitionLag p = PartitionLag.of("orders", 0, 1000, 0, 0, 0, 1000);
+    List<StateTransition> few = List.of(
+      new StateTransition(State.STABLE, State.PREPARING_REBALANCE, 1L));
+    GroupSnapshot g = new GroupSnapshot("payments", State.STABLE, 0, 0, 0,
+      List.of(p), List.of(), List.of(), List.of(), List.of(), List.of(),
+      few, List.of(), Direction.STABLE);
+
+    Diagnosis d = Diagnoser.diagnose(g);
+
+    assertEquals(Severity.OK, d.overall());
   }
 
   @Test

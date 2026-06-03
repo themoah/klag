@@ -166,7 +166,7 @@ public class MainVerticle extends AbstractVerticle {
     HotPartitionConfig hotPartitionConfig = HotPartitionConfig.fromEnvironment();
 
     MetricsReporter reporter = new MicrometerReporter(registry);
-    return new MetricsCollector(
+    MetricsCollector collector = new MetricsCollector(
       vertx,
       kafkaClientService,
       reporter,
@@ -175,6 +175,8 @@ public class MainVerticle extends AbstractVerticle {
       config.consumerGroupExclude(),
       hotPartitionConfig
     );
+    collector.setLagTrendDeadband(config.lagTrendDeadband());
+    return collector;
   }
 
   private void registerMcpEndpoint(Router router) {

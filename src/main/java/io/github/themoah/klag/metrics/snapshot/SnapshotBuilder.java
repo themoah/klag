@@ -3,13 +3,17 @@ package io.github.themoah.klag.metrics.snapshot;
 import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupState;
 import io.github.themoah.klag.model.ConsumerGroupState.State;
+import io.github.themoah.klag.metrics.trend.LagTrendClassifier;
 import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.HotPartitionThroughput;
 import io.github.themoah.klag.model.LagMs;
+import io.github.themoah.klag.model.LagTrend;
+import io.github.themoah.klag.model.LagTrend.Direction;
 import io.github.themoah.klag.model.LagVelocity;
 import io.github.themoah.klag.model.MetricsSnapshot;
 import io.github.themoah.klag.model.MetricsSnapshot.GroupSnapshot;
 import io.github.themoah.klag.model.RetentionRisk;
+import io.github.themoah.klag.model.StateTransition;
 import io.github.themoah.klag.model.TimeToCloseEstimate;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +41,7 @@ public final class SnapshotBuilder {
    * @param retentionRisks per group+topic retention risk
    * @param hotByLag per group+topic+partition lag outliers
    * @param hotByThroughput topic-level throughput outliers (no consumer dimension)
-   * @return the assembled snapshot
+   * @return the assembled snapshot with no transition history and the default trend deadband
    */
   public static MetricsSnapshot build(
     long timestampMs,
@@ -50,6 +54,40 @@ public final class SnapshotBuilder {
     List<HotPartitionLag> hotByLag,
     List<HotPartitionThroughput> hotByThroughput
   ) {
+    return build(timestampMs, lagData, stateData, velocities, lagMsData, timeToClose,
+      retentionRisks, hotByLag, hotByThroughput, Map.of(), 1.0);
+  }
+
+  /**
+   * Builds an immutable snapshot including state-transition history and lag-trend classification.
+   * See the 9-argument overload for the shared parameters.
+   *
+   * @param timestampMs wall-clock time of assembly
+   * @param lagData per-group lag detail (defines the set of groups in the snapshot)
+   * @param stateData group ID to state (missing entries default to UNKNOWN)
+   * @param velocities per group+topic lag velocity
+   * @param lagMsData per group+topic lag in ms
+   * @param timeToClose per group+topic time-to-close estimates
+   * @param retentionRisks per group+topic retention risk
+   * @param hotByLag per group+topic+partition lag outliers
+   * @param hotByThroughput topic-level throughput outliers (no consumer dimension)
+   * @param transitionsByGroup recent state transitions per group (empty if untracked)
+   * @param lagTrendDeadband STABLE band magnitude (msg/s) for trend classification
+   * @return the assembled snapshot
+   */
+  public static MetricsSnapshot build(
+    long timestampMs,
+    List<ConsumerGroupLag> lagData,
+    Map<String, ConsumerGroupState> stateData,
+    List<LagVelocity> velocities,
+    List<LagMs> lagMsData,
+    List<TimeToCloseEstimate> timeToClose,
+    List<RetentionRisk> retentionRisks,
+    List<HotPartitionLag> hotByLag,
+    List<HotPartitionThroughput> hotByThroughput,
+    Map<String, List<StateTransition>> transitionsByGroup,
+    double lagTrendDeadband
+  ) {
     Map<String, List<LagVelocity>> velByGroup = groupBy(velocities, LagVelocity::consumerGroup);
     Map<String, List<LagMs>> lagMsByGroup = groupBy(lagMsData, LagMs::consumerGroup);
     Map<String, List<TimeToCloseEstimate>> ttcByGroup = groupBy(timeToClose, TimeToCloseEstimate::consumerGroup);
@@ -60,6 +98,9 @@ public final class SnapshotBuilder {
     for (ConsumerGroupLag lag : lagData) {
       String group = lag.consumerGroup();
       State state = stateData.containsKey(group) ? stateData.get(group).state() : State.UNKNOWN;
+      List<LagVelocity> groupVelocities = velByGroup.getOrDefault(group, List.of());
+      List<LagTrend> trends = LagTrendClassifier.perTopic(groupVelocities, lagTrendDeadband);
+      Direction overallTrend = LagTrendClassifier.overall(trends, lag.totalLag());
       groups.add(new GroupSnapshot(
         group,
         state,
@@ -67,11 +108,14 @@ public final class SnapshotBuilder {
         lag.maxLag(),
         lag.minLag(),
         lag.partitions(),
-        velByGroup.getOrDefault(group, List.of()),
+        groupVelocities,
         lagMsByGroup.getOrDefault(group, List.of()),
         ttcByGroup.getOrDefault(group, List.of()),
         riskByGroup.getOrDefault(group, List.of()),
-        hotByGroup.getOrDefault(group, List.of())
+        hotByGroup.getOrDefault(group, List.of()),
+        transitionsByGroup.getOrDefault(group, List.of()),
+        trends,
+        overallTrend
       ));
     }
 

@@ -10,10 +10,12 @@ import io.github.themoah.klag.model.ConsumerGroupState.State;
 import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.HotPartitionThroughput;
 import io.github.themoah.klag.model.LagMs;
+import io.github.themoah.klag.model.LagTrend.Direction;
 import io.github.themoah.klag.model.LagVelocity;
 import io.github.themoah.klag.model.MetricsSnapshot;
 import io.github.themoah.klag.model.MetricsSnapshot.GroupSnapshot;
 import io.github.themoah.klag.model.RetentionRisk;
+import io.github.themoah.klag.model.StateTransition;
 import io.github.themoah.klag.model.TimeToCloseEstimate;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +77,39 @@ class SnapshotBuilderTest {
     GroupSnapshot other = snap.group("other").orElseThrow();
     assertTrue(other.velocities().isEmpty());
     assertTrue(other.retentionRisks().isEmpty());
+  }
+
+  @Test
+  void classifiesTrendsAndCarriesTransitions() {
+    LagVelocity growing = new LagVelocity("payments", "orders", 50.0, 1000, 3);
+    StateTransition t = new StateTransition(State.STABLE, State.EMPTY, 999L);
+
+    MetricsSnapshot snap = SnapshotBuilder.build(
+      1L,
+      List.of(groupLag("payments", "orders", 0, 100, 40)),
+      Map.of("payments", new ConsumerGroupState("payments", State.STABLE)),
+      List.of(growing), List.of(), List.of(), List.of(), List.of(),
+      List.of(),
+      Map.of("payments", List.of(t)),
+      1.0);
+
+    GroupSnapshot g = snap.group("payments").orElseThrow();
+    assertEquals(1, g.trends().size());
+    assertEquals(Direction.GROWING, g.trends().get(0).direction());
+    assertEquals(Direction.GROWING, g.overallTrend());
+    assertEquals(List.of(t), g.recentTransitions());
+  }
+
+  @Test
+  void defaultsTrendsAndTransitionsWhenNotSupplied() {
+    MetricsSnapshot snap = SnapshotBuilder.build(
+      1L, List.of(groupLag("g", "t", 0, 10, 0)),
+      Map.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+
+    GroupSnapshot g = snap.group("g").orElseThrow();
+    assertTrue(g.trends().isEmpty());
+    assertTrue(g.recentTransitions().isEmpty());
+    assertEquals(Direction.STABLE, g.overallTrend());
   }
 
   @Test

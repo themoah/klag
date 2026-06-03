@@ -14,6 +14,7 @@ import io.github.themoah.klag.metrics.timelag.TimeLagEstimator;
 import io.github.themoah.klag.metrics.velocity.LagVelocityTracker;
 import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
+import io.github.themoah.klag.model.StateTransition;
 import io.github.themoah.klag.model.ConsumerGroupOffsets;
 import io.github.themoah.klag.model.ConsumerGroupOffsets.TopicPartitionKey;
 import io.github.themoah.klag.model.ConsumerGroupState;
@@ -64,6 +65,9 @@ public class MetricsCollector {
   // Optional snapshot store for the MCP layer. When set, the collector publishes its
   // last cycle into it (best-effort, never affecting collection). Null = MCP disabled.
   private SnapshotStore snapshotStore;
+
+  // STABLE band (msg/s) for classifying lag velocity into a basic trend in the MCP snapshot.
+  private double lagTrendDeadband = 1.0;
 
   private Long timerId;
 
@@ -149,6 +153,16 @@ public class MetricsCollector {
    */
   public void setSnapshotStore(SnapshotStore snapshotStore) {
     this.snapshotStore = snapshotStore;
+  }
+
+  /**
+   * Sets the STABLE deadband (msg/s) used to classify lag velocity into a basic trend for the
+   * MCP snapshot. Defaults to 1.0.
+   *
+   * @param lagTrendDeadband the deadband magnitude in messages/second
+   */
+  public void setLagTrendDeadband(double lagTrendDeadband) {
+    this.lagTrendDeadband = lagTrendDeadband;
   }
 
   /**
@@ -515,8 +529,14 @@ public class MetricsCollector {
 
       // Accumulate this call's derived metrics into the cycle snapshot for the MCP layer.
       if (cycleSnapshot != null) {
+        Map<String, List<StateTransition>> transitionsByGroup = new HashMap<>();
+        for (ConsumerGroupLag lag : lagData) {
+          transitionsByGroup.put(lag.consumerGroup(),
+            micrometerReporter.recentStateTransitions(lag.consumerGroup()));
+        }
         MetricsSnapshot partial = SnapshotBuilder.build(0L, lagData, stateData, velocities,
-          lagMsData, timeToCloseEstimates, retentionRisks, hotByLag, hotByThroughput);
+          lagMsData, timeToCloseEstimates, retentionRisks, hotByLag, hotByThroughput,
+          transitionsByGroup, lagTrendDeadband);
         cycleSnapshot.groups.addAll(partial.groups());
         cycleSnapshot.throughput.addAll(hotByThroughput);
       }

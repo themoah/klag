@@ -7,10 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.themoah.klag.metrics.snapshot.SnapshotStore;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import io.github.themoah.klag.model.ConsumerGroupState.State;
+import io.github.themoah.klag.model.LagTrend;
+import io.github.themoah.klag.model.LagTrend.Direction;
 import io.github.themoah.klag.model.LagVelocity;
 import io.github.themoah.klag.model.MetricsSnapshot;
 import io.github.themoah.klag.model.MetricsSnapshot.GroupSnapshot;
 import io.github.themoah.klag.model.RetentionRisk;
+import io.github.themoah.klag.model.StateTransition;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import java.util.List;
@@ -26,6 +29,17 @@ class McpToolsTest {
       List.of(), List.of(),
       List.of(new RetentionRisk(name, "orders", retention)),
       List.of());
+  }
+
+  private static GroupSnapshot groupWithTrend(String name, long lag, Direction dir, double velocity,
+      List<StateTransition> transitions) {
+    PartitionLag p = PartitionLag.of("orders", 0, 1000, 0, 0, 0, 1000 - lag);
+    return new GroupSnapshot(name, State.STABLE, lag, lag, 0, List.of(p),
+      List.of(new LagVelocity(name, "orders", velocity, 1000, 3)),
+      List.of(), List.of(), List.of(), List.of(),
+      transitions,
+      List.of(new LagTrend("orders", dir, velocity)),
+      dir);
   }
 
   private static SnapshotStore storeWith(GroupSnapshot... groups) {
@@ -100,6 +114,39 @@ class McpToolsTest {
     assertTrue(text.contains("payments"));
     assertTrue(text.contains("orders"));
     assertTrue(text.contains("50"));
+  }
+
+  @Test
+  void getConsumerGroupLagIncludesTrendAndTransitions() {
+    StateTransition t = new StateTransition(State.STABLE, State.EMPTY, 500L);
+    McpTools tools = new McpTools(storeWith(
+      groupWithTrend("payments", 5000, Direction.GROWING, 42.0, List.of(t))));
+
+    JsonObject r = tools.call("get_consumer_group_lag", new JsonObject().put("group", "payments"));
+    String body = textOf(r);
+    JsonObject parsed = new JsonObject(body);
+
+    assertEquals("growing", parsed.getString("overallTrend"));
+    JsonArray trends = parsed.getJsonArray("trends");
+    assertEquals(1, trends.size());
+    assertEquals("growing", trends.getJsonObject(0).getString("direction"));
+    assertEquals("orders", trends.getJsonObject(0).getString("topic"));
+
+    JsonArray transitions = parsed.getJsonArray("recentTransitions");
+    assertEquals(1, transitions.size());
+    assertEquals("stable", transitions.getJsonObject(0).getString("from"));
+    assertEquals("empty", transitions.getJsonObject(0).getString("to"));
+    assertTrue(transitions.getJsonObject(0).containsKey("ageMs"));
+  }
+
+  @Test
+  void listConsumerGroupsIncludesOverallTrend() {
+    McpTools tools = new McpTools(storeWith(
+      groupWithTrend("payments", 5000, Direction.GROWING, 42.0, List.of())));
+
+    String text = textOf(tools.call("list_consumer_groups", new JsonObject()));
+    assertTrue(text.contains("overallTrend"));
+    assertTrue(text.contains("growing"));
   }
 
   @Test
