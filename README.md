@@ -7,6 +7,8 @@
 
 Inspired by [kafka-lag-exporter](https://github.com/seglo/kafka-lag-exporter) (archived 2024). Built with Vert.x and Micrometer.
 
+📖 **Full documentation: [klag.dev](https://klag.dev)** — the docs site lives in [`website/`](website/) (Astro + Starlight).
+
 > **Scales to large clusters:** Monitors thousands of consumer groups in ~50MB heap. Request batching with configurable delays prevents overwhelming brokers — fetch offsets for 500+ groups without spiking cluster CPU.
 
 ## Why Klag?
