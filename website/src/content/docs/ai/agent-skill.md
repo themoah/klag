@@ -9,9 +9,9 @@ preserve project conventions, and leave changes ready for review.
 
 ## Files
 
-- `skills/klag/SKILL.md` — portable skill entry point.
-- `skills/klag/references/project-map.md` — detailed project map and change checklists.
-- `skills/klag/agents/openai.yaml` — optional Codex/OpenAI UI metadata.
+- `skills/klag/SKILL.md`: portable skill entry point.
+- `skills/klag/references/project-map.md`: detailed project map and change checklists.
+- `skills/klag/agents/openai.yaml`: optional Codex/OpenAI UI metadata.
 
 ## Install
 
@@ -41,7 +41,7 @@ cp -R skills/klag "$HOME/.claude/skills/klag"
 ```
 
 For any other harness, copy or symlink the `skills/klag` directory into that tool's
-Agent Skills directory. The contract is simply that the harness can discover `SKILL.md`
+Agent Skills directory. The contract: the harness can discover `SKILL.md`
 with YAML frontmatter fields `name` and `description`.
 
 ## Use

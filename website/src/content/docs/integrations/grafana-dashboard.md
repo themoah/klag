@@ -17,15 +17,15 @@ Klag ships a comprehensive, pre-built Grafana dashboard at
 
 ## What's included
 
-- **Consumer Lag Overview** — real-time lag by group with color-coded thresholds.
-- **Lag Velocity Tracking** — is lag growing or shrinking over time.
-- **Consumer Group Health** — state table with alerts for unhealthy states.
-- **Partition & Offset Details** — topic throughput and per-partition lag.
-- **Hot Partition Detection** — count, table, and time series.
-- **Time-Based Lag** — max time lag, groups catching up, time-to-close charts.
-- **Data Loss Prevention** — retention-risk and at-risk topics panels.
-- **JVM panels** — memory, GC pause, threads, CPU, allocation rate, loaded classes.
-- **Template variables** — filter by consumer group and topic; auto-refresh every minute.
+- **Consumer Lag Overview**: real-time lag by group with color-coded thresholds.
+- **Lag Velocity Tracking**: is lag growing or shrinking over time.
+- **Consumer Group Health**: state table with alerts for unhealthy states.
+- **Partition & Offset Details**: topic throughput and per-partition lag.
+- **Hot Partition Detection**: count, table, and time series.
+- **Time-Based Lag**: max time lag, groups catching up, time-to-close charts.
+- **Data Loss Prevention**: retention-risk and at-risk topics panels.
+- **JVM panels**: memory, GC pause, threads, CPU, allocation rate, loaded classes.
+- **Template variables**: filter by consumer group and topic; auto-refresh every minute.
 
 ## Requirements
 

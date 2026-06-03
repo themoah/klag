@@ -4,7 +4,7 @@ description: Klag detects partitions with statistically abnormal throughput so y
 ---
 
 Within a single topic, partitions should carry roughly even load. When one partition
-runs much hotter than its peers — usually from a skewed partition key — it becomes a
+runs much hotter than its peers, usually from a skewed partition key, it becomes a
 bottleneck. Klag detects these **statistical outliers**.
 
 ## Metrics
@@ -16,7 +16,7 @@ Reported **only when an outlier exists** (so they stay quiet on healthy topics):
 | `klag.hot_partition` | Partition throughput × 100 when statistically high. |
 | `klag.hot_partition.lag` | Partition lag on a hot partition specifically. |
 
-`klag.hot_partition` has only `topic` and `partition` tags — throughput is
+`klag.hot_partition` has only `topic` and `partition` tags, because throughput is
 partition-level and independent of any consumer.
 
 ## How detection works

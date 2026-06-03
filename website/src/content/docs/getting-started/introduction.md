@@ -26,8 +26,8 @@ Klag surfaces these problems early, with enough signal to act before users notic
 
 | Feature | Why it matters |
 |---|---|
-| **Lag velocity** | Know if lag is growing or shrinking — catch problems before they escalate. |
-| **Time-based lag estimation** | See lag in seconds/minutes, not just message counts. |
+| **Lag velocity** | Know if lag is growing or shrinking, to catch problems before they escalate. |
+| **Time-based lag estimation** | See lag in seconds/minutes, beyond raw message counts. |
 | **Hot partition detection** | Find partitions with uneven load causing bottlenecks. |
 | **Consumer group state tracking** | Alert on Rebalancing, Dead, or Empty states. |
 | **Request batching** | Safely monitor large clusters without overwhelming brokers. |
@@ -37,18 +37,18 @@ Klag surfaces these problems early, with enough signal to act before users notic
 ## Scales to large clusters
 
 Klag monitors thousands of consumer groups in ~50 MB heap. Request batching with
-configurable delays lets it fetch offsets for 500+ groups without spiking broker CPU —
-see [Group Filtering](/configuration/group-filtering/) and the `KAFKA_CHUNK_COUNT` /
+configurable delays lets it fetch offsets for 500+ groups without spiking broker CPU.
+See [Group Filtering](/configuration/group-filtering/) and the `KAFKA_CHUNK_COUNT` /
 `KAFKA_CHUNK_DELAY_MS` settings in the [Configuration Reference](/configuration/reference/).
 
 ## Read-only by design
 
-Klag requires **read-only** (DESCRIBE) access to Kafka — no write or alter permissions.
+Klag requires **read-only** (DESCRIBE) access to Kafka, no write or alter permissions.
 See [ACL Permissions](/kafka/acl-permissions/) for the exact grants on self-managed
 Kafka and Confluent Cloud.
 
 ## Next steps
 
-- [Quick Start](/getting-started/quick-start/) — run Klag in one command.
-- [Installation](/getting-started/installation/) — Helm, Docker, and env-file setups.
-- [Metrics Overview](/metrics/overview/) — everything Klag exposes.
+- [Quick Start](/getting-started/quick-start/): run Klag in one command.
+- [Installation](/getting-started/installation/): Helm, Docker, and env-file setups.
+- [Metrics Overview](/metrics/overview/): the full list of what Klag exposes.

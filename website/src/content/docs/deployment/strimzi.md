@@ -3,7 +3,7 @@ title: Strimzi
 description: Klag works out of the box with Kafka clusters managed by the Strimzi operator on Kubernetes (KRaft).
 ---
 
-Klag works with Kafka clusters managed by the [Strimzi](https://strimzi.io) operator —
+Klag works with Kafka clusters managed by the [Strimzi](https://strimzi.io) operator,
 the common production way to run Kafka on Kubernetes.
 
 ## Connecting

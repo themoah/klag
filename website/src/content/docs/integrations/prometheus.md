@@ -27,7 +27,7 @@ scrape_configs:
 ```
 
 On Kubernetes, the [Helm chart](/deployment/kubernetes/) can render a `ServiceMonitor`
-for the Prometheus Operator — see the chart's `values.yaml`.
+for the Prometheus Operator. See the chart's `values.yaml`.
 
 ## What you get
 

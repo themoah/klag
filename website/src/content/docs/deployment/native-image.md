@@ -1,10 +1,10 @@
 ---
 title: Native Image
-description: Run Klag as a GraalVM native binary for ~70-100 ms startup and ~44 MB RSS — ideal for fast scaling and low-footprint deployments.
+description: Run Klag as a GraalVM native binary for ~70-100 ms startup and ~44 MB RSS, ideal for fast scaling and low-footprint deployments.
 ---
 
 Klag publishes a GraalVM **native image** alongside the JVM image. It starts in
-**~70–100 ms using ~44 MB RSS**, versus ~500 ms / ~119 MB for the JVM image — with the
+**~70–100 ms using ~44 MB RSS**, versus ~500 ms / ~119 MB for the JVM image, with the
 same config, endpoints, and metrics.
 
 ## Run the published image

@@ -1,6 +1,6 @@
 ---
 title: Configuration Reference
-description: Complete reference of every Klag environment variable — app, Kafka, metrics, hot partitions, time-based lag, MCP, OTLP, and logging.
+description: Complete reference of every Klag environment variable across app, Kafka, metrics, hot partitions, time-based lag, MCP, OTLP, and logging.
 ---
 
 Klag is configured via `src/main/resources/application.properties`, an external config
@@ -25,7 +25,7 @@ vars** (env vars win).
 | `KAFKA_CHUNK_DELAY_MS` | `0` | Delay (ms) between batches. |
 
 For SASL/SSL, set `KAFKA_SECURITY_PROTOCOL`, `KAFKA_SASL_MECHANISM`, and
-`KAFKA_SASL_JAAS_CONFIG` — see [Installation](/getting-started/installation/).
+`KAFKA_SASL_JAAS_CONFIG`. See [Installation](/getting-started/installation/).
 
 ## Metrics
 
@@ -91,4 +91,4 @@ temporality is cumulative. See [OTLP & Grafana Cloud](/integrations/otlp-grafana
 ## Logging
 
 `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`,
-`LOG_LEVEL_METRICS` — set per-area log levels.
+`LOG_LEVEL_METRICS` set per-area log levels.

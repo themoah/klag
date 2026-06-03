@@ -1,5 +1,5 @@
 ---
-title: Klag — Kafka Consumer Lag Exporter
+title: 'Klag: Kafka Consumer Lag Exporter'
 description: Klag is an open-source Kafka consumer lag exporter built with Vert.x. Monitor lag, lag velocity, hot partitions, time-based lag, and group state with Prometheus, Datadog, or OTLP.
 template: splash
 hero:
@@ -51,10 +51,10 @@ delays fetches offsets for 500+ groups without spiking broker CPU.
 
 <CardGrid>
   <Card title="Lag velocity" icon="random">
-    Know if lag is **growing or shrinking** — catch problems before they escalate.
+    Know if lag is **growing or shrinking**, and catch problems before they escalate.
   </Card>
   <Card title="Time-based lag" icon="seti:clock">
-    See lag in **seconds/minutes**, not just message counts, plus time-to-close estimates.
+    See lag in **seconds/minutes**, with time-to-close estimates, instead of raw message counts.
   </Card>
   <Card title="Hot partition detection" icon="warning">
     Find partitions with **uneven load** causing bottlenecks, via statistical outliers.
@@ -87,14 +87,14 @@ for native image, Helm, and Docker env-file options.
 <CardGrid>
   <LinkCard title="Prometheus" href="/integrations/prometheus/" description="Scrape endpoint at /metrics." />
   <LinkCard title="Datadog" href="/integrations/datadog/" description="Direct Datadog agent submission." />
-  <LinkCard title="OTLP / Grafana Cloud" href="/integrations/otlp-grafana/" description="OpenTelemetry — Grafana Cloud, New Relic, and more." />
+  <LinkCard title="OTLP / Grafana Cloud" href="/integrations/otlp-grafana/" description="OpenTelemetry for Grafana Cloud, New Relic, and more." />
   <LinkCard title="Grafana dashboard" href="/integrations/grafana-dashboard/" description="Pre-built, comprehensive dashboard." />
 </CardGrid>
 
 ## Built for AI-native operations
 
 Klag exposes an opt-in, read-only [MCP endpoint](/ai/mcp/) so SRE and dev agents can
-query lag, find lagging groups, and run composite `diagnose` checks — served from an
+query lag, find lagging groups, and run composite `diagnose` checks, served from an
 in-memory snapshot, never touching your brokers. A portable [Agent Skill](/ai/agent-skill/)
 ships in the repo for Claude Code, Codex, and other harnesses.
 

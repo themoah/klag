@@ -1,9 +1,9 @@
 ---
 title: Time-Based Lag
-description: Klag estimates consumer lag in milliseconds and seconds-to-catch-up, not just message counts, using Kafka log timestamps with a poll-history fallback.
+description: Klag estimates consumer lag in milliseconds and seconds-to-catch-up, beyond raw message counts, using Kafka log timestamps with a poll-history fallback.
 ---
 
-Message-count lag is hard to reason about — "50,000 messages behind" means nothing
+Message-count lag is hard to reason about. "50,000 messages behind" means nothing
 without throughput context. Klag also estimates lag in **time**.
 
 ## Metrics
@@ -18,7 +18,7 @@ Both are tagged with `consumer_group` and `topic` (per-topic granularity).
 ## How `lag.ms` is computed
 
 **Primary:** linear interpolation between Kafka `listOffsets` log start/end timestamps
-and offsets — maps the committed offset to a wall-clock timestamp.
+and offsets, mapping the committed offset to a wall-clock timestamp.
 
 **Fallback:** when Kafka timestamps are invalid (e.g. `logStartTimestamp=0`), Klag uses
 a poll-time `(logEndOffset, systemTime)` history. The fallback requires 2+ poll

@@ -4,7 +4,7 @@ description: How Klag measures whether consumer lag is growing or shrinking over
 ---
 
 A single lag number tells you where a consumer is **right now**. **Lag velocity** tells
-you where it's **heading** — whether the consumer is falling behind or catching up.
+you where it's **heading**: whether the consumer is falling behind or catching up.
 
 ## The metric
 
@@ -21,9 +21,9 @@ metric pipelines.
 
 ## Why it matters
 
-Lag that is high but **shrinking** is often fine — the consumer is recovering from a
+Lag that is high but **shrinking** is often fine; the consumer is recovering from a
 blip. Lag that is **low but growing fast** can be the early warning of an outage. Alert
-on velocity, not just absolute lag, to catch problems while there is still time to act.
+on velocity as well as absolute lag, to catch problems while there is still time to act.
 
 ## Related: lag trend for AI agents
 

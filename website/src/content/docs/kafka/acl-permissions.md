@@ -6,7 +6,7 @@ description: The read-only Kafka ACLs Klag needs (DESCRIBE on cluster, topics, a
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 Klag requires **read-only** access. It uses only the Kafka Admin Client API with
-`DESCRIBE` permissions — no write or alter access is ever needed.
+`DESCRIBE` permissions. No write or alter access is ever needed.
 
 ## Required permissions
 

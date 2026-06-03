@@ -21,7 +21,7 @@ Klag is a Java 21 / Vert.x project built with Gradle.
 
 ## Helm chart template tests
 
-Fast and offline — lints the chart and renders every values permutation:
+Fast and offline. Lints the chart and renders every values permutation:
 
 ```bash
 ./scripts/test-helm-chart.sh

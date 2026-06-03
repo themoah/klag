@@ -1,6 +1,6 @@
 ---
 title: Metrics Overview
-description: The full catalog of metrics Klag exposes — consumer lag, offsets, group state, velocity, hot partitions, time-based lag, and data-loss prevention.
+description: The full catalog of metrics Klag exposes, covering consumer lag, offsets, group state, velocity, hot partitions, time-based lag, and data-loss prevention.
 ---
 
 Klag exports its metrics through Micrometer, so the exact name format depends on the
@@ -13,7 +13,7 @@ All metrics are tagged with `consumer_group`, `topic`, and `partition` where app
 | Metric | Description |
 |---|---|
 | `klag.consumer.lag` | Current lag per partition (also `.sum`, `.max`, `.min`). |
-| `klag.consumer.lag.velocity` | Rate of change — positive means falling behind. See [Lag Velocity](/metrics/lag-velocity/). |
+| `klag.consumer.lag.velocity` | Rate of change; positive means falling behind. See [Lag Velocity](/metrics/lag-velocity/). |
 | `klag.consumer.committed_offset` | Last committed offset per consumer. |
 | `klag.partition.log_end_offset` | Latest offset per partition. |
 | `klag.partition.log_start_offset` | Earliest available offset per partition. |
@@ -49,4 +49,4 @@ See [Data Loss Prevention](/metrics/data-loss-prevention/). Tags: `consumer_grou
 ## Optional JVM metrics
 
 When `METRICS_JVM_ENABLED=true`, standard Micrometer JVM metrics (memory, GC, threads,
-classes, CPU) are exported too — visualized in the [Grafana dashboard](/integrations/grafana-dashboard/).
+classes, CPU) are exported too, and visualized in the [Grafana dashboard](/integrations/grafana-dashboard/).

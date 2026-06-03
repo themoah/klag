@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install Klag via the Helm chart, Docker, or a Docker environment file — including SASL authentication examples.
+description: Install Klag via the Helm chart, Docker, or a Docker environment file, including SASL authentication examples.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
@@ -77,6 +77,6 @@ METRICS_JVM_ENABLED=true
 
 ## Next steps
 
-- [Configuration Reference](/configuration/reference/) — all environment variables.
-- [ACL Permissions](/kafka/acl-permissions/) — the read-only grants Klag needs.
-- [Build from Source](/development/build/) — for contributors.
+- [Configuration Reference](/configuration/reference/): all environment variables.
+- [ACL Permissions](/kafka/acl-permissions/): the read-only grants Klag needs.
+- [Build from Source](/development/build/): for contributors.

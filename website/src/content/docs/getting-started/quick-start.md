@@ -29,7 +29,7 @@ docker run -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
 ```
 
 The native binary starts in **~70–100 ms using ~44 MB RSS**, versus ~500 ms / ~119 MB
-for the JVM image — ideal for fast scaling and low-footprint deployments. Same config,
+for the JVM image, ideal for fast scaling and low-footprint deployments. Same config,
 endpoints, and metrics. See [Native Image](/deployment/native-image/) for build details.
 
 ## HTTP endpoints
@@ -46,6 +46,6 @@ Once running, Klag exposes:
 
 ## What's next
 
-- [Installation](/getting-started/installation/) — Helm chart, Docker env-file.
-- [Configuration Reference](/configuration/reference/) — every environment variable.
-- [Metrics Overview](/metrics/overview/) — the full metric catalog.
+- [Installation](/getting-started/installation/): Helm chart, Docker env-file.
+- [Configuration Reference](/configuration/reference/): every environment variable.
+- [Metrics Overview](/metrics/overview/): the full metric catalog.

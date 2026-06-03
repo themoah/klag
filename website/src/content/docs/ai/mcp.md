@@ -1,10 +1,10 @@
 ---
 title: MCP Endpoint
-description: Klag's opt-in, read-only MCP endpoint lets AI agents query consumer lag, find lagging groups, and run composite diagnose checks — served from an in-memory snapshot.
+description: Klag's opt-in, read-only MCP endpoint lets AI agents query consumer lag, find lagging groups, and run composite diagnose checks, served from an in-memory snapshot.
 ---
 
-Klag exposes an optional **MCP** (Model Context Protocol) endpoint so AI agents — SRE
-copilots, dev assistants — can query consumer-lag state in natural workflows.
+Klag exposes an optional **MCP** (Model Context Protocol) endpoint so AI agents (SRE
+copilots, dev assistants) can query consumer-lag state in natural workflows.
 
 It is **opt-in, read-only, and zero-impact when off**. The endpoint serves an in-memory
 snapshot the metrics collector publishes after each cycle; it never queries Kafka or
@@ -18,7 +18,7 @@ touches the collection flow.
 | `MCP_AUTH_TOKEN` | _(empty)_ | When set, requires `Authorization: Bearer <token>`. Empty = open (logged warning). |
 | `MCP_PATH` | `/mcp` | HTTP path of the endpoint. |
 
-MCP requires `METRICS_REPORTER` to be set — the snapshot is only populated when metrics
+MCP requires `METRICS_REPORTER` to be set. The snapshot is only populated when metrics
 collection runs.
 
 ## Transport
@@ -44,6 +44,6 @@ transition history to flag rebalance storms and flapping groups.
 
 ## Design
 
-The MCP layer reads from a `SnapshotStore` populated by the metrics collector — never
+The MCP layer reads from a `SnapshotStore` populated by the metrics collector, never
 from direct Kafka calls. See the design doc:
 [`docs/superpowers/specs/2026-06-01-mcp-support-design.md`](https://github.com/themoah/klag/blob/main/docs/superpowers/specs/2026-06-01-mcp-support-design.md).

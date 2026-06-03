@@ -5,7 +5,7 @@ description: Klag's retention-percent metric warns you before consumer lag excee
 
 The most dangerous kind of lag is the kind that crosses your **retention window**. Once
 a consumer falls further behind than Kafka retains, the oldest unread messages are
-deleted — gone, unrecoverable. Klag warns you **before** that happens.
+deleted, gone, unrecoverable. Klag warns you **before** that happens.
 
 ## The metric
 
@@ -22,14 +22,14 @@ retention_percent = (lag / (logEndOffset - logStartOffset)) * 100
 ```
 
 - **A rising value** means the consumer is eating into its safety margin.
-- **100%** means the consumer is at or behind `logStartOffset` — **data loss has
+- **100%** means the consumer is at or behind `logStartOffset`: **data loss has
   already occurred**.
 
 ## Why offsets, not time
 
 Retention in Kafka is enforced by the broker deleting old segments. Comparing lag to the
 actual span of **available** offsets (`logEndOffset − logStartOffset`) measures the real,
-current safety margin — more reliable than assuming a fixed time-based retention.
+current safety margin, more reliable than assuming a fixed time-based retention.
 
 ## Alerting
 

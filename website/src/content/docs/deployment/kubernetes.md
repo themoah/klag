@@ -47,5 +47,5 @@ underlying environment variables.
 
 ## Permissions
 
-Klag needs only read-only Kafka access — see [ACL Permissions](/kafka/acl-permissions/).
+Klag needs only read-only Kafka access. See [ACL Permissions](/kafka/acl-permissions/).
 On Kubernetes-managed Kafka, [Strimzi](/deployment/strimzi/) is fully supported.

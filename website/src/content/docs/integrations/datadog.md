@@ -3,7 +3,7 @@ title: Datadog
 description: Ship Klag metrics directly to Datadog using the Datadog Micrometer registry.
 ---
 
-Klag can submit metrics straight to Datadog via the Micrometer Datadog registry — no
+Klag can submit metrics straight to Datadog via the Micrometer Datadog registry, with no
 Prometheus scrape required.
 
 ## Enable
@@ -19,7 +19,7 @@ docker run -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
 
 Configure the Datadog API credentials and site as required by the Micrometer Datadog
 registry (API key, application key, and Datadog site/region) through the standard
-configuration channels — classpath properties, external file, or environment variables
+configuration channels: classpath properties, external file, or environment variables
 (see the [Configuration Reference](/configuration/reference/)).
 
 ## Notes
