@@ -1,6 +1,10 @@
 package io.github.themoah.klag.metrics;
 
 import io.github.themoah.klag.model.ConsumerGroupState;
+import io.github.themoah.klag.model.StateTransition;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,7 +28,14 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ConsumerGroupStateTracker {
 
+  /** Number of most-recent transitions retained per group for the MCP history. */
+  static final int HISTORY_SIZE = 10;
+
   private final Map<String, TrackedState> previousStates = new ConcurrentHashMap<>();
+
+  // Bounded per-group history of observed state transitions (oldest first). Read by the MCP
+  // snapshot to expose recent state churn; never affects the numeric state-change metric.
+  private final Map<String, Deque<StateTransition>> transitions = new ConcurrentHashMap<>();
 
   /**
    * Internal record to track state and last reported value.
@@ -56,7 +67,35 @@ public class ConsumerGroupStateTracker {
     // State changed - add +1 to previous reported value
     long newValue = prev.lastReportedValue() + 1;
     previousStates.put(groupId, new TrackedState(currentState, newValue));
+    recordTransition(groupId, prev.state(), currentState);
     return newValue;
+  }
+
+  private void recordTransition(String groupId, ConsumerGroupState.State from,
+      ConsumerGroupState.State to) {
+    Deque<StateTransition> history = transitions.computeIfAbsent(groupId, k -> new ArrayDeque<>());
+    synchronized (history) {
+      if (history.size() >= HISTORY_SIZE) {
+        history.removeFirst();
+      }
+      history.addLast(new StateTransition(from, to, System.currentTimeMillis()));
+    }
+  }
+
+  /**
+   * Returns the recent state transitions for a group, oldest first.
+   *
+   * @param groupId the consumer group ID
+   * @return an immutable copy of the bounded transition history (empty if none)
+   */
+  public List<StateTransition> recentTransitions(String groupId) {
+    Deque<StateTransition> history = transitions.get(groupId);
+    if (history == null) {
+      return List.of();
+    }
+    synchronized (history) {
+      return List.copyOf(history);
+    }
   }
 
   /**
@@ -66,6 +105,7 @@ public class ConsumerGroupStateTracker {
    */
   public void cleanup(Set<String> activeGroupIds) {
     previousStates.keySet().retainAll(activeGroupIds);
+    transitions.keySet().retainAll(activeGroupIds);
   }
 
   /**

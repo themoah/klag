@@ -5,10 +5,12 @@ import io.github.themoah.klag.mcp.Diagnoser.Finding;
 import io.github.themoah.klag.metrics.snapshot.SnapshotStore;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import io.github.themoah.klag.model.LagMs;
+import io.github.themoah.klag.model.LagTrend;
 import io.github.themoah.klag.model.LagVelocity;
 import io.github.themoah.klag.model.MetricsSnapshot;
 import io.github.themoah.klag.model.MetricsSnapshot.GroupSnapshot;
 import io.github.themoah.klag.model.RetentionRisk;
+import io.github.themoah.klag.model.StateTransition;
 import io.github.themoah.klag.model.TimeToCloseEstimate;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -97,6 +99,7 @@ public class McpTools {
         .put("group", g.consumerGroup())
         .put("state", g.state().toMetricValue())
         .put("totalLag", g.totalLag())
+        .put("overallTrend", g.overallTrend().name().toLowerCase())
         .put("topics", topicCount(g)));
     }
     JsonObject body = new JsonObject()
@@ -136,6 +139,9 @@ public class McpTools {
       .put("minLag", g.minLag())
       .put("partitions", partitions)
       .put("velocity", velocityArray(g.velocities()))
+      .put("trends", trendArray(g.trends()))
+      .put("overallTrend", g.overallTrend().name().toLowerCase())
+      .put("recentTransitions", transitionArray(g.recentTransitions()))
       .put("lagMs", lagMsArray(g.lagMs()))
       .put("timeToClose", timeToCloseArray(g.timeToClose()))
       .put("retentionRisk", retentionArray(g.retentionRisks()));
@@ -166,6 +172,7 @@ public class McpTools {
         .put("group", g.consumerGroup())
         .put("state", g.state().toMetricValue())
         .put("totalLag", g.totalLag())
+        .put("overallTrend", g.overallTrend().name().toLowerCase())
         .put("maxVelocity", maxVelocity(g))
         .put("maxRetentionPercent", maxRetention(g)));
     }
@@ -238,6 +245,30 @@ public class McpTools {
     for (TimeToCloseEstimate t : estimates) {
       a.add(new JsonObject().put("topic", t.topic())
         .put("estimatedSeconds", t.estimatedTimeToCloseSeconds()));
+    }
+    return a;
+  }
+
+  private static JsonArray trendArray(List<LagTrend> trends) {
+    JsonArray a = new JsonArray();
+    for (LagTrend t : trends) {
+      a.add(new JsonObject()
+        .put("topic", t.topic())
+        .put("direction", t.direction().name().toLowerCase())
+        .put("velocity", t.velocity()));
+    }
+    return a;
+  }
+
+  private static JsonArray transitionArray(List<StateTransition> transitions) {
+    long now = System.currentTimeMillis();
+    JsonArray a = new JsonArray();
+    for (StateTransition t : transitions) {
+      a.add(new JsonObject()
+        .put("from", t.from().toMetricValue())
+        .put("to", t.to().toMetricValue())
+        .put("timestampMs", t.timestampMs())
+        .put("ageMs", now - t.timestampMs()));
     }
     return a;
   }

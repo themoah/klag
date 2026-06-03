@@ -2,6 +2,7 @@ package io.github.themoah.klag.model;
 
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import io.github.themoah.klag.model.ConsumerGroupState.State;
+import io.github.themoah.klag.model.LagTrend.Direction;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,6 +36,9 @@ public record MetricsSnapshot(
    * @param timeToClose per-topic time-to-close estimates
    * @param retentionRisks per-topic retention risk percentages
    * @param hotPartitionsByLag lag outlier partitions for this group
+   * @param recentTransitions rolling history of recent state changes (oldest first)
+   * @param trends per-topic basic lag trend (growing/shrinking/stable)
+   * @param overallTrend group-level lag trend rollup
    */
   public record GroupSnapshot(
     String consumerGroup,
@@ -47,8 +51,33 @@ public record MetricsSnapshot(
     List<LagMs> lagMs,
     List<TimeToCloseEstimate> timeToClose,
     List<RetentionRisk> retentionRisks,
-    List<HotPartitionLag> hotPartitionsByLag
-  ) {}
+    List<HotPartitionLag> hotPartitionsByLag,
+    List<StateTransition> recentTransitions,
+    List<LagTrend> trends,
+    Direction overallTrend
+  ) {
+
+    /**
+     * Backward-compatible constructor defaulting the state-change/trend fields to empty/STABLE.
+     * Used by tests and any caller that does not supply trend/transition data.
+     */
+    public GroupSnapshot(
+      String consumerGroup,
+      State state,
+      long totalLag,
+      long maxLag,
+      long minLag,
+      List<PartitionLag> partitions,
+      List<LagVelocity> velocities,
+      List<LagMs> lagMs,
+      List<TimeToCloseEstimate> timeToClose,
+      List<RetentionRisk> retentionRisks,
+      List<HotPartitionLag> hotPartitionsByLag
+    ) {
+      this(consumerGroup, state, totalLag, maxLag, minLag, partitions, velocities, lagMs,
+        timeToClose, retentionRisks, hotPartitionsByLag, List.of(), List.of(), Direction.STABLE);
+    }
+  }
 
   /**
    * Looks up a group snapshot by exact (case-sensitive) consumer group ID.

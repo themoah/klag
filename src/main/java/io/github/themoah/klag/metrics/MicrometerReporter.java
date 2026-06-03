@@ -136,6 +136,19 @@ public class MicrometerReporter implements MetricsReporter {
   }
 
   /**
+   * Returns the recent state transitions tracked for a consumer group (oldest first).
+   *
+   * <p>Exposed for the MCP snapshot so agents can see recent state churn. Read-only; does not
+   * affect the state-change metric.
+   *
+   * @param groupId the consumer group ID
+   * @return immutable transition history (empty if none)
+   */
+  public List<io.github.themoah.klag.model.StateTransition> recentStateTransitions(String groupId) {
+    return stateTracker.recentTransitions(groupId);
+  }
+
+  /**
    * Reports lag velocity metrics.
    *
    * @param velocities list of calculated velocities

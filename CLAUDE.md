@@ -75,7 +75,7 @@ src/main/java/io/github/themoah/klag/
 
 **Kafka:** `KAFKA_BOOTSTRAP_SERVERS` (localhost:9092), `KAFKA_REQUEST_TIMEOUT_MS` (30000), `KAFKA_CHUNK_COUNT` (1), `KAFKA_CHUNK_DELAY_MS` (0)
 
-**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false). A group is monitored iff it matches any include segment AND no exclude segment.
+**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false), `LAG_TREND_DEADBAND_MSG_PER_SEC` (1.0 — STABLE band for the MCP basic lag-trend classifier; |velocity| within the band is STABLE). A group is monitored iff it matches any include segment AND no exclude segment.
 
 **Hot Partition Detection:**
 - `HOT_PARTITION_ENABLED` (true) - Enable/disable hot partition detection
@@ -99,7 +99,15 @@ MCP is read-only and served from an in-memory snapshot the metrics collector pub
 cycle — it never queries Kafka or touches the collection flow. Transport: Streamable HTTP (JSON-RPC
 2.0 over POST; GET returns 405). Tools: `list_consumer_groups`, `get_consumer_group_lag`,
 `find_lagging_groups`, `diagnose` (composite severity assessment). Requires `METRICS_REPORTER` set
-(snapshot is only populated when metrics collection runs). See `docs/superpowers/specs/2026-06-01-mcp-support-design.md`.
+(snapshot is only populated when metrics collection runs).
+
+Each group snapshot also carries a **basic lag trend** (`growing`/`shrinking`/`stable`, per-topic +
+`overallTrend` rollup, derived from lag velocity via `LAG_TREND_DEADBAND_MSG_PER_SEC`) and a rolling
+**state-change history** (last 10 `from→to` transitions). `get_consumer_group_lag` returns `trends`,
+`overallTrend`, and `recentTransitions`; `list_consumer_groups`/`find_lagging_groups` include
+`overallTrend`; `diagnose` flags frequent state changes (rebalance storm / flapping).
+See `docs/superpowers/specs/2026-06-01-mcp-support-design.md` and
+`docs/superpowers/specs/2026-06-03-mcp-state-changes-lag-trends-design.md`.
 
 **Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`
 
