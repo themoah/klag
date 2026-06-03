@@ -23,6 +23,7 @@ public class KafkaClientConfig {
   private static final String PROP_BOOTSTRAP_SERVERS = "kafka.bootstrap.servers";
   private static final String PROP_REQUEST_TIMEOUT_MS = "kafka.request.timeout.ms";
   private static final String PROP_PREFIX = "kafka.";
+  private static final String ENV_PREFIX = "KAFKA_";
 
   private static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
   private static final int DEFAULT_REQUEST_TIMEOUT_MS = 30000;
@@ -58,7 +59,7 @@ public class KafkaClientConfig {
   }
 
   public static KafkaClientConfig fromEnvironment() {
-    return builder()
+    Builder builder = builder()
       .bootstrapServers(
         System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", DEFAULT_BOOTSTRAP_SERVERS)
       )
@@ -67,8 +68,24 @@ public class KafkaClientConfig {
           System.getenv().getOrDefault("KAFKA_REQUEST_TIMEOUT_MS",
             String.valueOf(DEFAULT_REQUEST_TIMEOUT_MS))
         )
-      )
-      .build();
+      );
+
+    // Pass through any other KAFKA_* env vars as Kafka client properties (security, etc.).
+    // KAFKA_SECURITY_PROTOCOL -> security.protocol, KAFKA_SASL_JAAS_CONFIG -> sasl.jaas.config.
+    for (Map.Entry<String, String> entry : System.getenv().entrySet()) {
+      String name = entry.getKey();
+      if (name.startsWith(ENV_PREFIX)
+          && !name.equals("KAFKA_BOOTSTRAP_SERVERS")
+          && !name.equals("KAFKA_REQUEST_TIMEOUT_MS")
+          && !name.startsWith("KAFKA_CHUNK_")) {
+        String kafkaKey = name.substring(ENV_PREFIX.length())
+          .toLowerCase(java.util.Locale.ROOT)
+          .replace('_', '.');
+        builder.property(kafkaKey, entry.getValue());
+      }
+    }
+
+    return builder.build();
   }
 
   /**

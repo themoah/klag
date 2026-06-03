@@ -67,6 +67,7 @@ src/main/java/io/github/themoah/klag/
 | `/readyz` | Readiness probe (200 if Kafka UP, 503 if DOWN) |
 | `/metrics` | Prometheus scrape endpoint (if enabled) |
 | `/version` | Build information |
+| `/mcp` | MCP endpoint for AI agents (JSON-RPC over POST; if `MCP_ENABLED=true`) |
 
 ## Environment Variables
 
@@ -88,6 +89,17 @@ src/main/java/io/github/themoah/klag/
 - `TIME_LAG_MIN_MESSAGES` (100) - Minimum lag messages required for time-to-close estimates
 - `TIME_LAG_INTERPOLATION_BUFFER_SIZE` (60) - Number of offset/timestamp points per partition for interpolation
 - `TIME_LAG_STALE_PRODUCER_THRESHOLD_MS` (180000) - Time in ms before a producer with no offset progress is considered stale
+
+**MCP (AI agent access):**
+- `MCP_ENABLED` (false) - Expose the `/mcp` endpoint for AI agents (SRE/dev). Opt-in; zero impact when off.
+- `MCP_AUTH_TOKEN` (empty) - When set, requires `Authorization: Bearer <token>`. Empty = open (logged warning).
+- `MCP_PATH` (/mcp) - HTTP path of the MCP endpoint.
+
+MCP is read-only and served from an in-memory snapshot the metrics collector publishes after each
+cycle — it never queries Kafka or touches the collection flow. Transport: Streamable HTTP (JSON-RPC
+2.0 over POST; GET returns 405). Tools: `list_consumer_groups`, `get_consumer_group_lag`,
+`find_lagging_groups`, `diagnose` (composite severity assessment). Requires `METRICS_REPORTER` set
+(snapshot is only populated when metrics collection runs). See `docs/superpowers/specs/2026-06-01-mcp-support-design.md`.
 
 **Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`
 
