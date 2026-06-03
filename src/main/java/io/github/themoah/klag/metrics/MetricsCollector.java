@@ -231,9 +231,13 @@ public class MetricsCollector {
 
         Set<String> activeKeys = new HashSet<>();
         Set<String> velocityKeys = new HashSet<>();
+        Set<String> throughputKeys = new HashSet<>();
         CycleSnapshot cycleSnapshot = newCycleSnapshot();
-        reportMetrics(lagData, stateData, activeKeys, velocityKeys, cycleSnapshot);
+        reportMetrics(lagData, stateData, activeKeys, velocityKeys, throughputKeys, cycleSnapshot);
         velocityTracker.cleanupStaleTopics(velocityKeys);
+        if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
+          hotPartitionDetector.cleanupStalePartitions(throughputKeys);
+        }
         if (reporter instanceof MicrometerReporter micrometerReporter) {
           micrometerReporter.cleanupStaleGauges(activeKeys);
         }
@@ -255,13 +259,18 @@ public class MetricsCollector {
 
     Set<String> cycleActiveKeys = new HashSet<>();
     Set<String> cycleVelocityKeys = new HashSet<>();
+    Set<String> cycleThroughputKeys = new HashSet<>();
     CycleSnapshot cycleSnapshot = newCycleSnapshot();
 
     return ChunkProcessor.<String, Void>processSequentially(
       vertx, groupChunks, chunkConfig.chunkDelayMs(),
-      chunk -> processGroupChunk(chunk, cycleActiveKeys, cycleVelocityKeys, cycleSnapshot)
+      chunk -> processGroupChunk(chunk, cycleActiveKeys, cycleVelocityKeys,
+        cycleThroughputKeys, cycleSnapshot)
     ).compose(results -> {
       velocityTracker.cleanupStaleTopics(cycleVelocityKeys);
+      if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
+        hotPartitionDetector.cleanupStalePartitions(cycleThroughputKeys);
+      }
       if (reporter instanceof MicrometerReporter micrometerReporter) {
         micrometerReporter.cleanupStaleGauges(cycleActiveKeys);
       }
@@ -277,6 +286,7 @@ public class MetricsCollector {
       List<String> chunk,
       Set<String> cycleActiveKeys,
       Set<String> cycleVelocityKeys,
+      Set<String> cycleThroughputKeys,
       CycleSnapshot cycleSnapshot
   ) {
     log.debug("Processing group chunk with {} groups", chunk.size());
@@ -296,7 +306,8 @@ public class MetricsCollector {
         List<ConsumerGroupLag> lagData = composite.resultAt(0);
         Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
 
-        reportMetrics(lagData, stateData, cycleActiveKeys, cycleVelocityKeys, cycleSnapshot);
+        reportMetrics(lagData, stateData, cycleActiveKeys, cycleVelocityKeys,
+          cycleThroughputKeys, cycleSnapshot);
 
         // Update cached group partition counts
         for (ConsumerGroupLag lag : lagData) {
@@ -412,13 +423,14 @@ public class MetricsCollector {
   /**
    * Reports metrics for the given lag and state data.
    * Adds active gauge keys to the provided set but does NOT perform cleanup.
-   * Velocity keys are accumulated across chunks for cycle-level cleanup.
+   * Velocity and throughput keys are accumulated across chunks for cycle-level cleanup.
    */
   private void reportMetrics(
       List<ConsumerGroupLag> lagData,
       Map<String, ConsumerGroupState> stateData,
       Set<String> activeKeys,
       Set<String> velocityKeys,
+      Set<String> throughputKeys,
       CycleSnapshot cycleSnapshot
   ) {
     if (reporter instanceof MicrometerReporter micrometerReporter) {
@@ -489,15 +501,16 @@ public class MetricsCollector {
       List<HotPartitionLag> hotByLag = List.of();
       List<HotPartitionThroughput> hotByThroughput = List.of();
       if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
-        Set<String> throughputKeys = hotPartitionDetector.recordThroughputSnapshots(lagData);
+        // Accumulate active throughput keys across chunks; cleanup happens once per
+        // cycle (see collectAndReportChunked / collectAllGroupsParallel). Cleaning up
+        // here per-chunk would retainAll() away other chunks' throughput histories.
+        throughputKeys.addAll(hotPartitionDetector.recordThroughputSnapshots(lagData));
 
         hotByLag = hotPartitionDetector.detectHotPartitionsByLag(lagData);
         micrometerReporter.reportHotPartitionLag(hotByLag, activeKeys);
 
         hotByThroughput = hotPartitionDetector.detectHotPartitionsByThroughput();
         micrometerReporter.reportHotPartitionThroughput(hotByThroughput, activeKeys);
-
-        hotPartitionDetector.cleanupStalePartitions(throughputKeys);
       }
 
       // Accumulate this call's derived metrics into the cycle snapshot for the MCP layer.

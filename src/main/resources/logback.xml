@@ -36,4 +36,11 @@
   <!-- Netty (suppress verbose logging) -->
   <logger name="io.netty" level="WARN"/>
 
+  <!-- ServerBootstrap logs a full WARN+stacktrace ("Failed to set channel option
+       'SO_KEEPALIVE'/'TCP_NODELAY' ... Invalid argument") whenever the acceptor thread
+       applies child-socket options to a connection already RST/closed by the peer
+       (health-check probes, port scanners, LB TCP checks). The socket is dead, so the
+       failure is harmless noise. Raise to ERROR to drop it; override if ever needed. -->
+  <logger name="io.netty.bootstrap.ServerBootstrap" level="${LOG_LEVEL_NETTY_BOOTSTRAP:-ERROR}"/>
+
 </configuration>

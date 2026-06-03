@@ -88,4 +88,23 @@ class McpHandlerTest {
     assertFalse(h.authorized("s3cret"));
     assertTrue(h.authorized("Bearer s3cret"));
   }
+
+  @Test
+  void authAcceptsCaseInsensitiveSchemeAndExtraWhitespace() {
+    McpHandler h = handler(McpConfig.from(k -> switch (k) {
+      case "MCP_ENABLED" -> "true";
+      case "MCP_AUTH_TOKEN" -> "s3cret";
+      default -> null;
+    }));
+    assertTrue(h.authorized("bearer s3cret"));
+    assertTrue(h.authorized("BEARER s3cret"));
+    assertTrue(h.authorized("Bearer   s3cret"));
+    assertTrue(h.authorized("  Bearer s3cret  "));
+    assertTrue(h.authorized("Bearer\ts3cret"));
+    // Token comparison stays exact.
+    assertFalse(h.authorized("Bearer s3cret extra"));
+    assertFalse(h.authorized("Bearer S3CRET"));
+    assertFalse(h.authorized("Basic s3cret"));
+    assertFalse(h.authorized("Bearer"));
+  }
 }

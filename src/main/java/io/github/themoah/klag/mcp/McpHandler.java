@@ -146,7 +146,16 @@ public class McpHandler {
     if (!config.authEnabled()) {
       return true;
     }
-    return ("Bearer " + config.authToken()).equals(authHeader);
+    if (authHeader == null) {
+      return false;
+    }
+    // Auth scheme is case-insensitive (RFC 7235) and surrounding/internal whitespace may
+    // be normalized by clients/proxies. Match "Bearer" loosely, compare the token exactly.
+    String[] parts = authHeader.trim().split("\\s+", 2);
+    if (parts.length != 2 || !parts[0].equalsIgnoreCase("Bearer")) {
+      return false;
+    }
+    return config.authToken().equals(parts[1]);
   }
 
   private static void writeJson(RoutingContext ctx, int status, JsonObject body) {
