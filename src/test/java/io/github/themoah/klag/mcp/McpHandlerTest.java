@@ -52,6 +52,30 @@ class McpHandlerTest {
   }
 
   @Test
+  void toolsCallWithNonObjectParamsIsInvalidParams() {
+    for (Object bad : new Object[] {"oops", 42, new io.vertx.core.json.JsonArray().add(1), true}) {
+      JsonObject req = request(40, McpProtocol.TOOLS_CALL).put("params", bad);
+      JsonObject resp = openHandler().dispatch(req).orElseThrow();
+      JsonObject err = resp.getJsonObject("error");
+      assertEquals(McpProtocol.INVALID_PARAMS, err.getInteger("code"), "params=" + bad);
+      // Must not leak internal exception text (e.g. ClassCastException / class-loader detail).
+      assertFalse(err.getString("message").contains("cannot be cast"), "leaked: " + err);
+    }
+  }
+
+  @Test
+  void toolsCallWithNonObjectArgumentsIsInvalidParams() {
+    for (Object bad : new Object[] {"oops", 42, new io.vertx.core.json.JsonArray().add(1), true}) {
+      JsonObject params = new JsonObject().put("name", "list_consumer_groups").put("arguments", bad);
+      JsonObject req = request(41, McpProtocol.TOOLS_CALL).put("params", params);
+      JsonObject resp = openHandler().dispatch(req).orElseThrow();
+      JsonObject err = resp.getJsonObject("error");
+      assertEquals(McpProtocol.INVALID_PARAMS, err.getInteger("code"), "arguments=" + bad);
+      assertFalse(err.getString("message").contains("cannot be cast"), "leaked: " + err);
+    }
+  }
+
+  @Test
   void unknownMethodReturnsMethodNotFound() {
     JsonObject resp = openHandler().dispatch(request(5, "does/notExist")).orElseThrow();
     assertEquals(McpProtocol.METHOD_NOT_FOUND, resp.getJsonObject("error").getInteger("code"));

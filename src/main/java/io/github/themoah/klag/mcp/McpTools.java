@@ -149,8 +149,11 @@ public class McpTools {
   }
 
   private JsonObject findLagging(MetricsSnapshot snap, JsonObject args) {
-    String sortBy = args.getString("sortBy", "lag");
-    int limit = args.getInteger("limit", DEFAULT_LIMIT);
+    String sortBy = args.getValue("sortBy") != null ? String.valueOf(args.getValue("sortBy")) : "lag";
+    // Accept any numeric limit (truncating floats); ignore non-numeric junk rather than letting
+    // the cast throw. Non-positive or out-of-range values fall back to the default.
+    Object limitVal = args.getValue("limit");
+    int limit = limitVal instanceof Number n ? n.intValue() : DEFAULT_LIMIT;
     if (limit <= 0) {
       limit = DEFAULT_LIMIT;
     }
