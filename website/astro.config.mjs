@@ -22,6 +22,9 @@ const head = [
     tag: 'link',
     attrs: { rel: 'alternate', type: 'text/markdown', href: '/llms.txt', title: 'llms.txt' },
   },
+  // Favicons: higher-res PNG + Apple touch icon (Starlight injects the base /favicon-32.png).
+  { tag: 'link', attrs: { rel: 'icon', type: 'image/png', sizes: '48x48', href: '/favicon-48.png' } },
+  { tag: 'link', attrs: { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' } },
 ];
 if (cfToken) {
   head.push({
@@ -43,8 +46,8 @@ export default defineConfig({
       description:
         'Klag is a Kafka consumer lag exporter built with Vert.x. Monitor consumer lag, lag velocity, hot partitions, and group state with Prometheus, Datadog, or OTLP.',
       tagline: 'Know when your consumers fall behind, before it becomes a problem.',
-      logo: { src: './src/assets/logo.svg', alt: 'Klag' },
-      favicon: '/favicon.svg',
+      logo: { src: './src/assets/klag-logo.png', alt: 'Klag', replacesTitle: true },
+      favicon: '/favicon-32.png',
       head,
       social: [
         { icon: 'github', label: 'GitHub', href: REPO },

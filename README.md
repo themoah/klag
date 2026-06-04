@@ -94,6 +94,10 @@ All metrics tagged with `consumer_group`, `topic`, `partition` where applicable.
 
 ## Installation
 
+### AI Agent Skill
+
+This repo includes a portable Agent Skill for Codex, Claude Code, and other AI coding harnesses. See [docs/agent-skill.md](docs/agent-skill.md) for installation and usage.
+
 ### Helm Chart
 
 The chart is published to a Helm repository served from GitHub Pages and indexed on
