@@ -63,6 +63,10 @@ spec:
                   name: {{ include "klag.kafkaSecretName" . }}
                   key: {{ .Values.kafka.secretKeys.jaasConfig }}
             {{- end }}
+            {{- if .Values.kafka.sslTruststoreLocation }}
+            - name: KAFKA_SSL_TRUSTSTORE_LOCATION
+              value: {{ .Values.kafka.sslTruststoreLocation | quote }}
+            {{- end }}
             # Metrics configuration
             - name: METRICS_REPORTER
               value: {{ .Values.metrics.reporter | quote }}
@@ -144,6 +148,14 @@ spec:
             {{- toYaml .Values.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.extraVolumeMounts }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.extraVolumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
