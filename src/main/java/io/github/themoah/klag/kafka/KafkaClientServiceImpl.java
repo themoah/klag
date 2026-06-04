@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +43,11 @@ public class KafkaClientServiceImpl implements KafkaClientService {
   // the WARN emitted by processOffsets so steady-state idle/new groups do not
   // produce repeated WARN noise on each collection cycle.
   final Map<String, Map<String, Integer>> lastMissingByGroup = new ConcurrentHashMap<>();
+
+  // Latched once the broker rejects MAX_TIMESTAMP so the fallback WARN fires once
+  // per process instead of once per topic per scrape. Broker capability does not
+  // change at runtime, so a single warning is enough.
+  private final AtomicBoolean maxTimestampUnsupportedLogged = new AtomicBoolean(false);
 
   /**
    * Creates a new KafkaClientServiceImpl.
@@ -135,68 +141,93 @@ public class KafkaClientServiceImpl implements KafkaClientService {
         Future<Map<TopicPartition, ListOffsetsResultInfo>> latestOffsetFuture =
           adminClient.listOffsets(latestOffsetRequest);
 
-        return Future.all(maxTimestampFuture, earliestTimestampFuture, latestOffsetFuture)
-          .map(composite -> {
-            Map<TopicPartition, ListOffsetsResultInfo> maxTimestampOffsets = composite.resultAt(0);
-            Map<TopicPartition, ListOffsetsResultInfo> earliestTimestampOffsets = composite.resultAt(1);
-            Map<TopicPartition, ListOffsetsResultInfo> latestOffsets = composite.resultAt(2);
+        // Future.join (not Future.all) so MAX_TIMESTAMP failing on pre-3.0 brokers
+        // doesn't fail the whole call — we want to fall back to LATEST instead.
+        var composite = Future.join(maxTimestampFuture, earliestTimestampFuture, latestOffsetFuture);
+        return composite.transform(ar -> {
+          // earliestTimestampFuture and latestOffsetFuture are required.
+          if (composite.failed(1)) {
+            return Future.failedFuture(composite.cause(1));
+          }
+          if (composite.failed(2)) {
+            return Future.failedFuture(composite.cause(2));
+          }
 
-            List<PartitionOffsets> result = new ArrayList<>();
-            boolean loggedSampleTimestamp = false;
+          Map<TopicPartition, ListOffsetsResultInfo> maxTimestampOffsets;
+          if (composite.failed(0)) {
+            // Broker likely pre-Kafka 3.0 (LIST_OFFSETS v7 unsupported). Fall back to LATEST.
+            if (maxTimestampUnsupportedLogged.compareAndSet(false, true)) {
+              log.warn("MAX_TIMESTAMP listOffsets unsupported by broker (likely pre-Kafka 3.0); "
+                  + "falling back to LATEST for logEndTimestamp. Logged once per process; "
+                  + "further occurrences at DEBUG. Cause: {}", composite.cause(0).toString());
+            } else {
+              log.debug("MAX_TIMESTAMP listOffsets failed for topic {}; using LATEST fallback", topic);
+            }
+            maxTimestampOffsets = Collections.emptyMap();
+          } else {
+            maxTimestampOffsets = composite.resultAt(0);
+          }
+          Map<TopicPartition, ListOffsetsResultInfo> earliestTimestampOffsets = composite.resultAt(1);
+          Map<TopicPartition, ListOffsetsResultInfo> latestOffsets = composite.resultAt(2);
 
-            for (PartitionInfo partition : partitions) {
-              TopicPartition tp = new TopicPartition(topic, partition.partition());
+          List<PartitionOffsets> result = new ArrayList<>();
+          boolean loggedSampleTimestamp = false;
 
-              // Get earliest offset and timestamp from TIMESTAMP(0)
-              long logStartOffset = earliestTimestampOffsets.get(tp).getOffset();
-              long logStartTimestamp = earliestTimestampOffsets.get(tp).getTimestamp();
+          for (PartitionInfo partition : partitions) {
+            TopicPartition tp = new TopicPartition(topic, partition.partition());
 
-              ListOffsetsResultInfo maxTimestampResult = maxTimestampOffsets.get(tp);
-              ListOffsetsResultInfo latestOffsetResult = latestOffsets.get(tp);
+            // Get earliest offset and timestamp from TIMESTAMP(0)
+            long logStartOffset = earliestTimestampOffsets.get(tp).getOffset();
+            long logStartTimestamp = earliestTimestampOffsets.get(tp).getTimestamp();
 
-              // logEndOffset is ALWAYS the true end-of-log (LATEST). This is the boundary
-              // for lag = logEndOffset - committedOffset, throughput, and retention.
-              long logEndOffset = latestOffsetResult.getOffset();
+            ListOffsetsResultInfo maxTimestampResult = maxTimestampOffsets.get(tp);
+            ListOffsetsResultInfo latestOffsetResult = latestOffsets.get(tp);
 
-              // The timestamp anchor comes from MAX_TIMESTAMP (offset of the highest-timestamp
-              // record). This offset can be < logEndOffset, so carry it separately rather than
-              // overwriting logEndOffset, otherwise interpolation anchors and lag disagree.
-              long logEndTimestamp;
-              long maxTimestampOffset;
+            // logEndOffset is ALWAYS the true end-of-log (LATEST). This is the boundary
+            // for lag = logEndOffset - committedOffset, throughput, and retention.
+            long logEndOffset = latestOffsetResult.getOffset();
 
-              if (maxTimestampResult.getOffset() >= 0 && maxTimestampResult.getTimestamp() > 0) {
-                // MAX_TIMESTAMP returned a valid offset/timestamp anchor
-                maxTimestampOffset = maxTimestampResult.getOffset();
-                logEndTimestamp = maxTimestampResult.getTimestamp();
-              } else {
-                // MAX_TIMESTAMP failed (pre-3.0 broker or no timestamps) - fall back to LATEST
-                maxTimestampOffset = latestOffsetResult.getOffset();
-                logEndTimestamp = latestOffsetResult.getTimestamp();
-              }
+            // The timestamp anchor comes from MAX_TIMESTAMP (offset of the highest-timestamp
+            // record). This offset can be < logEndOffset, so carry it separately rather than
+            // overwriting logEndOffset, otherwise interpolation anchors and lag disagree.
+            long logEndTimestamp;
+            long maxTimestampOffset;
 
-              // Handle edge case: if earliest also returns -1, topic may be empty
-              if (logStartOffset < 0) {
-                logStartOffset = 0;
-                logStartTimestamp = -1;
-              }
-
-              // Log first partition's timestamps at INFO level for debugging
-              if (!loggedSampleTimestamp) {
-                log.info("Topic {} sample timestamps: partition {} logStart={} (ts={}), logEnd={}, maxTsOffset={} (ts={})",
-                  topic, partition.partition(), logStartOffset, logStartTimestamp, logEndOffset, maxTimestampOffset, logEndTimestamp);
-                loggedSampleTimestamp = true;
-              } else {
-                log.debug("Topic {} partition {}: logStart={} (ts={}), logEnd={}, maxTsOffset={} (ts={})",
-                  topic, partition.partition(), logStartOffset, logStartTimestamp, logEndOffset, maxTimestampOffset, logEndTimestamp);
-              }
-
-              result.add(new PartitionOffsets(topic, partition.partition(), logEndOffset, logStartOffset,
-                logEndTimestamp, maxTimestampOffset, logStartTimestamp));
+            if (maxTimestampResult != null
+                && maxTimestampResult.getOffset() >= 0
+                && maxTimestampResult.getTimestamp() > 0) {
+              // MAX_TIMESTAMP returned a valid offset/timestamp anchor
+              maxTimestampOffset = maxTimestampResult.getOffset();
+              logEndTimestamp = maxTimestampResult.getTimestamp();
+            } else {
+              // MAX_TIMESTAMP missing/failed (pre-3.0 broker or no timestamps) - fall back to LATEST
+              maxTimestampOffset = latestOffsetResult.getOffset();
+              logEndTimestamp = latestOffsetResult.getTimestamp();
             }
 
-            log.info("Retrieved offsets for {} partitions of topic {}", result.size(), topic);
-            return result;
-          });
+            // Handle edge case: if earliest also returns -1, topic may be empty
+            if (logStartOffset < 0) {
+              logStartOffset = 0;
+              logStartTimestamp = -1;
+            }
+
+            // Log first partition's timestamps at INFO level for debugging
+            if (!loggedSampleTimestamp) {
+              log.info("Topic {} sample timestamps: partition {} logStart={} (ts={}), logEnd={}, maxTsOffset={} (ts={})",
+                topic, partition.partition(), logStartOffset, logStartTimestamp, logEndOffset, maxTimestampOffset, logEndTimestamp);
+              loggedSampleTimestamp = true;
+            } else {
+              log.debug("Topic {} partition {}: logStart={} (ts={}), logEnd={}, maxTsOffset={} (ts={})",
+                topic, partition.partition(), logStartOffset, logStartTimestamp, logEndOffset, maxTimestampOffset, logEndTimestamp);
+            }
+
+            result.add(new PartitionOffsets(topic, partition.partition(), logEndOffset, logStartOffset,
+              logEndTimestamp, maxTimestampOffset, logStartTimestamp));
+          }
+
+          log.info("Retrieved offsets for {} partitions of topic {}", result.size(), topic);
+          return Future.succeededFuture(result);
+        });
       })
       .onFailure(err -> log.error("Failed to get log end offsets for topic: {}", topic, err));
   }

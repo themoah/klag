@@ -33,6 +33,11 @@
   <!-- Kafka clients (Apache) -->
   <logger name="org.apache.kafka" level="${LOG_LEVEL_KAFKA_CLIENT:-INFO}"/>
 
+  <!-- AdminClient emits a per-scrape WARN when the broker doesn't support
+       MAX_TIMESTAMP (Kafka < 3.0). Klag handles this via fallback and emits
+       its own one-shot WARN; the Kafka-client-side line is redundant noise. -->
+  <logger name="org.apache.kafka.clients.admin.internals.ListOffsetsHandler" level="ERROR"/>
+
   <!-- Netty (suppress verbose logging) -->
   <logger name="io.netty" level="WARN"/>
 
