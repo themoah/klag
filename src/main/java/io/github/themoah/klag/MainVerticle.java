@@ -44,7 +44,7 @@ public class MainVerticle extends AbstractVerticle {
 
     AppConfig appConfig = AppConfig.fromEnvironment();
     MetricsConfig metricsConfig = MetricsConfig.fromEnvironment();
-    KafkaClientConfig kafkaConfig = loadKafkaConfig();
+    KafkaClientConfig kafkaConfig = KafkaClientConfig.load();
 
     kafkaClientService = new KafkaClientServiceImpl(vertx, kafkaConfig);
     healthMonitor = new KafkaHealthMonitor(vertx, kafkaClientService, appConfig.healthCheckIntervalMs());
@@ -119,15 +119,6 @@ public class MainVerticle extends AbstractVerticle {
       .listen(port)
       .onSuccess(server -> log.info("HTTP server started on port {}", port))
       .onFailure(err -> log.error("Failed to start HTTP server", err));
-  }
-
-  private KafkaClientConfig loadKafkaConfig() {
-    try {
-      return KafkaClientConfig.fromClasspath();
-    } catch (Exception e) {
-      log.info("No classpath config found, loading from environment: {}", e.getMessage());
-      return KafkaClientConfig.fromEnvironment();
-    }
   }
 
   private MetricsCollector createMetricsCollector(MetricsConfig config, Router router) {
