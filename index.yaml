@@ -8,6 +8,52 @@ entries:
           description: Initial publication of the Klag Helm chart to Artifact Hub
       artifacthub.io/images: |
         - name: klag
+          image: themoah/klag:0.1.14
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: source
+          url: https://github.com/themoah/klag
+        - name: issues
+          url: https://github.com/themoah/klag/issues
+        - name: documentation
+          url: https://github.com/themoah/klag/blob/main/README.md
+      artifacthub.io/maintainers: |
+        - name: themoah
+          email: aviv@dozorets.com
+      artifacthub.io/prerelease: "false"
+    apiVersion: v2
+    appVersion: 0.1.14
+    created: "2026-06-05T21:22:49.345705517Z"
+    description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter
+      with pluggable metrics sinks.
+    digest: cbb400577ba71dd03726fef8efea890fa77d172a3e7f6f8d49c6706868ea8659
+    home: https://github.com/themoah/klag
+    icon: https://avatars.githubusercontent.com/themoah
+    keywords:
+    - kafka
+    - lag
+    - monitoring
+    - prometheus
+    - metrics
+    - consumer-groups
+    maintainers:
+    - email: aviv@dozorets.com
+      name: themoah
+      url: https://github.com/themoah
+    name: klag
+    sources:
+    - https://github.com/themoah/klag
+    type: application
+    urls:
+    - https://github.com/themoah/klag/releases/download/klag-0.2.0/klag-0.2.0.tgz
+    version: 0.2.0
+  - annotations:
+      artifacthub.io/category: monitoring-logging
+      artifacthub.io/changes: |
+        - kind: added
+          description: Initial publication of the Klag Helm chart to Artifact Hub
+      artifacthub.io/images: |
+        - name: klag
           image: themoah/klag:0.1.12
       artifacthub.io/license: Apache-2.0
       artifacthub.io/links: |
@@ -47,4 +93,4 @@ entries:
     urls:
     - https://github.com/themoah/klag/releases/download/klag-0.1.12/klag-0.1.12.tgz
     version: 0.1.12
-generated: "2026-05-30T14:35:16.16003092Z"
+generated: "2026-06-05T21:22:49.345713209Z"
