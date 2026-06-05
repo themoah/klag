@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -158,6 +159,22 @@ class KafkaClientConfigTest {
     assertEquals("from-file:9092", config.getBootstrapServers());
     assertEquals("SASL_PLAINTEXT", config.toProperties().get("security.protocol"));
     assertEquals("from-env", config.toProperties().get("client.id"));
+  }
+
+  @Test
+  void envBinding_localeIndependentLowercase() {
+    Locale previous = Locale.getDefault();
+    try {
+      // Turkish locale famously maps 'I' -> 'ı' (dotless i) under default toLowerCase().
+      Locale.setDefault(new Locale("tr", "TR"));
+      Map<String, String> env = Map.of("KAFKA_CLIENT_ID", "klag-prod");
+
+      KafkaClientConfig config = KafkaClientConfig.fromEnvironment(env);
+
+      assertEquals("klag-prod", config.toProperties().get("client.id"));
+    } finally {
+      Locale.setDefault(previous);
+    }
   }
 
   @Test

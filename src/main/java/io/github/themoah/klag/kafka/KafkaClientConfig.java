@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -234,7 +235,8 @@ public class KafkaClientConfig {
         continue;
       }
       String propertyKey =
-        PROP_PREFIX + name.substring(ENV_PREFIX.length()).toLowerCase().replace('_', '.');
+        PROP_PREFIX
+          + name.substring(ENV_PREFIX.length()).toLowerCase(Locale.ROOT).replace('_', '.');
       props.setProperty(propertyKey, value);
     }
   }
