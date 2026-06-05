@@ -9,9 +9,11 @@ panel plugins for the catalog.
 """
 import json
 import sys
+from pathlib import Path
 
-SRC = sys.argv[1] if len(sys.argv) > 1 else "demo-dashboard.json"
-DST = sys.argv[2] if len(sys.argv) > 2 else "klag-grafana-com.json"
+BASE = Path(__file__).resolve().parent
+SRC = sys.argv[1] if len(sys.argv) > 1 else BASE / "demo-dashboard.json"
+DST = sys.argv[2] if len(sys.argv) > 2 else BASE / "klag-grafana-com.json"
 GVER = sys.argv[3] if len(sys.argv) > 3 else "11.3.0"
 
 PANEL_NAMES = {
@@ -100,7 +102,7 @@ for v in d["variables"]:
     s = v["spec"]
     if v["kind"] == "DatasourceVariable":
         tmpl.append({
-            "current": {},
+            "current": s.get("current", {}),
             "hide": HIDE.get(s.get("hide"), 0),
             "includeAll": s.get("includeAll", False),
             "label": s.get("label", ""),
@@ -117,7 +119,7 @@ for v in d["variables"]:
         qspec = s["query"]["spec"]
         tmpl.append({
             "allValue": s.get("allValue"),
-            "current": {},
+            "current": s.get("current", {}),
             "datasource": dict(DS),
             "definition": s.get("definition", ""),
             "hide": HIDE.get(s.get("hide"), 0),

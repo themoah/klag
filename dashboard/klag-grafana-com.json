@@ -3177,7 +3177,10 @@
   "templating": {
     "list": [
       {
-        "current": {},
+        "current": {
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
         "hide": 0,
         "includeAll": false,
         "label": "Data Source",
@@ -3192,7 +3195,10 @@
       },
       {
         "allValue": ".*",
-        "current": {},
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
@@ -3216,7 +3222,10 @@
       },
       {
         "allValue": ".*",
-        "current": {},
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
         "datasource": {
           "type": "prometheus",
           "uid": "${datasource}"
