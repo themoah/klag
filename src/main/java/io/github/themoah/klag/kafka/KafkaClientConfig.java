@@ -48,6 +48,8 @@ public class KafkaClientConfig {
   private static final Pattern PLACEHOLDER_PATTERN =
     Pattern.compile("\\$\\{([^${}:]+)(?::([^}]*))?}");
 
+  private static final int MAX_PLACEHOLDER_PASSES = 10;
+
   private final String bootstrapServers;
   private final int requestTimeoutMs;
   private final Map<String, String> additionalProperties;
@@ -244,16 +246,29 @@ public class KafkaClientConfig {
   /**
    * Resolves {@code ${VAR}} and {@code ${VAR:default}} placeholders in property values.
    * Looks up the variable in the environment first, then in the properties bag itself.
-   * Unresolved placeholders are left as-is.
+   * Resolution runs as a fixed-point iteration (up to {@link #MAX_PLACEHOLDER_PASSES}
+   * passes) so chained references — e.g. {@code A=${B}}, {@code B=${ENV_VAR}} — fully
+   * resolve regardless of iteration order. Unresolved placeholders are left as-is;
+   * cycles terminate at the pass cap.
    */
   static void resolvePlaceholders(Properties props, Map<String, String> env) {
-    for (String name : props.stringPropertyNames()) {
-      String value = props.getProperty(name);
-      String resolved = resolveString(value, env, props);
-      if (!Objects.equals(value, resolved)) {
-        props.setProperty(name, resolved);
+    for (int pass = 0; pass < MAX_PLACEHOLDER_PASSES; pass++) {
+      boolean changed = false;
+      for (String name : props.stringPropertyNames()) {
+        String value = props.getProperty(name);
+        String resolved = resolveString(value, env, props);
+        if (!Objects.equals(value, resolved)) {
+          props.setProperty(name, resolved);
+          changed = true;
+        }
+      }
+      if (!changed) {
+        return;
       }
     }
+    log.warn(
+      "Placeholder resolution did not stabilise after {} passes; possible cycle",
+      MAX_PLACEHOLDER_PASSES);
   }
 
   private static String resolveString(String value, Map<String, String> env, Properties props) {

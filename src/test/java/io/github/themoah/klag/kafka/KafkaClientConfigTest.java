@@ -123,6 +123,40 @@ class KafkaClientConfigTest {
   }
 
   @Test
+  void placeholders_resolveChainedPropertyToPropertyToEnv() {
+    Properties props = new Properties();
+    props.setProperty("kafka.sasl.jaas.config", "${JAAS_TEMPLATE}");
+    props.setProperty(
+      "JAAS_TEMPLATE",
+      "org.apache.kafka.common.security.plain.PlainLoginModule required "
+        + "username=\"${SASL_USERNAME}\" password=\"${SASL_PASSWORD}\";");
+    Map<String, String> env = Map.of(
+      "SASL_USERNAME", "alice",
+      "SASL_PASSWORD", "s3cret");
+
+    KafkaClientConfig.resolvePlaceholders(props, env);
+
+    String jaas = props.getProperty("kafka.sasl.jaas.config");
+    assertTrue(jaas.contains("username=\"alice\""), jaas);
+    assertTrue(jaas.contains("password=\"s3cret\""), jaas);
+    assertFalse(jaas.contains("${"), jaas);
+  }
+
+  @Test
+  void placeholders_cycleTerminatesWithoutHanging() {
+    Properties props = new Properties();
+    props.setProperty("kafka.a", "${kafka.b}");
+    props.setProperty("kafka.b", "${kafka.a}");
+
+    // Must return; the assertion is implicit (no infinite loop).
+    KafkaClientConfig.resolvePlaceholders(props, Map.of());
+
+    // Values remain placeholder-shaped because the cycle can never resolve.
+    assertTrue(props.getProperty("kafka.a").contains("${"));
+    assertTrue(props.getProperty("kafka.b").contains("${"));
+  }
+
+  @Test
   void placeholders_leftAsIsWhenUnresolvable() {
     Properties props = new Properties();
     props.setProperty("kafka.client.id", "${MISSING_VAR}");
