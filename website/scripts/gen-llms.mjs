@@ -66,7 +66,6 @@ const summary =
 let index = `# Klag\n\n> ${summary}\n\n`;
 index += `Source: ${SITE} | Repository: https://github.com/themoah/klag\n\n## Docs\n\n`;
 for (const p of pages) {
-  if (p.splash) continue;
   index += `- [${p.title}](${p.url})${p.description ? `: ${p.description}` : ''}\n`;
 }
 index += `\n## Full text\n\n- [Full documentation, concatenated](${SITE}/llms-full.txt)\n`;
