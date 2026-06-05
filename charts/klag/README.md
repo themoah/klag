@@ -120,6 +120,8 @@ helm install klag ./charts/klag \
 
 Any other `KAFKA_*` env var set on the pod is automatically picked up by klag and mapped to the equivalent Kafka client property (e.g. `KAFKA_SSL_TRUSTSTORE_PASSWORD` → `ssl.truststore.password`).
 
+Set `KLAG_CONFIG_FILE` to the path of an external `application.properties` (typically mounted from a ConfigMap or Secret via `extraVolumes` / `extraVolumeMounts`) to layer file-based config between the classpath defaults and `KAFKA_*` env vars. Precedence: classpath `application.properties` < `KLAG_CONFIG_FILE` < `KAFKA_*` env vars.
+
 ### Metrics Configuration
 
 | Parameter | Description | Default |

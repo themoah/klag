@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
  * <ol>
  *   <li>Built-in defaults</li>
  *   <li>{@code application.properties} on the classpath (if present)</li>
+ *   <li>External properties file referenced by {@code KLAG_CONFIG_FILE} (if set and readable)</li>
  *   <li>Environment variables — any {@code KAFKA_X_Y_Z} maps to {@code kafka.x.y.z}
  *       (lowercase, underscores become dots). For example
  *       {@code KAFKA_SECURITY_PROTOCOL} sets {@code kafka.security.protocol}.</li>
@@ -38,6 +39,7 @@ public class KafkaClientConfig {
   private static final String PROP_REQUEST_TIMEOUT_MS = "kafka.request.timeout.ms";
   private static final String PROP_PREFIX = "kafka.";
   private static final String ENV_PREFIX = "KAFKA_";
+  private static final String EXTERNAL_CONFIG_ENV = "KLAG_CONFIG_FILE";
 
   private static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
   private static final int DEFAULT_REQUEST_TIMEOUT_MS = 30000;
@@ -77,8 +79,9 @@ public class KafkaClientConfig {
 
   /**
    * Loads configuration with full layered precedence: defaults &lt; classpath
-   * {@code application.properties} &lt; {@code KAFKA_*} environment variables.
-   * Placeholders in values are resolved against the process environment.
+   * {@code application.properties} &lt; external file referenced by {@code KLAG_CONFIG_FILE}
+   * &lt; {@code KAFKA_*} environment variables. Placeholders in values are resolved against
+   * the process environment.
    */
   public static KafkaClientConfig load() {
     return load(System.getenv());
@@ -87,6 +90,10 @@ public class KafkaClientConfig {
   static KafkaClientConfig load(Map<String, String> env) {
     Properties props = new Properties();
     loadClasspathInto(props, DEFAULT_CONFIG_FILE);
+    String externalPath = env.get(EXTERNAL_CONFIG_ENV);
+    if (externalPath != null && !externalPath.isBlank()) {
+      loadFileInto(props, Path.of(externalPath));
+    }
     applyEnvironmentOverrides(props, env);
     resolvePlaceholders(props, env);
     return fromProperties(props);
@@ -191,6 +198,24 @@ public class KafkaClientConfig {
       props.load(is);
     } catch (IOException e) {
       log.warn("Failed to load {}: {}", resourceName, e.getMessage());
+    }
+  }
+
+  /**
+   * Layers properties from an external file path on top of the existing bag.
+   * If the file is missing or unreadable, the failure is logged and the bag is unchanged —
+   * the caller can still fall back to env vars / defaults.
+   */
+  static void loadFileInto(Properties props, Path path) {
+    if (!Files.isReadable(path)) {
+      log.warn("External config file not readable, skipping: {}", path);
+      return;
+    }
+    try (InputStream is = Files.newInputStream(path)) {
+      log.info("Loading configuration from external file: {}", path);
+      props.load(is);
+    } catch (IOException e) {
+      log.warn("Failed to load external config file {}: {}", path, e.getMessage());
     }
   }
 

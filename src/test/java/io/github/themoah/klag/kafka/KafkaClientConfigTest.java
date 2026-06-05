@@ -5,11 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class KafkaClientConfigTest {
 
@@ -134,5 +137,37 @@ class KafkaClientConfigTest {
 
     assertEquals("localhost:9092", config.getBootstrapServers());
     assertEquals(30000, config.getRequestTimeoutMs());
+  }
+
+  @Test
+  void externalFile_overridesClasspathAndIsOverriddenByEnv(@TempDir Path tmp) throws Exception {
+    Path external = tmp.resolve("application.properties");
+    Files.writeString(
+      external,
+      """
+      kafka.bootstrap.servers=from-file:9092
+      kafka.security.protocol=SASL_PLAINTEXT
+      kafka.client.id=from-file
+      """);
+    Map<String, String> env = Map.of(
+      "KLAG_CONFIG_FILE", external.toString(),
+      "KAFKA_CLIENT_ID", "from-env");
+
+    KafkaClientConfig config = KafkaClientConfig.load(env);
+
+    assertEquals("from-file:9092", config.getBootstrapServers());
+    assertEquals("SASL_PLAINTEXT", config.toProperties().get("security.protocol"));
+    assertEquals("from-env", config.toProperties().get("client.id"));
+  }
+
+  @Test
+  void externalFile_missingPathIsIgnored() {
+    Map<String, String> env = Map.of(
+      "KLAG_CONFIG_FILE", "/does/not/exist.properties",
+      "KAFKA_BOOTSTRAP_SERVERS", "broker:9092");
+
+    KafkaClientConfig config = KafkaClientConfig.load(env);
+
+    assertEquals("broker:9092", config.getBootstrapServers());
   }
 }
