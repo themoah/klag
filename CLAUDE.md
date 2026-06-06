@@ -89,7 +89,7 @@ src/main/java/io/github/themoah/klag/
 - `TIME_LAG_INTERPOLATION_BUFFER_SIZE` (60) - Number of offset/timestamp points per partition for interpolation
 - `TIME_LAG_STALE_PRODUCER_THRESHOLD_MS` (180000) - Time in ms before a producer with no offset progress is considered stale
 
-**Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`
+**Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`, `LOG_LEVEL_KAFKA_CLIENT` (Apache kafka-clients, default `INFO`), `LOG_LEVEL_KAFKA_LIST_OFFSETS_HANDLER` (Apache `ListOffsetsHandler`, default `ERROR` — silences the redundant per-scrape MAX_TIMESTAMP WARN on Kafka <3.0; raise to `WARN`/`DEBUG` when investigating other listOffsets issues)
 
 **OTLP Configuration (when METRICS_REPORTER=otlp):**
 

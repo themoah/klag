@@ -35,8 +35,12 @@
 
   <!-- AdminClient emits a per-scrape WARN when the broker doesn't support
        MAX_TIMESTAMP (Kafka < 3.0). Klag handles this via fallback and emits
-       its own one-shot WARN; the Kafka-client-side line is redundant noise. -->
-  <logger name="org.apache.kafka.clients.admin.internals.ListOffsetsHandler" level="ERROR"/>
+       its own one-shot WARN; the Kafka-client-side line is redundant noise.
+       Defaults to ERROR; set LOG_LEVEL_KAFKA_LIST_OFFSETS_HANDLER=WARN (or
+       DEBUG) to restore Kafka-client-side output when debugging non-2.x
+       listOffsets issues. -->
+  <logger name="org.apache.kafka.clients.admin.internals.ListOffsetsHandler"
+          level="${LOG_LEVEL_KAFKA_LIST_OFFSETS_HANDLER:-ERROR}"/>
 
   <!-- Netty (suppress verbose logging) -->
   <logger name="io.netty" level="WARN"/>
