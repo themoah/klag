@@ -42,6 +42,26 @@ helm install klag ./charts/klag \
   --set kafka.existingSecret="kafka-creds"
 ```
 
+### With SASL_SSL and Private Truststore
+
+When the brokers present certs signed by an internal CA, mount the truststore via
+`extraVolumes` / `extraVolumeMounts` and point `kafka.sslTruststoreLocation` at it.
+
+```bash
+helm install klag ./charts/klag \
+  --set kafka.bootstrapServers="kafka:9093" \
+  --set kafka.securityProtocol="SASL_SSL" \
+  --set kafka.saslMechanism="PLAIN" \
+  --set kafka.existingSecret="kafka-creds" \
+  --set kafka.sslTruststoreLocation="/etc/shared-certificates/kafka/client.truststore.jks" \
+  --set-json 'extraVolumes=[{"name":"shared-certificates","persistentVolumeClaim":{"claimName":"shared-certificates-volume-claim"}}]' \
+  --set-json 'extraVolumeMounts=[{"name":"shared-certificates","mountPath":"/etc/shared-certificates","readOnly":true}]'
+```
+
+If the truststore is password-protected, also set `KAFKA_SSL_TRUSTSTORE_PASSWORD`
+(via `--set-json` env injection or by mounting it from a secret) — klag picks it
+up automatically as `ssl.truststore.password`.
+
 ### With OTLP Metrics (Grafana Cloud)
 
 ```bash
@@ -94,8 +114,13 @@ helm install klag ./charts/klag \
 | `kafka.securityProtocol` | Security protocol (PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL) | `""` |
 | `kafka.saslMechanism` | SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512) | `""` |
 | `kafka.saslJaasConfig` | JAAS configuration string | `""` |
+| `kafka.sslTruststoreLocation` | Path inside the container to the SSL truststore (emits `KAFKA_SSL_TRUSTSTORE_LOCATION`) | `""` |
 | `kafka.existingSecret` | Name of existing secret for Kafka credentials | `""` |
 | `kafka.secretKeys.jaasConfig` | Key in secret for JAAS config | `jaas-config` |
+
+Any other `KAFKA_*` env var set on the pod is automatically picked up by klag and mapped to the equivalent Kafka client property (e.g. `KAFKA_SSL_TRUSTSTORE_PASSWORD` → `ssl.truststore.password`).
+
+Set `KLAG_CONFIG_FILE` to the path of an external `application.properties` (typically mounted from a ConfigMap or Secret via `extraVolumes` / `extraVolumeMounts`) to layer file-based config between the classpath defaults and `KAFKA_*` env vars. Precedence: classpath `application.properties` < `KLAG_CONFIG_FILE` < `KAFKA_*` env vars.
 
 ### Metrics Configuration
 
@@ -177,6 +202,8 @@ helm install klag ./charts/klag \
 | `podAnnotations` | Pod annotations | `{}` |
 | `podSecurityContext` | Pod security context | `{}` |
 | `securityContext` | Container security context | `{}` |
+| `extraVolumes` | Additional pod-level volumes (e.g., truststore PVC, certs Secret) | `[]` |
+| `extraVolumeMounts` | Additional container volume mounts; pair with `extraVolumes` | `[]` |
 
 ### ServiceAccount Configuration
 
