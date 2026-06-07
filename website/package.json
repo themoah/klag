@@ -8,12 +8,15 @@
     "dev": "astro dev",
     "start": "astro dev",
     "build": "node scripts/gen-llms.mjs && astro build",
-    "preview": "astro preview",
+    "preview": "npm run build && wrangler dev",
     "astro": "astro",
     "check": "astro check",
-    "gen:llms": "node scripts/gen-llms.mjs"
+    "gen:llms": "node scripts/gen-llms.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
+    "@astrojs/cloudflare": "12",
     "@astrojs/sitemap": "^3.5.0",
     "@astrojs/starlight": "^0.36.0",
     "astro": "^5.18.0",
@@ -21,5 +24,8 @@
   },
   "engines": {
     "node": ">=20.3.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.98.0"
   }
 }

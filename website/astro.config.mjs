@@ -3,6 +3,8 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import sitemap from '@astrojs/sitemap';
 
+import cloudflare from "@astrojs/cloudflare";
+
 const SITE = 'https://klag.dev';
 const REPO = 'https://github.com/themoah/klag';
 
@@ -40,6 +42,7 @@ if (cfToken) {
 // https://astro.build/config
 export default defineConfig({
   site: SITE,
+
   integrations: [
     starlight({
       title: 'Klag',
@@ -120,4 +123,6 @@ export default defineConfig({
     }),
     sitemap(),
   ],
+
+  adapter: cloudflare()
 });
