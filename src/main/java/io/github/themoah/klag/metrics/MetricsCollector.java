@@ -5,6 +5,8 @@ import io.github.themoah.klag.kafka.ChunkProcessor;
 import io.github.themoah.klag.kafka.KafkaClientService;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionConfig;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionDetector;
+import io.github.themoah.klag.metrics.snapshot.SnapshotBuilder;
+import io.github.themoah.klag.metrics.snapshot.SnapshotStore;
 import io.github.themoah.klag.metrics.timelag.LagMsCalculator;
 import io.github.themoah.klag.metrics.timelag.OffsetTimestampTracker;
 import io.github.themoah.klag.metrics.timelag.TimeLagConfig;
@@ -12,6 +14,7 @@ import io.github.themoah.klag.metrics.timelag.TimeLagEstimator;
 import io.github.themoah.klag.metrics.velocity.LagVelocityTracker;
 import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
+import io.github.themoah.klag.model.StateTransition;
 import io.github.themoah.klag.model.ConsumerGroupOffsets;
 import io.github.themoah.klag.model.ConsumerGroupOffsets.TopicPartitionKey;
 import io.github.themoah.klag.model.ConsumerGroupState;
@@ -19,6 +22,8 @@ import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.HotPartitionThroughput;
 import io.github.themoah.klag.model.LagMs;
 import io.github.themoah.klag.model.LagVelocity;
+import io.github.themoah.klag.model.MetricsSnapshot;
+import io.github.themoah.klag.model.MetricsSnapshot.GroupSnapshot;
 import io.github.themoah.klag.model.PartitionOffsets;
 import io.github.themoah.klag.model.RetentionRisk;
 import io.github.themoah.klag.model.TimeToCloseEstimate;
@@ -56,6 +61,13 @@ public class MetricsCollector {
 
   private final Map<String, Integer> cachedGroupPartitionCounts = new ConcurrentHashMap<>();
   private final Map<String, Integer> cachedTopicPartitionCounts = new ConcurrentHashMap<>();
+
+  // Optional snapshot store for the MCP layer. When set, the collector publishes its
+  // last cycle into it (best-effort, never affecting collection). Null = MCP disabled.
+  private SnapshotStore snapshotStore;
+
+  // STABLE band (msg/s) for classifying lag velocity into a basic trend in the MCP snapshot.
+  private double lagTrendDeadband = 1.0;
 
   private Long timerId;
 
@@ -133,6 +145,36 @@ public class MetricsCollector {
   }
 
   /**
+   * Attaches a snapshot store. After each collection cycle the collector publishes its
+   * derived metrics into this store for the MCP layer to read. Publishing is best-effort
+   * and never affects collection. Pass null to disable.
+   *
+   * @param snapshotStore the store to publish to, or null
+   */
+  public void setSnapshotStore(SnapshotStore snapshotStore) {
+    this.snapshotStore = snapshotStore;
+  }
+
+  /**
+   * Sets the STABLE deadband (msg/s) used to classify lag velocity into a basic trend for the
+   * MCP snapshot. Defaults to 1.0.
+   *
+   * @param lagTrendDeadband the deadband magnitude in messages/second
+   */
+  public void setLagTrendDeadband(double lagTrendDeadband) {
+    this.lagTrendDeadband = lagTrendDeadband;
+  }
+
+  /**
+   * Runs a single collection-and-report cycle. Exposed for tests.
+   *
+   * @return future completing when the cycle finishes
+   */
+  Future<Void> collectOnce() {
+    return collectAndReport();
+  }
+
+  /**
    * Starts the metrics collector with periodic collection.
    */
   public Future<Void> start() {
@@ -203,11 +245,17 @@ public class MetricsCollector {
 
         Set<String> activeKeys = new HashSet<>();
         Set<String> velocityKeys = new HashSet<>();
-        reportMetrics(lagData, stateData, activeKeys, velocityKeys);
+        Set<String> throughputKeys = new HashSet<>();
+        CycleSnapshot cycleSnapshot = newCycleSnapshot();
+        reportMetrics(lagData, stateData, activeKeys, velocityKeys, throughputKeys, cycleSnapshot);
         velocityTracker.cleanupStaleTopics(velocityKeys);
+        if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
+          hotPartitionDetector.cleanupStalePartitions(throughputKeys);
+        }
         if (reporter instanceof MicrometerReporter micrometerReporter) {
           micrometerReporter.cleanupStaleGauges(activeKeys);
         }
+        publishSnapshot(cycleSnapshot);
         return (Void) null;
       });
   }
@@ -225,15 +273,22 @@ public class MetricsCollector {
 
     Set<String> cycleActiveKeys = new HashSet<>();
     Set<String> cycleVelocityKeys = new HashSet<>();
+    Set<String> cycleThroughputKeys = new HashSet<>();
+    CycleSnapshot cycleSnapshot = newCycleSnapshot();
 
     return ChunkProcessor.<String, Void>processSequentially(
       vertx, groupChunks, chunkConfig.chunkDelayMs(),
-      chunk -> processGroupChunk(chunk, cycleActiveKeys, cycleVelocityKeys)
+      chunk -> processGroupChunk(chunk, cycleActiveKeys, cycleVelocityKeys,
+        cycleThroughputKeys, cycleSnapshot)
     ).compose(results -> {
       velocityTracker.cleanupStaleTopics(cycleVelocityKeys);
+      if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
+        hotPartitionDetector.cleanupStalePartitions(cycleThroughputKeys);
+      }
       if (reporter instanceof MicrometerReporter micrometerReporter) {
         micrometerReporter.cleanupStaleGauges(cycleActiveKeys);
       }
+      publishSnapshot(cycleSnapshot);
       return Future.succeededFuture();
     });
   }
@@ -244,7 +299,9 @@ public class MetricsCollector {
   private Future<Void> processGroupChunk(
       List<String> chunk,
       Set<String> cycleActiveKeys,
-      Set<String> cycleVelocityKeys
+      Set<String> cycleVelocityKeys,
+      Set<String> cycleThroughputKeys,
+      CycleSnapshot cycleSnapshot
   ) {
     log.debug("Processing group chunk with {} groups", chunk.size());
 
@@ -263,7 +320,8 @@ public class MetricsCollector {
         List<ConsumerGroupLag> lagData = composite.resultAt(0);
         Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
 
-        reportMetrics(lagData, stateData, cycleActiveKeys, cycleVelocityKeys);
+        reportMetrics(lagData, stateData, cycleActiveKeys, cycleVelocityKeys,
+          cycleThroughputKeys, cycleSnapshot);
 
         // Update cached group partition counts
         for (ConsumerGroupLag lag : lagData) {
@@ -379,13 +437,15 @@ public class MetricsCollector {
   /**
    * Reports metrics for the given lag and state data.
    * Adds active gauge keys to the provided set but does NOT perform cleanup.
-   * Velocity keys are accumulated across chunks for cycle-level cleanup.
+   * Velocity and throughput keys are accumulated across chunks for cycle-level cleanup.
    */
   private void reportMetrics(
       List<ConsumerGroupLag> lagData,
       Map<String, ConsumerGroupState> stateData,
       Set<String> activeKeys,
-      Set<String> velocityKeys
+      Set<String> velocityKeys,
+      Set<String> throughputKeys,
+      CycleSnapshot cycleSnapshot
   ) {
     if (reporter instanceof MicrometerReporter micrometerReporter) {
       // Report topic partition counts (max partition number + 1)
@@ -425,6 +485,7 @@ public class MetricsCollector {
       micrometerReporter.reportLagMs(lagMsData, activeKeys);
 
       // Time-to-close estimation (based on velocity data)
+      List<TimeToCloseEstimate> timeToCloseEstimates = List.of();
       if (timeLagEstimator != null && timeLagEstimator.isEnabled()) {
         // Build lag map: group -> topic -> totalLag
         Map<String, Map<String, Long>> lagByGroupTopic = new HashMap<>();
@@ -435,7 +496,7 @@ public class MetricsCollector {
           )
         );
 
-        List<TimeToCloseEstimate> timeToCloseEstimates = timeLagEstimator.calculateTimeToClose(velocities, lagByGroupTopic);
+        timeToCloseEstimates = timeLagEstimator.calculateTimeToClose(velocities, lagByGroupTopic);
         micrometerReporter.reportTimeToClose(timeToCloseEstimates, activeKeys);
       }
 
@@ -451,16 +512,33 @@ public class MetricsCollector {
       micrometerReporter.reportConsumerGroupStates(stateData, activeKeys);
 
       // Hot partition detection and reporting
+      List<HotPartitionLag> hotByLag = List.of();
+      List<HotPartitionThroughput> hotByThroughput = List.of();
       if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
-        Set<String> throughputKeys = hotPartitionDetector.recordThroughputSnapshots(lagData);
+        // Accumulate active throughput keys across chunks; cleanup happens once per
+        // cycle (see collectAndReportChunked / collectAllGroupsParallel). Cleaning up
+        // here per-chunk would retainAll() away other chunks' throughput histories.
+        throughputKeys.addAll(hotPartitionDetector.recordThroughputSnapshots(lagData));
 
-        List<HotPartitionLag> hotByLag = hotPartitionDetector.detectHotPartitionsByLag(lagData);
+        hotByLag = hotPartitionDetector.detectHotPartitionsByLag(lagData);
         micrometerReporter.reportHotPartitionLag(hotByLag, activeKeys);
 
-        List<HotPartitionThroughput> hotByThroughput = hotPartitionDetector.detectHotPartitionsByThroughput();
+        hotByThroughput = hotPartitionDetector.detectHotPartitionsByThroughput();
         micrometerReporter.reportHotPartitionThroughput(hotByThroughput, activeKeys);
+      }
 
-        hotPartitionDetector.cleanupStalePartitions(throughputKeys);
+      // Accumulate this call's derived metrics into the cycle snapshot for the MCP layer.
+      if (cycleSnapshot != null) {
+        Map<String, List<StateTransition>> transitionsByGroup = new HashMap<>();
+        for (ConsumerGroupLag lag : lagData) {
+          transitionsByGroup.put(lag.consumerGroup(),
+            micrometerReporter.recentStateTransitions(lag.consumerGroup()));
+        }
+        MetricsSnapshot partial = SnapshotBuilder.build(0L, lagData, stateData, velocities,
+          lagMsData, timeToCloseEstimates, retentionRisks, hotByLag, hotByThroughput,
+          transitionsByGroup, lagTrendDeadband);
+        cycleSnapshot.groups.addAll(partial.groups());
+        cycleSnapshot.throughput.addAll(hotByThroughput);
       }
 
       log.debug("Reported metrics for {} consumer groups", lagData.size());
@@ -703,6 +781,42 @@ public class MetricsCollector {
 
     int count() {
       return count;
+    }
+  }
+
+  /**
+   * Mutable per-cycle accumulator of derived metrics destined for the MCP snapshot.
+   * Across chunked collection it gathers groups from every chunk before a single publish.
+   */
+  private static class CycleSnapshot {
+    final List<GroupSnapshot> groups = new ArrayList<>();
+    final List<HotPartitionThroughput> throughput = new ArrayList<>();
+  }
+
+  /**
+   * @return a fresh accumulator when a snapshot store is attached, else null (no work done).
+   */
+  private CycleSnapshot newCycleSnapshot() {
+    return snapshotStore != null ? new CycleSnapshot() : null;
+  }
+
+  /**
+   * Publishes the accumulated cycle into the snapshot store. Best-effort: any failure is
+   * logged and swallowed so it can never disrupt metrics collection or reporting.
+   *
+   * @param cycleSnapshot the accumulated cycle, or null when no store is attached
+   */
+  private void publishSnapshot(CycleSnapshot cycleSnapshot) {
+    if (snapshotStore == null || cycleSnapshot == null) {
+      return;
+    }
+    try {
+      snapshotStore.set(new MetricsSnapshot(
+        System.currentTimeMillis(),
+        List.copyOf(cycleSnapshot.groups),
+        List.copyOf(cycleSnapshot.throughput)));
+    } catch (RuntimeException e) {
+      log.warn("Failed to publish MCP snapshot (collection unaffected): {}", e.getMessage());
     }
   }
 

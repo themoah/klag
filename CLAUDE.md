@@ -67,6 +67,7 @@ src/main/java/io/github/themoah/klag/
 | `/readyz` | Readiness probe (200 if Kafka UP, 503 if DOWN) |
 | `/metrics` | Prometheus scrape endpoint (if enabled) |
 | `/version` | Build information |
+| `/mcp` | MCP endpoint for AI agents (JSON-RPC over POST; if `MCP_ENABLED=true`) |
 
 ## Environment Variables
 
@@ -74,7 +75,7 @@ src/main/java/io/github/themoah/klag/
 
 **Kafka:** `KAFKA_BOOTSTRAP_SERVERS` (localhost:9092), `KAFKA_REQUEST_TIMEOUT_MS` (30000), `KAFKA_CHUNK_COUNT` (1), `KAFKA_CHUNK_DELAY_MS` (0). Any other `KAFKA_X_Y_Z` env var maps to `kafka.x.y.z` and is forwarded to the AdminClient. Config precedence: classpath `application.properties` < external file at `KLAG_CONFIG_FILE` < `KAFKA_*` env vars.
 
-**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false). A group is monitored iff it matches any include segment AND no exclude segment.
+**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false), `LAG_TREND_DEADBAND_MSG_PER_SEC` (1.0 — STABLE band for the MCP basic lag-trend classifier; |velocity| within the band is STABLE). A group is monitored iff it matches any include segment AND no exclude segment.
 
 **Hot Partition Detection:**
 - `HOT_PARTITION_ENABLED` (true) - Enable/disable hot partition detection
@@ -89,7 +90,26 @@ src/main/java/io/github/themoah/klag/
 - `TIME_LAG_INTERPOLATION_BUFFER_SIZE` (60) - Number of offset/timestamp points per partition for interpolation
 - `TIME_LAG_STALE_PRODUCER_THRESHOLD_MS` (180000) - Time in ms before a producer with no offset progress is considered stale
 
+**MCP (AI agent access):**
+- `MCP_ENABLED` (false) - Expose the `/mcp` endpoint for AI agents (SRE/dev). Opt-in; zero impact when off.
+- `MCP_AUTH_TOKEN` (empty) - When set, requires `Authorization: Bearer <token>`. Empty = open (logged warning).
+- `MCP_PATH` (/mcp) - HTTP path of the MCP endpoint.
+
+MCP is read-only and served from an in-memory snapshot the metrics collector publishes after each
+cycle — it never queries Kafka or touches the collection flow. Transport: Streamable HTTP (JSON-RPC
+2.0 over POST; GET returns 405). Tools: `list_consumer_groups`, `get_consumer_group_lag`,
+`find_lagging_groups`, `diagnose` (composite severity assessment). Requires `METRICS_REPORTER` set
+(snapshot is only populated when metrics collection runs).
+
+Each group snapshot also carries a **basic lag trend** (`growing`/`shrinking`/`stable`, per-topic +
+`overallTrend` rollup, derived from lag velocity via `LAG_TREND_DEADBAND_MSG_PER_SEC`) and a rolling
+**state-change history** (last 10 `from→to` transitions). `get_consumer_group_lag` returns `trends`,
+`overallTrend`, and `recentTransitions`; `list_consumer_groups`/`find_lagging_groups` include
+`overallTrend`; `diagnose` flags frequent state changes (rebalance storm / flapping).
+See `docs/superpowers/specs/2026-06-01-mcp-support-design.md`.
+
 **Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`, `LOG_LEVEL_KAFKA_CLIENT` (Apache kafka-clients, default `INFO`), `LOG_LEVEL_KAFKA_LIST_OFFSETS_HANDLER` (Apache `ListOffsetsHandler`, default `ERROR` — silences the redundant per-scrape MAX_TIMESTAMP WARN on Kafka <3.0; raise to `WARN`/`DEBUG` when investigating other listOffsets issues)
+
 
 **OTLP Configuration (when METRICS_REPORTER=otlp):**
 

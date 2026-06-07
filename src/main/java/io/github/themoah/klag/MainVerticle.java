@@ -7,6 +7,10 @@ import io.github.themoah.klag.health.VersionHandler;
 import io.github.themoah.klag.kafka.KafkaClientConfig;
 import io.github.themoah.klag.kafka.KafkaClientService;
 import io.github.themoah.klag.kafka.KafkaClientServiceImpl;
+import io.github.themoah.klag.mcp.McpConfig;
+import io.github.themoah.klag.mcp.McpHandler;
+import io.github.themoah.klag.mcp.McpTools;
+import io.github.themoah.klag.metrics.snapshot.SnapshotStore;
 import io.github.themoah.klag.metrics.MetricsCollector;
 import io.github.themoah.klag.metrics.MetricsConfig;
 import io.github.themoah.klag.metrics.MetricsReporter;
@@ -57,6 +61,10 @@ public class MainVerticle extends AbstractVerticle {
 
     // Create metrics collector if enabled (also registers /metrics endpoint for Prometheus)
     metricsCollector = createMetricsCollector(metricsConfig, router);
+
+    // Optionally expose the MCP endpoint for AI agents (read-only, served from a snapshot
+    // the collector publishes; never touches the Kafka collection path).
+    registerMcpEndpoint(router);
 
     router.route().handler(ctx -> {
       ctx.response()
@@ -149,7 +157,7 @@ public class MainVerticle extends AbstractVerticle {
     HotPartitionConfig hotPartitionConfig = HotPartitionConfig.fromEnvironment();
 
     MetricsReporter reporter = new MicrometerReporter(registry);
-    return new MetricsCollector(
+    MetricsCollector collector = new MetricsCollector(
       vertx,
       kafkaClientService,
       reporter,
@@ -158,6 +166,26 @@ public class MainVerticle extends AbstractVerticle {
       config.consumerGroupExclude(),
       hotPartitionConfig
     );
+    collector.setLagTrendDeadband(config.lagTrendDeadband());
+    return collector;
+  }
+
+  private void registerMcpEndpoint(Router router) {
+    McpConfig mcpConfig = McpConfig.fromEnvironment();
+    if (!mcpConfig.enabled()) {
+      return;
+    }
+
+    SnapshotStore snapshotStore = new SnapshotStore();
+    if (metricsCollector != null) {
+      metricsCollector.setSnapshotStore(snapshotStore);
+    } else {
+      log.warn("MCP endpoint enabled but metrics collection is disabled; "
+        + "tools will report 'snapshot not ready' until metrics are enabled (METRICS_REPORTER)");
+    }
+
+    McpTools mcpTools = new McpTools(snapshotStore);
+    new McpHandler(mcpConfig, mcpTools).registerRoutes(router);
   }
 
   private Future<Void> startMetricsCollector() {
