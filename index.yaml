@@ -23,6 +23,52 @@ entries:
       artifacthub.io/prerelease: "false"
     apiVersion: v2
     appVersion: 0.1.14
+    created: "2026-06-07T10:14:20.432660622Z"
+    description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter
+      with pluggable metrics sinks.
+    digest: 5f1a5ccd95db0ba3e1dbb42ff73fd3b1372493b0c564d54f6c9aa37d6092b695
+    home: https://github.com/themoah/klag
+    icon: https://avatars.githubusercontent.com/themoah
+    keywords:
+    - kafka
+    - lag
+    - monitoring
+    - prometheus
+    - metrics
+    - consumer-groups
+    maintainers:
+    - email: aviv@dozorets.com
+      name: themoah
+      url: https://github.com/themoah
+    name: klag
+    sources:
+    - https://github.com/themoah/klag
+    type: application
+    urls:
+    - https://github.com/themoah/klag/releases/download/klag-0.2.1/klag-0.2.1.tgz
+    version: 0.2.1
+  - annotations:
+      artifacthub.io/category: monitoring-logging
+      artifacthub.io/changes: |
+        - kind: added
+          description: Initial publication of the Klag Helm chart to Artifact Hub
+      artifacthub.io/images: |
+        - name: klag
+          image: themoah/klag:0.1.14
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: source
+          url: https://github.com/themoah/klag
+        - name: issues
+          url: https://github.com/themoah/klag/issues
+        - name: documentation
+          url: https://github.com/themoah/klag/blob/main/README.md
+      artifacthub.io/maintainers: |
+        - name: themoah
+          email: aviv@dozorets.com
+      artifacthub.io/prerelease: "false"
+    apiVersion: v2
+    appVersion: 0.1.14
     created: "2026-06-05T21:22:49.345705517Z"
     description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter
       with pluggable metrics sinks.
@@ -93,4 +139,4 @@ entries:
     urls:
     - https://github.com/themoah/klag/releases/download/klag-0.1.12/klag-0.1.12.tgz
     version: 0.1.12
-generated: "2026-06-05T21:22:49.345713209Z"
+generated: "2026-06-07T10:14:20.432684588Z"
