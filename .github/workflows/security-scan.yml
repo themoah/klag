@@ -5,10 +5,14 @@ on:
     branches:
       - main
       - dev
+    paths-ignore:
+      - 'website/**'
   pull_request:
     branches:
       - dev
       - main
+    paths-ignore:
+      - 'website/**'
 
 jobs:
   trufflehog-scan:
