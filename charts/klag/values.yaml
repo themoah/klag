@@ -52,6 +52,11 @@ kafka:
   # JAAS configuration string for SASL authentication
   # Example: org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="pass";
   saslJaasConfig: ""
+  # Path to the SSL truststore file inside the container. When set, the chart emits
+  # KAFKA_SSL_TRUSTSTORE_LOCATION so the AdminClient can verify broker certs.
+  # Typically combined with extraVolumes/extraVolumeMounts to mount a secret or PVC
+  # carrying the JKS/PKCS12 truststore.
+  sslTruststoreLocation: ""
   # Use an existing secret for Kafka credentials instead of creating one
   existingSecret: ""
   # Keys in the existing secret
@@ -152,6 +157,20 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+# Additional volumes to attach to the pod (e.g., truststore PVC, certs ConfigMap).
+# Example:
+#   - name: shared-certificates
+#     persistentVolumeClaim:
+#       claimName: shared-certificates-volume-claim
+extraVolumes: []
+
+# Additional volume mounts for the klag container. Pair with extraVolumes.
+# Example:
+#   - name: shared-certificates
+#     mountPath: /etc/shared-certificates
+#     readOnly: true
+extraVolumeMounts: []
 
 # Prometheus ServiceMonitor configuration
 serviceMonitor:
