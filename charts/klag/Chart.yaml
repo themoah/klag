@@ -2,7 +2,7 @@ apiVersion: v2
 name: klag
 description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter with pluggable metrics sinks.
 type: application
-version: 0.1.13
+version: 0.2.1
 appVersion: "0.1.14"
 home: https://github.com/themoah/klag
 icon: https://avatars.githubusercontent.com/themoah
