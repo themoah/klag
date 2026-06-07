@@ -7,17 +7,18 @@
 
 Inspired by [kafka-lag-exporter](https://github.com/seglo/kafka-lag-exporter) (archived 2024). Built with Vert.x and Micrometer.
 
+> ### 📖 Documentation lives at **[klag.dev](https://klag.dev)**
+>
+> Full guides — configuration, Kafka ACLs, Helm/Strimzi deployment, integrations,
+> metrics reference, and development — are at **[klag.dev](https://klag.dev)**.
+> AI agents: a machine-readable corpus is at [klag.dev/llms.txt](https://klag.dev/llms.txt).
+> The docs source lives in [`website/`](website/) (Astro + Starlight).
+
 > **Scales to large clusters:** Monitors thousands of consumer groups in ~50MB heap. Request batching with configurable delays prevents overwhelming brokers — fetch offsets for 500+ groups without spiking cluster CPU.
 
 ## Why Klag?
 
-Consumer lag is the gap between what Kafka has produced and what your consumers have processed. Left unmonitored, growing lag leads to:
-
-- **Stale data** in downstream systems
-- **Memory pressure** as consumers struggle to catch up
-- **Silent failures** when consumer groups die without alerts
-
-Klag continuously monitors all consumer groups and exposes metrics to your observability stack.
+Consumer lag is the gap between what Kafka has produced and what your consumers have processed. Left unmonitored, growing lag leads to stale downstream data, memory pressure as consumers struggle to catch up, and silent failures when groups die without alerts. Klag continuously monitors all consumer groups and exposes metrics to your observability stack.
 
 ## Key Features
 
@@ -27,16 +28,11 @@ Klag continuously monitors all consumer groups and exposes metrics to your obser
 | **Time-based lag estimation**     | See lag in seconds/minutes, not just message counts                       |
 | **Hot partition detection**       | Find partitions with uneven load causing bottlenecks                      |
 | **Consumer group state tracking** | Alert on Rebalancing, Dead, or Empty states                               |
+| **Data loss prevention**          | Alert before lag exceeds retention and data is lost                       |
 | **Request batching**              | Safely monitor large clusters without overwhelming brokers                |
-| **Stale group cleanup**           | Automatically stops reporting deleted/inactive groups                     |
-| **Data loss prevention**          | Prevent scenario when data is lost because lag is higher than retention.  |
+| **AI-native**                     | Opt-in read-only [MCP endpoint](https://klag.dev/ai/mcp/) for SRE/dev agents |
 
-## Supported Sinks
-
-- Prometheus endpoint
-- Datadog
-- OTLP (OpenTelemetry) — works with Grafana Cloud, New Relic, etc.
-- *(planned)* Prometheus Push Gateway, StatsD, Google Stackdriver
+**Sinks:** Prometheus, Datadog, OTLP (Grafana Cloud, New Relic, etc.). See [integrations](https://klag.dev/integrations/prometheus/).
 
 ## Quick Start
 
@@ -47,132 +43,51 @@ docker run -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
            themoah/klag:latest
 ```
 
-Metrics available at `http://localhost:8888/metrics`
+Metrics available at `http://localhost:8888/metrics`.
 
-### Native image (faster startup, lower memory)
+A GraalVM native image (`themoah/klag:native`) starts in ~70-100 ms using ~44 MB RSS,
+versus ~500 ms / ~119 MB for the JVM image — same config, endpoints, and metrics. See
+[Native Image](https://klag.dev/deployment/native-image/).
 
-A GraalVM native build is published alongside the JVM image, tagged `:native` and
-`:<version>-native`:
+### Helm
 
 ```bash
-docker run -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
-           -e METRICS_REPORTER=prometheus \
-           -p 8888:8888 \
-           themoah/klag:native
+helm repo add klag https://themoah.github.io/klag
+helm repo update
+helm install klag klag/klag --set kafka.bootstrapServers="kafka-broker:9092"
 ```
 
-The native binary starts in ~70-100 ms using ~44 MB RSS, versus ~500 ms / ~119 MB for
-the JVM image — ideal for fast scaling and low-footprint deployments. Same config,
-endpoints, and metrics. Build locally with `gradle nativeCompile` (needs a GraalVM
-JDK 21) or `docker build -f Dockerfile.native -t klag:native .`.
+Published to [Artifact Hub](https://artifacthub.io/packages/helm/klag/klag). Full chart
+config, SASL, and Strimzi: [Kubernetes deployment](https://klag.dev/deployment/kubernetes/)
+and [charts/klag/README.md](charts/klag/README.md).
 
-## Metrics Exposed
+## Metrics
 
 | Metric | Description                                                          |
 |--------|----------------------------------------------------------------------|
-| `klag.consumer.lag` | Current lag per partition (also `.sum`, `.max`, `.min` aggregations) |
-| `klag.consumer.lag.velocity` | Rate of change — positive means falling behind                       |
-| `klag.consumer.lag.ms` | Lag in ms from Kafka log timestamps; poll-history fallback when unavailable |
-| `klag.consumer.lag.time_to_close_seconds` | Estimated seconds until lag reaches zero (only when catching up)     |
-| `klag.consumer.lag.retention_percent` | Lag as percentage of available messages. Use to prevent data loss.   |
-| `klag.consumer.group.state` | Group health: Stable, Rebalancing, Dead, Empty                       |
-| `klag.hot_partition` | Partitions with statistically abnormal throughput                    |
-| `klag.hot_partition.lag` | Lag on hot partitions specifically                                   |
-| `klag.topic.partitions` | Partition count per topic                                            |
-| `klag.partition.log_end_offset` | Latest offset per partition                                          |
-| `klag.consumer.committed_offset` | Last committed offset per consumer                                   |
+| `klag.consumer.lag` | Current lag per partition (also `.sum`, `.max`, `.min`)             |
+| `klag.consumer.lag.velocity` | Rate of change — positive means falling behind            |
+| `klag.consumer.lag.ms` | Lag in ms from Kafka log timestamps                            |
+| `klag.consumer.lag.time_to_close_seconds` | Estimated seconds until lag reaches zero    |
+| `klag.consumer.lag.retention_percent` | Lag as % of available messages (data loss alerting) |
+| `klag.consumer.group.state` | Group health: Stable, Rebalancing, Dead, Empty           |
+| `klag.hot_partition[.lag]` | Partitions with statistically abnormal throughput         |
 
-All metrics tagged with `consumer_group`, `topic`, `partition` where applicable.
+Full metrics reference and the pre-built [Grafana dashboard](https://klag.dev/integrations/grafana-dashboard/)
+are documented at [klag.dev/metrics](https://klag.dev/metrics/overview/).
 
 [![Grafana Dashboard](dashboard/grafana.png)](dashboard/demo-dashboard.json)
 
 [Blogpost: Introducing Klag](https://medium.com/p/introducing-klag-the-kafka-lag-exporter-i-always-wanted-d919bdb64a7a)
 
----
-
-## Installation
-
-### Helm Chart
-
-The chart is published to a Helm repository served from GitHub Pages and indexed on
-[Artifact Hub](https://artifacthub.io/packages/helm/klag/klag).
-
-```bash
-helm repo add klag https://themoah.github.io/klag
-helm repo update
-helm search repo klag   # find the latest version
-
-helm install klag klag/klag \
-  --set kafka.bootstrapServers="kafka-broker:9092"
-```
-
-Pin a specific version with `--version`, e.g. `helm install klag klag/klag --version 0.1.12 ...`.
-
-<details>
-<summary>With SASL authentication</summary>
-
-```bash
-helm install klag klag/klag \
-  --set kafka.bootstrapServers="kafka:9092" \
-  --set kafka.securityProtocol="SASL_SSL" \
-  --set kafka.saslMechanism="PLAIN" \
-  --set kafka.saslJaasConfig="org.apache.kafka.common.security.plain.PlainLoginModule required username='user' password='pass';"
-```
-
-</details>
-
-<details>
-<summary>Install from a local checkout (development)</summary>
-
-```bash
-helm install klag ./charts/klag \
-  --set kafka.bootstrapServers="kafka-broker:9092"
-```
-
-</details>
-
-See [charts/klag/README.md](charts/klag/README.md) for full configuration options.
-
-### Docker with Environment File
-
-```bash
-docker run --env-file .env themoah/klag:latest
-```
-
-<details>
-<summary>Sample .env file</summary>
-
-```dotenv
-# Kafka connection
-KAFKA_BOOTSTRAP_SERVERS=instance.gcp.confluent.cloud:9092
-KAFKA_SECURITY_PROTOCOL=SASL_SSL
-KAFKA_SASL_MECHANISM=PLAIN
-KAFKA_SASL_JAAS_CONFIG="org.apache.kafka.common.security.plain.PlainLoginModule required username=${SASL_USERNAME} password=${SASL_PASSWORD};"
-
-# Metrics
-METRICS_REPORTER=prometheus
-METRICS_INTERVAL_MS=30000
-METRICS_GROUP_FILTER=*
-METRICS_GROUP_EXCLUDE=
-
-# Optional: JVM metrics
-METRICS_JVM_ENABLED=true
-```
-
-</details>
-
----
-
 ## Configuration
 
-Configure via `src/main/resources/application.properties` or environment variables:
+Configure via `src/main/resources/application.properties` or environment variables. The
+most common:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka broker addresses |
-| `KAFKA_REQUEST_TIMEOUT_MS` | `30000` | Request timeout |
-| `KAFKA_CHUNK_COUNT` | `1` | Split offset requests into N batches |
-| `KAFKA_CHUNK_DELAY_MS` | `0` | Delay (ms) between batches |
 | `METRICS_REPORTER` | `none` | `prometheus`, `datadog`, or `otlp` |
 | `METRICS_INTERVAL_MS` | `60000` | How often to collect metrics |
 | `METRICS_GROUP_FILTER` | `*` | Comma-separated glob patterns. A group is included if it matches any segment (e.g. `ingest*,categorize*`). |
@@ -247,84 +162,12 @@ kafka-acls --bootstrap-server <broker> \
 
 </details>
 
-<details>
-<summary>Monitor specific prefix only</summary>
+Klag needs **read-only** Kafka access (Admin Client DESCRIBE on cluster, topics, groups).
+Full configuration reference and ACL setup (self-managed + Confluent Cloud) are at
+[klag.dev/configuration](https://klag.dev/configuration/reference/) and
+[klag.dev/kafka/acl-permissions](https://klag.dev/kafka/acl-permissions/).
 
-```bash
-# Cluster permissions (required for listConsumerGroups)
-kafka-acls --bootstrap-server <broker> \
-  --add --allow-principal User:<klag-user> \
-  --operation Describe --cluster
-
-# Topics with prefix
-kafka-acls --bootstrap-server <broker> \
-  --add --allow-principal User:<klag-user> \
-  --operation Describe --topic 'myapp-' \
-  --resource-pattern-type prefixed
-
-# Consumer groups with prefix
-kafka-acls --bootstrap-server <broker> \
-  --add --allow-principal User:<klag-user> \
-  --operation Describe --group 'myapp-' \
-  --resource-pattern-type prefixed
-```
-
-</details>
-
-### Confluent Cloud
-
-Create a service account with the following ACLs using the [Confluent CLI](https://docs.confluent.io/confluent-cli/current/overview.html):
-
-<details>
-<summary>Monitor all groups and topics</summary>
-
-```bash
-# Set your cluster ID
-CLUSTER_ID=<your-cluster-id>
-SERVICE_ACCOUNT=<service-account-id>
-
-# Cluster permissions
-confluent kafka acl create --allow --service-account $SERVICE_ACCOUNT \
-  --operations describe --cluster-scope
-
-# All topics
-confluent kafka acl create --allow --service-account $SERVICE_ACCOUNT \
-  --operations describe --topic '*'
-
-# All consumer groups
-confluent kafka acl create --allow --service-account $SERVICE_ACCOUNT \
-  --operations describe --consumer-group '*'
-```
-
-</details>
-
-<details>
-<summary>Monitor specific prefix only</summary>
-
-```bash
-CLUSTER_ID=<your-cluster-id>
-SERVICE_ACCOUNT=<service-account-id>
-
-# Cluster permissions (required for listConsumerGroups)
-confluent kafka acl create --allow --service-account $SERVICE_ACCOUNT \
-  --operations describe --cluster-scope
-
-# Topics with prefix
-confluent kafka acl create --allow --service-account $SERVICE_ACCOUNT \
-  --operations describe --topic 'myapp-' --prefix
-
-# Consumer groups with prefix
-confluent kafka acl create --allow --service-account $SERVICE_ACCOUNT \
-  --operations describe --consumer-group 'myapp-' --prefix
-```
-
-</details>
-
-> **Note:** `METRICS_GROUP_FILTER` and `METRICS_GROUP_EXCLUDE` provide application-level filtering, but cluster DESCRIBE permission is always required since `listConsumerGroups()` queries all groups before filtering.
-
----
-
-## Building from Source
+## Development
 
 Requires Java 21.
 
@@ -334,90 +177,9 @@ Requires Java 21.
 ./gradlew clean run       # Run with hot-reload
 ```
 
----
-
-## Development
-
-### Helm Chart Template Tests
-
-Fast, offline. Lints the chart and renders every values permutation:
-
-```bash
-./scripts/test-helm-chart.sh
-```
-
-### End-to-End Test (k3d + real Kafka)
-
-The canonical integration test. Spins up a disposable [k3d](https://k3d.io)
-cluster, deploys a real single-node Kafka (KRaft), builds the Klag image from
-the local `Dockerfile`, installs the Helm chart, generates real consumer-group
-lag, and asserts Klag connects to Kafka and exposes the lag via `/metrics`.
-Nothing is mocked — Klag's readiness probe only passes once it can reach Kafka.
-
-```bash
-# Full e2e: cluster -> Kafka -> build+deploy Klag -> assert lag -> cleanup
-./scripts/e2e-test.sh
-
-# Install missing deps (k3d, kubectl, helm) via Homebrew
-./scripts/e2e-test.sh --auto-install
-
-# Keep the cluster running afterwards (inspect / debug)
-./scripts/e2e-test.sh --skip-cleanup
-
-# Test a published image instead of building locally
-KLAG_IMAGE=themoah/klag:0.1.12 ./scripts/e2e-test.sh
-
-# Test against an older Kafka broker
-KAFKA_IMAGE=apache/kafka:3.7.0 ./scripts/e2e-test.sh
-
-# Delete the test cluster
-./scripts/e2e-test.sh --cleanup
-```
-
-### Strimzi Compatibility
-
-Klag works with Kafka clusters managed by the [Strimzi](https://strimzi.io)
-operator (the common production way to run Kafka on Kubernetes). A dedicated
-e2e installs the Strimzi operator, provisions a real KRaft Kafka cluster via
-Strimzi CRDs, points the chart at the `*-kafka-bootstrap` service, and asserts
-Klag scrapes the lag.
-
-```bash
-# Single version (defaults to a Strimzi-supported Kafka version)
-./scripts/e2e-strimzi-test.sh
-
-# Specific Kafka version
-KAFKA_VERSION=4.1.0 ./scripts/e2e-strimzi-test.sh
-
-# Matrix across all supported versions
-./scripts/e2e-strimzi-matrix.sh 4.1.0 4.2.0
-```
-
-Verified against Strimzi-managed Kafka **4.1.0** and **4.2.0** (the versions the
-current Strimzi operator supports). Connecting to Strimzi needs no special chart
-config — just set `kafka.bootstrapServers` to the Strimzi bootstrap service,
-e.g. `--set kafka.bootstrapServers=my-cluster-kafka-bootstrap:9092`. Both e2e
-suites run in CI on every PR (`.github/workflows/e2e.yml`).
-
-Prerequisites: Docker, k3d, helm, kubectl (use `--auto-install` to install via
-Homebrew). This same script runs in CI on every PR (`.github/workflows/e2e.yml`).
-
-> The legacy `scripts/local-k8s-test.sh` (kind-based smoke test) is superseded
-> by `e2e-test.sh` and kept only for quick kind users.
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Run tests before submitting:
-   ```bash
-   ./gradlew test                # Java tests
-   ./scripts/test-helm-chart.sh  # Helm chart template tests
-   ./scripts/e2e-test.sh         # End-to-end (k3d + real Kafka)
-   ```
-4. Submit a pull request
+End-to-end tests (k3d + real Kafka, Strimzi matrix) live in `scripts/`. See
+[Build from Source](https://klag.dev/development/build/) and
+[Contributing](https://klag.dev/development/contributing/).
 
 ---
 
@@ -425,3 +187,5 @@ Homebrew). This same script runs in CI on every PR (`.github/workflows/e2e.yml`)
 
 Some parts of the code were written with Claude
 <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-png/dark/claude-color.png" width="56" height="56" alt="Claude">
+</content>
+</invoke>

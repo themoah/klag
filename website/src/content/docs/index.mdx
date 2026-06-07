@@ -1,0 +1,103 @@
+---
+title: 'Klag: Kafka Consumer Lag Exporter'
+description: Klag is an open-source Kafka consumer lag exporter built with Vert.x. Monitor lag, lag velocity, hot partitions, time-based lag, and group state with Prometheus, Datadog, or OTLP.
+template: splash
+hero:
+  tagline: Know when your consumers fall behind, before it becomes a problem.
+  image:
+    file: ../../assets/klag-logo.png
+  actions:
+    - text: Quick Start
+      link: /getting-started/quick-start/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/themoah/klag
+      icon: external
+      variant: minimal
+head:
+  - tag: script
+    attrs:
+      type: application/ld+json
+    content: |
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Klag",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Kubernetes",
+        "description": "Open-source Kafka consumer lag exporter built with Vert.x and Micrometer. Exports lag, lag velocity, hot partitions, time-based lag, and consumer-group state to Prometheus, Datadog, or OTLP.",
+        "url": "https://klag.dev",
+        "codeRepository": "https://github.com/themoah/klag",
+        "programmingLanguage": "Java",
+        "license": "https://www.apache.org/licenses/LICENSE-2.0",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Consumer lag is the gap between what Kafka has produced and what your consumers have
+processed. Left unmonitored, growing lag means stale downstream data, memory pressure,
+and silent failures when consumer groups die. **Klag continuously monitors every
+consumer group and ships the metrics to your observability stack.**
+
+:::tip[Scales to large clusters]
+Monitors thousands of consumer groups in ~50 MB heap. Request batching with configurable
+delays fetches offsets for 500+ groups without spiking broker CPU.
+:::
+
+## Why Klag?
+
+<CardGrid>
+  <Card title="Lag velocity" icon="random">
+    Know if lag is **growing or shrinking**, and catch problems before they escalate.
+  </Card>
+  <Card title="Time-based lag" icon="seti:clock">
+    See lag in **seconds/minutes**, with time-to-close estimates, instead of raw message counts.
+  </Card>
+  <Card title="Hot partition detection" icon="warning">
+    Find partitions with **uneven load** causing bottlenecks, via statistical outliers.
+  </Card>
+  <Card title="Group state tracking" icon="approve-check">
+    Alert on **Rebalancing, Dead, or Empty** consumer-group states.
+  </Card>
+  <Card title="Data loss prevention" icon="error">
+    Alert **before lag exceeds retention** and messages are lost forever.
+  </Card>
+  <Card title="Request batching" icon="setting">
+    Safely monitor **large clusters** without overwhelming brokers.
+  </Card>
+</CardGrid>
+
+## Get started in one command
+
+```bash
+docker run -e KAFKA_BOOTSTRAP_SERVERS=kafka:9092 \
+           -e METRICS_REPORTER=prometheus \
+           -p 8888:8888 \
+           themoah/klag:latest
+```
+
+Metrics land at `http://localhost:8888/metrics`. See the [Quick Start](/getting-started/quick-start/)
+for native image, Helm, and Docker env-file options.
+
+## Ships to your stack
+
+<CardGrid>
+  <LinkCard title="Prometheus" href="/integrations/prometheus/" description="Scrape endpoint at /metrics." />
+  <LinkCard title="Datadog" href="/integrations/datadog/" description="Direct Datadog agent submission." />
+  <LinkCard title="OTLP / Grafana Cloud" href="/integrations/otlp-grafana/" description="OpenTelemetry for Grafana Cloud, New Relic, and more." />
+  <LinkCard title="Grafana dashboard" href="/integrations/grafana-dashboard/" description="Pre-built, comprehensive dashboard." />
+</CardGrid>
+
+## Built for AI-native operations
+
+Klag exposes an opt-in, read-only [MCP endpoint](/ai/mcp/) so SRE and dev agents can
+query lag, find lagging groups, and run composite `diagnose` checks, served from an
+in-memory snapshot, never touching your brokers.
+
+---
+
+Inspired by [kafka-lag-exporter](https://github.com/seglo/kafka-lag-exporter) (archived 2024).
+Read the [introductory blog post](https://medium.com/p/introducing-klag-the-kafka-lag-exporter-i-always-wanted-d919bdb64a7a).

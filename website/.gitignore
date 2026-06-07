@@ -1,0 +1,14 @@
+# build output
+dist/
+# generated
+.astro/
+# deps
+node_modules/
+# generated GEO files (produced at build time by scripts/gen-llms.mjs)
+public/llms.txt
+public/llms-full.txt
+# env / logs
+.env
+.env.production
+npm-debug.log*
+.DS_Store
