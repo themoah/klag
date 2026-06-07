@@ -182,6 +182,35 @@ See [CLAUDE.md](CLAUDE.md) for the complete configuration reference.
 
 ---
 
+## Broker Compatibility
+
+Klag works with Apache Kafka **2.x and 3.x** brokers.
+
+### Running against Kafka 2.x
+
+When klag first talks to a 2.x broker, you'll see a single WARN log line — emitted **once per process**, not per topic and not per scrape:
+
+```
+MAX_TIMESTAMP listOffsets unsupported by broker (likely pre-Kafka 3.0);
+falling back to LATEST for logEndTimestamp. Logged once per process;
+further occurrences at DEBUG. Cause: ...
+```
+
+**This is expected, and safe to ignore.** All klag metrics remain accurate. Subsequent per-topic fallback events are emitted at DEBUG; flip `LOG_LEVEL_KLAG=DEBUG` if you want to see them.
+
+<details>
+<summary>Why this happens, and why the fallback exists at all</summary>
+
+Klag asks the broker for partition end-offsets using `OffsetSpec.MAX_TIMESTAMP`, an API added in Kafka 3.0 ([KIP-734](https://cwiki.apache.org/confluence/display/KAFKA/KIP-734%3A+Improve+AdminClient.listOffsets+to+return+timestamp+and+offset+for+the+record+with+the+largest+timestamp)). 2.x brokers don't support it and respond with `UnsupportedVersionException`. Klag catches that and falls back to `OffsetSpec.LATEST`, which every Kafka version supports. The fallback returns the same partition end-offset that drives every lag metric, so accuracy is preserved.
+
+**Why the fallback is necessary.** Without it, klag refuses to start on a 2.x cluster. The first metrics scrape runs synchronously during klag's startup, and a failure there propagates back up to the process launcher, which exits with code 1 — CrashLoopBackOff under Kubernetes. One consumer group on a 2.x cluster was enough to brick startup.
+
+**Note for future contributors.** On 2.x brokers, both `logEndTimestamp` and `maxTimestampOffset` fall back to the LATEST offset's timestamp/offset, so time-based lag interpolation degrades gracefully (the anchor becomes the broker-side append time of the last record rather than the highest-timestamp record).
+
+</details>
+
+---
+
 ## Kafka ACL Permissions
 
 Klag requires **read-only** access to monitor consumer lag. It uses only the Kafka Admin Client API with DESCRIBE permissions—no write or alter access needed.

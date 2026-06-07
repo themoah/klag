@@ -108,7 +108,8 @@ Each group snapshot also carries a **basic lag trend** (`growing`/`shrinking`/`s
 `overallTrend`; `diagnose` flags frequent state changes (rebalance storm / flapping).
 See `docs/superpowers/specs/2026-06-01-mcp-support-design.md`.
 
-**Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`
+**Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`, `LOG_LEVEL_KAFKA_CLIENT` (Apache kafka-clients, default `INFO`), `LOG_LEVEL_KAFKA_LIST_OFFSETS_HANDLER` (Apache `ListOffsetsHandler`, default `ERROR` — silences the redundant per-scrape MAX_TIMESTAMP WARN on Kafka <3.0; raise to `WARN`/`DEBUG` when investigating other listOffsets issues)
+
 
 **OTLP Configuration (when METRICS_REPORTER=otlp):**
 
