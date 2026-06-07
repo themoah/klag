@@ -33,5 +33,3 @@ metric, also update the reporter/collector and its tests, the `README.md` and `C
 metric docs, the [Grafana dashboard](/integrations/grafana-dashboard/)
 (`dashboard/demo-dashboard.json`), and, if Helm/ServiceMonitor behavior changes, the
 chart values, templates, README, and Helm tests.
-
-The repo's [Agent Skill](/ai/agent-skill/) encodes these checklists for AI coding agents.

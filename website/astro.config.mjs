@@ -99,7 +99,6 @@ export default defineConfig({
           label: 'AI Agents',
           items: [
             { label: 'MCP Endpoint', slug: 'ai/mcp' },
-            { label: 'Agent Skill', slug: 'ai/agent-skill' },
           ],
         },
         {
