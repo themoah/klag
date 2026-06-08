@@ -34,6 +34,23 @@ Consumer lag is the gap between what Kafka has produced and what your consumers 
 
 **Sinks:** Prometheus, Datadog, OTLP (Grafana Cloud, New Relic, etc.). See [integrations](https://klag.dev/integrations/prometheus/).
 
+## How Klag compares
+
+Klag, [Burrow](https://github.com/linkedin/Burrow), and [KMinion](https://github.com/redpanda-data/kminion) all monitor Kafka consumer lag. They differ in what they measure and where they send it.
+
+| Feature | Klag | Burrow | KMinion |
+|---|:---:|:---:|:---:|
+| Lag in messages | ✅ | ✅ | ✅ |
+| Consumer group state | ✅ | ✅ | ✅ |
+| Lag velocity (growing/shrinking) | ✅ | ⚠️ status only | ❌ |
+| Time-based lag + time-to-catch-up | ✅ | ❌ | ❌ |
+| Hot partition detection | ✅ | ❌ | ❌ |
+| Data loss / retention alerting | ✅ | ❌ | ❌ |
+| Lag status rules + notifiers | ❌ | ✅ | ❌ |
+| Prometheus / Datadog / OTLP native | ✅ | ⚠️ exporter / ❌ / ❌ | ✅ / ❌ / ❌ |
+| AI agent endpoint (MCP) | ✅ | ❌ | ❌ |
+| Read-only ACLs (DESCRIBE only) | ✅ | ✅ | ⚠️ writes for e2e |
+
 ## Quick Start
 
 ```bash

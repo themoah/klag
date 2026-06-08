@@ -52,3 +52,4 @@ Kafka and Confluent Cloud.
 - [Quick Start](/getting-started/quick-start/): run Klag in one command.
 - [Installation](/getting-started/installation/): Helm, Docker, and env-file setups.
 - [Metrics Overview](/metrics/overview/): the full list of what Klag exposes.
+- [Comparison](/getting-started/comparison/): Klag vs Burrow vs KMinion.
