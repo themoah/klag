@@ -62,6 +62,7 @@ export default defineConfig({
             { label: 'Introduction', slug: 'getting-started/introduction' },
             { label: 'Quick Start', slug: 'getting-started/quick-start' },
             { label: 'Installation', slug: 'getting-started/installation' },
+            { label: 'Comparison', slug: 'getting-started/comparison' },
           ],
         },
         {
