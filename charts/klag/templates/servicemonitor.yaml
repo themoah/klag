@@ -1,4 +1,7 @@
 {{- if .Values.serviceMonitor.enabled }}
+{{- if ne .Values.metrics.reporter "prometheus" }}
+{{- fail (printf "serviceMonitor.enabled requires metrics.reporter=prometheus (got %q): the /metrics endpoint is only registered for the prometheus reporter, so Prometheus would scrape a 404" .Values.metrics.reporter) }}
+{{- end }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

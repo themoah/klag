@@ -62,6 +62,16 @@ public class MetricsCollector {
   private final Map<String, Integer> cachedGroupPartitionCounts = new ConcurrentHashMap<>();
   private final Map<String, Integer> cachedTopicPartitionCounts = new ConcurrentHashMap<>();
 
+  // Per-cycle cache of topic offset futures: N groups consuming the same topic share one
+  // describeTopics + listOffsets round instead of issuing N identical queries per cycle.
+  // Cleared at the start of each cycle; cycles never overlap (in-flight guard below).
+  private final Map<String, Future<List<PartitionOffsets>>> cycleTopicOffsets =
+      new ConcurrentHashMap<>();
+
+  // Guards against overlapping collection cycles when a cycle exceeds the interval
+  // (large clusters, chunk delays). Only touched on the Vert.x event loop.
+  private boolean collectionInFlight;
+
   // Optional snapshot store for the MCP layer. When set, the collector publishes its
   // last cycle into it (best-effort, never affecting collection). Null = MCP disabled.
   private SnapshotStore snapshotStore;
@@ -184,7 +194,14 @@ public class MetricsCollector {
     return reporter.start()
       .compose(v -> collectAndReport())
       .onComplete(ar -> {
-        timerId = vertx.setPeriodic(intervalMs, id -> collectAndReport());
+        timerId = vertx.setPeriodic(intervalMs, id -> {
+          if (collectionInFlight) {
+            log.warn("Skipping collection tick: previous cycle still running "
+              + "(METRICS_INTERVAL_MS={} may be too short for this cluster)", intervalMs);
+            return;
+          }
+          collectAndReport();
+        });
         log.info("Metrics collector started, timer ID: {}", timerId);
       })
       .mapEmpty();
@@ -204,6 +221,8 @@ public class MetricsCollector {
 
   private Future<Void> collectAndReport() {
     log.debug("Collecting lag metrics");
+    collectionInFlight = true;
+    cycleTopicOffsets.clear();
 
     return kafkaClient.listConsumerGroups()
       .compose(groups -> {
@@ -227,7 +246,8 @@ public class MetricsCollector {
 
         return collectAllGroupsParallel(filteredGroups);
       })
-      .onFailure(err -> log.error("Failed to collect lag metrics", err));
+      .onFailure(err -> log.error("Failed to collect lag metrics", err))
+      .onComplete(ar -> collectionInFlight = false);
   }
 
   /**
@@ -378,7 +398,7 @@ public class MetricsCollector {
           vertx, topicChunks, chunkConfig.chunkDelayMs(),
           topicChunk -> {
             List<Future<List<PartitionOffsets>>> offsetFutures = topicChunk.stream()
-              .map(kafkaClient::getLogEndOffsets)
+              .map(this::getLogEndOffsetsCached)
               .collect(Collectors.toList());
 
             return Future.all(offsetFutures)
@@ -413,7 +433,12 @@ public class MetricsCollector {
           return buildConsumerGroupLag(groupId, offsets, topicOffsets);
         });
       })
-      .onFailure(err -> log.warn("Failed to collect lag for group {}: {}", groupId, err.getMessage()));
+      // Same recovery as collectGroupLag: a single failed group must not abort the chunk.
+      .recover(err -> {
+        log.warn("Failed to collect lag for group {} (skipped this cycle): {}",
+          groupId, err.getMessage());
+        return Future.succeededFuture(null);
+      });
   }
 
   private Future<List<ConsumerGroupLag>> collectAllGroupLags(Set<String> groups) {
@@ -472,7 +497,7 @@ public class MetricsCollector {
       groupTopicAggregates.forEach((consumerGroup, topicMap) ->
         topicMap.forEach((topic, agg) -> {
           recordVelocitySnapshot(consumerGroup, topic, agg);
-          velocityKeys.add(consumerGroup + ":" + topic);
+          velocityKeys.add(LagVelocityTracker.makeKey(consumerGroup, topic));
         })
       );
 
@@ -560,7 +585,7 @@ public class MetricsCollector {
 
         // Get log end offsets for all topics the group is consuming
         List<Future<List<PartitionOffsets>>> offsetFutures = topics.stream()
-          .map(kafkaClient::getLogEndOffsets)
+          .map(this::getLogEndOffsetsCached)
           .collect(Collectors.toList());
 
         return Future.all(offsetFutures)
@@ -576,7 +601,22 @@ public class MetricsCollector {
             return buildConsumerGroupLag(groupId, offsets, topicOffsets);
           });
       })
-      .onFailure(err -> log.warn("Failed to collect lag for group {}: {}", groupId, err.getMessage()));
+      // Recover to null so one failing group (deleted mid-cycle, coordinator hiccup, ACL gap)
+      // is skipped by the null-filter in collectAllGroupLags instead of failing Future.all
+      // and aborting the whole cycle for every other group.
+      .recover(err -> {
+        log.warn("Failed to collect lag for group {} (skipped this cycle): {}",
+          groupId, err.getMessage());
+        return Future.succeededFuture(null);
+      });
+  }
+
+  /**
+   * Per-cycle cached variant of {@link KafkaClientService#getLogEndOffsets(String)}.
+   * Multiple groups consuming the same topic reuse one in-flight (or completed) future.
+   */
+  private Future<List<PartitionOffsets>> getLogEndOffsetsCached(String topic) {
+    return cycleTopicOffsets.computeIfAbsent(topic, kafkaClient::getLogEndOffsets);
   }
 
   private ConsumerGroupLag buildConsumerGroupLag(
@@ -671,8 +711,10 @@ public class MetricsCollector {
       // Create RetentionRisk for each topic
       for (var entry : topicMaxPercent.entrySet()) {
         risks.add(new RetentionRisk(group.consumerGroup(), entry.getKey(), entry.getValue()));
-        log.debug("Retention risk for {}:{}: {:.2f}%",
-          group.consumerGroup(), entry.getKey(), entry.getValue());
+        if (log.isDebugEnabled()) {
+          log.debug("Retention risk for {}:{}: {}%",
+            group.consumerGroup(), entry.getKey(), String.format("%.2f", entry.getValue()));
+        }
       }
     }
 

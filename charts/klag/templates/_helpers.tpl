@@ -95,10 +95,30 @@ Create the name of the secret for Datadog credentials
 {{- end }}
 
 {{/*
+Create the name of the secret for the MCP auth token
+*/}}
+{{- define "klag.mcpSecretName" -}}
+{{- if .Values.mcp.existingSecret }}
+{{- .Values.mcp.existingSecret }}
+{{- else }}
+{{- include "klag.fullname" . }}-mcp
+{{- end }}
+{{- end }}
+
+{{/*
 Determine if Kafka secret should be created
 */}}
 {{- define "klag.createKafkaSecret" -}}
-{{- if and .Values.kafka.saslJaasConfig (not .Values.kafka.existingSecret) }}
+{{- if and (or .Values.kafka.saslJaasConfig .Values.kafka.sslTruststorePassword) (not .Values.kafka.existingSecret) }}
+{{- true }}
+{{- end }}
+{{- end }}
+
+{{/*
+Determine if MCP secret should be created
+*/}}
+{{- define "klag.createMcpSecret" -}}
+{{- if and .Values.mcp.enabled .Values.mcp.authToken (not .Values.mcp.existingSecret) }}
 {{- true }}
 {{- end }}
 {{- end }}

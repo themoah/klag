@@ -61,8 +61,11 @@ public class LagVelocityTracker {
       LagVelocity velocity = history.calculateVelocity();
       if (velocity != null) {
         velocities.add(velocity);
-        log.debug("Calculated velocity for {}:{}: {:.2f} msg/s ({} samples)",
-          velocity.consumerGroup(), velocity.topic(), velocity.velocity(), velocity.sampleCount());
+        if (log.isDebugEnabled()) {
+          log.debug("Calculated velocity for {}:{}: {} msg/s ({} samples)",
+            velocity.consumerGroup(), velocity.topic(),
+            String.format("%.2f", velocity.velocity()), velocity.sampleCount());
+        }
       }
     }
 
@@ -74,16 +77,21 @@ public class LagVelocityTracker {
    * Follows two-phase deletion pattern similar to MicrometerReporter.
    */
   public void cleanupStaleTopics(Set<String> activeKeys) {
-    Set<String> currentKeys = histories.keySet();
-    currentKeys.retainAll(activeKeys);
+    int before = histories.size();
+    histories.keySet().retainAll(activeKeys);
 
-    int removed = currentKeys.size() - histories.size();
+    int removed = before - histories.size();
     if (removed > 0) {
       log.debug("Cleaned up {} stale topic histories", removed);
     }
   }
 
-  private String makeKey(String consumerGroup, String topic) {
-    return consumerGroup + ":" + topic;
+  /**
+   * Builds the history key for a consumer-group/topic pair. NUL is illegal in topic names
+   * and the topic comes last, so the key decomposes unambiguously even though group IDs
+   * may contain any character (a plain ":" separator collides for group IDs containing ":").
+   */
+  public static String makeKey(String consumerGroup, String topic) {
+    return consumerGroup + '\u0000' + topic;
   }
 }

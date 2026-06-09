@@ -28,7 +28,8 @@ RUN gradle nativeCompile --no-daemon -PnativeStatic
 # ---- Runtime stage ----
 # distroless/base provides glibc only (no JVM, minimal attack surface). The binary
 # is mostly-static (-PnativeStatic) so it needs no libz.so.1 / libstdc++ at runtime.
-FROM gcr.io/distroless/base-debian12
+# :nonroot variant runs as UID 65532 instead of root.
+FROM gcr.io/distroless/base-debian12:nonroot
 
 WORKDIR /app
 COPY --from=builder /app/build/native/nativeCompile/klag /app/klag

@@ -15,8 +15,8 @@
 
   <!-- Package-specific loggers -->
 
-  <!-- Klag application -->
-  <logger name="io.github.themoah.klag" level="${LOG_LEVEL_KLAG:-DEBUG}"/>
+  <!-- Klag application: follows the root level unless LOG_LEVEL_KLAG is set -->
+  <logger name="io.github.themoah.klag" level="${LOG_LEVEL_KLAG:-${LOG_LEVEL:-INFO}}"/>
 
   <!-- Kafka client (health monitor, service) -->
   <logger name="io.github.themoah.klag.kafka" level="${LOG_LEVEL_KAFKA:-INFO}"/>
