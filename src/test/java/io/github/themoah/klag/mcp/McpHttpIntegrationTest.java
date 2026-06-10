@@ -149,6 +149,8 @@ class McpHttpIntegrationTest {
         })
         .compose(resp -> resp.body().map(b -> new HttpResult(resp.statusCode(), b)))
         .onSuccess(r -> ctx.verify(() -> {
+          // JSON-RPC errors ride on HTTP 200; only the envelope carries the failure.
+          assertEquals(200, r.status());
           assertEquals(-32600, r.json().getJsonObject("error").getInteger("code"));
           ctx.completeNow();
         }))
