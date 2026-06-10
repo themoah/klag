@@ -116,7 +116,7 @@ public class McpTools {
     }
     Optional<GroupSnapshot> gs = snap.group(group);
     if (gs.isEmpty()) {
-      return text("Consumer group not found in the latest snapshot: " + group);
+      return error("Consumer group not found in the latest snapshot: " + group);
     }
     GroupSnapshot g = gs.get();
 
@@ -150,6 +150,9 @@ public class McpTools {
 
   private JsonObject findLagging(MetricsSnapshot snap, JsonObject args) {
     String sortBy = args.getValue("sortBy") != null ? String.valueOf(args.getValue("sortBy")) : "lag";
+    if (!sortBy.equals("lag") && !sortBy.equals("velocity") && !sortBy.equals("retention")) {
+      return error("Invalid sortBy: " + sortBy + " (expected one of: lag, velocity, retention)");
+    }
     // Accept any numeric limit (truncating floats); ignore non-numeric junk rather than letting
     // the cast throw. Non-positive or out-of-range values fall back to the default.
     Object limitVal = args.getValue("limit");
@@ -193,7 +196,7 @@ public class McpTools {
     }
     Optional<GroupSnapshot> gs = snap.group(group);
     if (gs.isEmpty()) {
-      return text("Consumer group not found in the latest snapshot: " + group);
+      return error("Consumer group not found in the latest snapshot: " + group);
     }
 
     Diagnosis d = Diagnoser.diagnose(gs.get());

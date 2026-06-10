@@ -100,10 +100,18 @@ class McpToolsTest {
   }
 
   @Test
-  void getConsumerGroupLagUnknownGroupIsNotError() {
+  void getConsumerGroupLagUnknownGroupIsError() {
     McpTools tools = new McpTools(storeWith(group("payments", State.STABLE, 50, 1, 5)));
     JsonObject r = tools.call("get_consumer_group_lag", new JsonObject().put("group", "ghost"));
-    assertFalse(r.getBoolean("isError"));
+    assertTrue(r.getBoolean("isError"));
+    assertTrue(textOf(r).toLowerCase(Locale.ROOT).contains("not found"));
+  }
+
+  @Test
+  void diagnoseUnknownGroupIsError() {
+    McpTools tools = new McpTools(storeWith(group("payments", State.STABLE, 50, 1, 5)));
+    JsonObject r = tools.call("diagnose", new JsonObject().put("group", "ghost"));
+    assertTrue(r.getBoolean("isError"));
     assertTrue(textOf(r).toLowerCase(Locale.ROOT).contains("not found"));
   }
 
@@ -171,6 +179,28 @@ class McpToolsTest {
     String text = textOf(tools.call("find_lagging_groups", new JsonObject().put("limit", 1)));
     assertTrue(text.contains("a"));
     assertFalse(text.contains("\"c\""));
+  }
+
+  @Test
+  void findLaggingGroupsRejectsInvalidSortBy() {
+    McpTools tools = new McpTools(storeWith(group("payments", State.STABLE, 50, 1, 5)));
+    JsonObject r = tools.call("find_lagging_groups", new JsonObject().put("sortBy", "bogus"));
+    assertTrue(r.getBoolean("isError"));
+    String text = textOf(r);
+    assertTrue(text.contains("lag") && text.contains("velocity") && text.contains("retention"),
+      "error must name the valid sortBy values: " + text);
+  }
+
+  @Test
+  void findLaggingGroupsSortsByVelocity() {
+    McpTools tools = new McpTools(storeWith(
+      group("slow", State.STABLE, 9000, 1.0, 1),
+      group("fast", State.STABLE, 10, 99.0, 1)));
+
+    JsonObject r = tools.call("find_lagging_groups", new JsonObject().put("sortBy", "velocity"));
+    assertFalse(r.getBoolean("isError"));
+    String text = textOf(r);
+    assertTrue(text.indexOf("fast") < text.indexOf("slow"));
   }
 
   @Test

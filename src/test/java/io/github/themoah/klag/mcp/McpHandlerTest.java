@@ -89,6 +89,20 @@ class McpHandlerTest {
   }
 
   @Test
+  void missingJsonrpcVersionIsInvalidRequest() {
+    JsonObject req = new JsonObject().put("id", 7).put("method", McpProtocol.PING);
+    JsonObject resp = openHandler().dispatch(req).orElseThrow();
+    assertEquals(McpProtocol.INVALID_REQUEST, resp.getJsonObject("error").getInteger("code"));
+  }
+
+  @Test
+  void wrongJsonrpcVersionIsInvalidRequest() {
+    JsonObject req = new JsonObject().put("jsonrpc", "1.0").put("id", 8).put("method", McpProtocol.PING);
+    JsonObject resp = openHandler().dispatch(req).orElseThrow();
+    assertEquals(McpProtocol.INVALID_REQUEST, resp.getJsonObject("error").getInteger("code"));
+  }
+
+  @Test
   void notificationProducesNoResponse() {
     JsonObject notif = new JsonObject().put("jsonrpc", "2.0").put("method", McpProtocol.INITIALIZED);
     Optional<JsonObject> resp = openHandler().dispatch(notif);

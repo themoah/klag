@@ -99,8 +99,14 @@ public class McpHandler {
     JsonObject request;
     try {
       request = ctx.body().asJsonObject();
-    } catch (DecodeException | ClassCastException e) {
+    } catch (DecodeException e) {
       writeJson(ctx, 200, McpProtocol.error(null, McpProtocol.PARSE_ERROR, "Invalid JSON"));
+      return;
+    } catch (ClassCastException e) {
+      // Valid JSON but not an object (array/string/number) — most often a JSON-RPC batch,
+      // which this server does not support. Per JSON-RPC 2.0 this is -32600, not -32700.
+      writeJson(ctx, 200, McpProtocol.error(null, McpProtocol.INVALID_REQUEST,
+        "Request must be a single JSON-RPC object (batching not supported)"));
       return;
     }
     if (request == null) {
@@ -134,6 +140,12 @@ public class McpHandler {
    * @return the response, or empty if the message is a notification (no response expected)
    */
   public Optional<JsonObject> dispatch(JsonObject request) {
+    // Must run before the notification check: a message missing both "jsonrpc" and "id"
+    // would otherwise be silently accepted as a notification.
+    if (!"2.0".equals(request.getValue("jsonrpc"))) {
+      return Optional.of(McpProtocol.error(request.getValue("id"),
+        McpProtocol.INVALID_REQUEST, "Missing or invalid jsonrpc version (expected \"2.0\")"));
+    }
     if (McpProtocol.isNotification(request)) {
       // The only notification we expect is notifications/initialized; nothing to return.
       return Optional.empty();
