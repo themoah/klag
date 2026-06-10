@@ -132,7 +132,19 @@ public class MicrometerReporter implements MetricsReporter {
       );
       trackKey(activeKeys, recordGauge("klag.consumer.group.state", tags, changeCount));
     }
-    stateTracker.cleanup(stateData.keySet());
+  }
+
+  /**
+   * Removes state-tracking data for consumer groups that are no longer active.
+   *
+   * <p>Must be called once per collection cycle with the union of all groups observed in
+   * that cycle. Calling it per chunk with a chunk-local subset wipes the state history
+   * (change counts and transitions) of every other chunk's groups.
+   *
+   * @param activeGroupIds all group IDs observed in the completed cycle
+   */
+  public void cleanupStateTracker(Set<String> activeGroupIds) {
+    stateTracker.cleanup(activeGroupIds);
   }
 
   /**
