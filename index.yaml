@@ -8,6 +8,52 @@ entries:
           description: Initial publication of the Klag Helm chart to Artifact Hub
       artifacthub.io/images: |
         - name: klag
+          image: themoah/klag:0.2.3
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: source
+          url: https://github.com/themoah/klag
+        - name: issues
+          url: https://github.com/themoah/klag/issues
+        - name: documentation
+          url: https://github.com/themoah/klag/blob/main/README.md
+      artifacthub.io/maintainers: |
+        - name: themoah
+          email: aviv@dozorets.com
+      artifacthub.io/prerelease: "false"
+    apiVersion: v2
+    appVersion: 0.2.3
+    created: "2026-06-12T07:57:23.190511693Z"
+    description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter
+      with pluggable metrics sinks.
+    digest: 1d6fbe4e1b1b65f1e58e7eecad684cafd530b45c4644755771f515c29cb65068
+    home: https://github.com/themoah/klag
+    icon: https://avatars.githubusercontent.com/themoah
+    keywords:
+    - kafka
+    - lag
+    - monitoring
+    - prometheus
+    - metrics
+    - consumer-groups
+    maintainers:
+    - email: aviv@dozorets.com
+      name: themoah
+      url: https://github.com/themoah
+    name: klag
+    sources:
+    - https://github.com/themoah/klag
+    type: application
+    urls:
+    - https://github.com/themoah/klag/releases/download/klag-0.3.0/klag-0.3.0.tgz
+    version: 0.3.0
+  - annotations:
+      artifacthub.io/category: monitoring-logging
+      artifacthub.io/changes: |
+        - kind: added
+          description: Initial publication of the Klag Helm chart to Artifact Hub
+      artifacthub.io/images: |
+        - name: klag
           image: themoah/klag:0.1.14
       artifacthub.io/license: Apache-2.0
       artifacthub.io/links: |
@@ -139,4 +185,4 @@ entries:
     urls:
     - https://github.com/themoah/klag/releases/download/klag-0.1.12/klag-0.1.12.tgz
     version: 0.1.12
-generated: "2026-06-07T10:14:20.432684588Z"
+generated: "2026-06-12T07:57:23.190545313Z"
