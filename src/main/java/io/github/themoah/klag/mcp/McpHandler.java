@@ -5,6 +5,8 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +26,10 @@ public class McpHandler {
   private static final String CONTENT_TYPE_JSON = "application/json";
   private static final String SERVER_NAME = "klag";
 
+  // JSON-RPC tool calls fit well under 1 MB; without a limit Vert.x buffers the
+  // entire body in heap (DEFAULT_BODY_LIMIT = -1).
+  private static final long MAX_BODY_BYTES = 1024 * 1024;
+
   private final McpConfig config;
   private final McpTools tools;
 
@@ -38,8 +44,12 @@ public class McpHandler {
    * @param router the Vert.x router
    */
   public void registerRoutes(Router router) {
+    // Auth runs on its own route ahead of the body handler so klag rejects unauthorized
+    // requests without buffering a single body byte (Vert.x forbids a USER handler before
+    // a BODY handler on the same route); the body limit caps what authorized clients can send.
+    router.post(config.path()).handler(this::checkAuth);
     router.post(config.path())
-      .handler(BodyHandler.create())
+      .handler(BodyHandler.create().setBodyLimit(MAX_BODY_BYTES))
       .handler(this::handlePost)
       .failureHandler(this::handleFailure);
     router.get(config.path()).handler(this::handleGet);
@@ -73,21 +83,30 @@ public class McpHandler {
       .end("{\"error\":\"Method Not Allowed; use POST for JSON-RPC\"}");
   }
 
-  private void handlePost(RoutingContext ctx) {
-    if (!authorized(ctx.request().getHeader("Authorization"))) {
-      ctx.response()
-        .setStatusCode(401)
-        .putHeader("WWW-Authenticate", "Bearer")
-        .putHeader("content-type", CONTENT_TYPE_JSON)
-        .end("{\"error\":\"Unauthorized\"}");
+  private void checkAuth(RoutingContext ctx) {
+    if (authorized(ctx.request().getHeader("Authorization"))) {
+      ctx.next();
       return;
     }
+    ctx.response()
+      .setStatusCode(401)
+      .putHeader("WWW-Authenticate", "Bearer")
+      .putHeader("content-type", CONTENT_TYPE_JSON)
+      .end("{\"error\":\"Unauthorized\"}");
+  }
 
+  private void handlePost(RoutingContext ctx) {
     JsonObject request;
     try {
       request = ctx.body().asJsonObject();
-    } catch (DecodeException | ClassCastException e) {
+    } catch (DecodeException e) {
       writeJson(ctx, 200, McpProtocol.error(null, McpProtocol.PARSE_ERROR, "Invalid JSON"));
+      return;
+    } catch (ClassCastException e) {
+      // Valid JSON but not an object (array/string/number) — most often a JSON-RPC batch,
+      // which this server does not support. Per JSON-RPC 2.0 this is -32600, not -32700.
+      writeJson(ctx, 200, McpProtocol.error(null, McpProtocol.INVALID_REQUEST,
+        "Request must be a single JSON-RPC object (batching not supported)"));
       return;
     }
     if (request == null) {
@@ -121,6 +140,12 @@ public class McpHandler {
    * @return the response, or empty if the message is a notification (no response expected)
    */
   public Optional<JsonObject> dispatch(JsonObject request) {
+    // Must run before the notification check: a message missing both "jsonrpc" and "id"
+    // would otherwise be silently accepted as a notification.
+    if (!"2.0".equals(request.getValue("jsonrpc"))) {
+      return Optional.of(McpProtocol.error(request.getValue("id"),
+        McpProtocol.INVALID_REQUEST, "Missing or invalid jsonrpc version (expected \"2.0\")"));
+    }
     if (McpProtocol.isNotification(request)) {
       // The only notification we expect is notifications/initialized; nothing to return.
       return Optional.empty();
@@ -192,7 +217,10 @@ public class McpHandler {
     if (parts.length != 2 || !parts[0].equalsIgnoreCase("Bearer")) {
       return false;
     }
-    return config.authToken().equals(parts[1]);
+    // Constant-time comparison; String.equals short-circuits and leaks a timing side channel.
+    return MessageDigest.isEqual(
+      config.authToken().getBytes(StandardCharsets.UTF_8),
+      parts[1].getBytes(StandardCharsets.UTF_8));
   }
 
   private static void writeJson(RoutingContext ctx, int status, JsonObject body) {

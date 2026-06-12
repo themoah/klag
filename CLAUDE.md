@@ -108,7 +108,7 @@ Each group snapshot also carries a **basic lag trend** (`growing`/`shrinking`/`s
 `overallTrend`; `diagnose` flags frequent state changes (rebalance storm / flapping).
 See `docs/superpowers/specs/2026-06-01-mcp-support-design.md`.
 
-**Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG`, `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`, `LOG_LEVEL_KAFKA_CLIENT` (Apache kafka-clients, default `INFO`), `LOG_LEVEL_KAFKA_LIST_OFFSETS_HANDLER` (Apache `ListOffsetsHandler`, default `ERROR` — silences the redundant per-scrape MAX_TIMESTAMP WARN on Kafka <3.0; raise to `WARN`/`DEBUG` when investigating other listOffsets issues)
+**Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG` (falls back to `LOG_LEVEL`, then `INFO`), `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`, `LOG_LEVEL_KAFKA_CLIENT` (Apache kafka-clients, default `INFO`), `LOG_LEVEL_KAFKA_LIST_OFFSETS_HANDLER` (Apache `ListOffsetsHandler`, default `ERROR` — silences the redundant per-scrape MAX_TIMESTAMP WARN on Kafka <3.0; raise to `WARN`/`DEBUG` when investigating other listOffsets issues)
 
 
 **OTLP Configuration (when METRICS_REPORTER=otlp):**
@@ -168,6 +168,7 @@ OTEL_RESOURCE_ATTRIBUTES=environment=development,cluster=local
 Note: `klag.hot_partition` only has `topic` and `partition` tags (throughput is partition-level, independent of consumers)
 Note: Time-based lag metrics only have `consumer_group` and `topic` tags (per-topic granularity)
 Note: DLP metrics only have `consumer_group` and `topic` tags (per-topic granularity)
+Note: `klag.consumer.group.state` carries the state as a *tag*; on a state change the old-state series survives 1–2 collection intervals (two-phase stale-gauge cleanup), so both states export during that window. Key alerts on the most recent sample rather than series existence.
 
 ## Grafana Dashboard
 

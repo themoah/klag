@@ -1,6 +1,10 @@
 # Default values for klag.
 # This is a YAML-formatted file.
 
+# Number of replicas. NOTE: klag has no leader election. Each replica independently
+# polls Kafka and reports the same metrics. With push reporters (datadog/otlp) more than
+# one replica double-reports (and double-bills); with prometheus it produces duplicate
+# series differing only by pod. Keep at 1 unless you deduplicate downstream.
 replicaCount: 1
 
 image:
@@ -16,6 +20,9 @@ fullnameOverride: ""
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
+  # Klag never talks to the Kubernetes API, so the chart skips mounting the API token.
+  # Set to true if you attach IRSA/workload-identity annotations that need the projected token.
+  automount: false
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
@@ -24,16 +31,23 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
+# Secure-by-default pod/container security contexts. UID 65532 matches the non-root user
+# baked into both the JVM and native (distroless :nonroot) images. readOnlyRootFilesystem
+# works because the chart always mounts an emptyDir at /tmp (JVM + Netty need it).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
 
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
 
 service:
   type: ClusterIP
@@ -57,11 +71,17 @@ kafka:
   # Typically combined with extraVolumes/extraVolumeMounts to mount a secret or PVC
   # carrying the JKS/PKCS12 truststore.
   sslTruststoreLocation: ""
+  # Password for the truststore above. Stored in the chart-managed Kafka secret and
+  # injected as KAFKA_SSL_TRUSTSTORE_PASSWORD via secretKeyRef. When using existingSecret,
+  # put the password under secretKeys.truststorePassword in that secret and set any
+  # non-empty placeholder here to enable the env var.
+  sslTruststorePassword: ""
   # Use an existing secret for Kafka credentials instead of creating one
   existingSecret: ""
   # Keys in the existing secret
   secretKeys:
     jaasConfig: "jaas-config"
+    truststorePassword: "truststore-password"
 
 # Metrics configuration
 metrics:
@@ -112,6 +132,19 @@ app:
   healthCheckIntervalMs: 30000
   # Enable Java 21 virtual threads (experimental)
   useVirtualThreads: false
+
+# MCP endpoint for AI agents (read-only; see docs). Disabled by default.
+mcp:
+  enabled: false
+  # HTTP path of the MCP endpoint
+  path: "/mcp"
+  # Bearer token required on every MCP request. Stored in a chart-managed Secret and
+  # injected as MCP_AUTH_TOKEN via secretKeyRef. Empty = unauthenticated (klag logs a warning).
+  authToken: ""
+  # Use an existing secret for the MCP token instead of creating one
+  existingSecret: ""
+  secretKeys:
+    authToken: "mcp-auth-token"
 
 # Logging configuration
 logging:
@@ -171,6 +204,36 @@ extraVolumes: []
 #     mountPath: /etc/shared-certificates
 #     readOnly: true
 extraVolumeMounts: []
+
+# Additional environment variables for the klag container (verbatim EnvVar entries).
+# Escape hatch for settings without first-class values: HOT_PARTITION_*, TIME_LAG_*,
+# KAFKA_CHUNK_*, LAG_TREND_DEADBAND_MSG_PER_SEC, KLAG_CONFIG_FILE, LOG_LEVEL_KAFKA_CLIENT, ...
+# Example:
+#   - name: KAFKA_CHUNK_COUNT
+#     value: "4"
+#   - name: SOME_SECRET
+#     valueFrom:
+#       secretKeyRef:
+#         name: my-secret
+#         key: my-key
+extraEnv: []
+
+# Additional envFrom sources (ConfigMaps/Secrets) for the klag container.
+# Example:
+#   - secretRef:
+#       name: my-kafka-env
+extraEnvFrom: []
+
+# Optional NetworkPolicy restricting ingress to the metrics/health/MCP port.
+networkPolicy:
+  enabled: false
+  # Peers allowed to reach the http port (NetworkPolicyPeer entries). Empty list = allow
+  # from anywhere (still restricted to the http port only).
+  # Example:
+  #   - namespaceSelector:
+  #       matchLabels:
+  #         kubernetes.io/metadata.name: monitoring
+  ingressFrom: []
 
 # Prometheus ServiceMonitor configuration
 serviceMonitor:

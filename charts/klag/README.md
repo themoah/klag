@@ -58,9 +58,10 @@ helm install klag ./charts/klag \
   --set-json 'extraVolumeMounts=[{"name":"shared-certificates","mountPath":"/etc/shared-certificates","readOnly":true}]'
 ```
 
-If the truststore is password-protected, also set `KAFKA_SSL_TRUSTSTORE_PASSWORD`
-(via `--set-json` env injection or by mounting it from a secret) — klag picks it
-up automatically as `ssl.truststore.password`.
+If the truststore is password-protected, set `kafka.sslTruststorePassword`. The chart
+stores it in the chart-managed Kafka Secret and injects it as `KAFKA_SSL_TRUSTSTORE_PASSWORD`
+(mapped by klag to `ssl.truststore.password`). With `kafka.existingSecret`, put the password
+under the `truststore-password` key (configurable via `kafka.secretKeys.truststorePassword`).
 
 ### With OTLP Metrics (Grafana Cloud)
 
@@ -98,7 +99,7 @@ helm install klag ./charts/klag \
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `replicaCount` | Number of replicas | `1` |
+| `replicaCount` | Number of replicas. Klag has no leader election: each replica reports the same metrics, so >1 double-reports with push reporters and duplicates series with Prometheus | `1` |
 | `image.repository` | Image repository | `themoah/klag` |
 | `image.tag` | Image tag (defaults to chart appVersion) | `""` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
@@ -115,8 +116,10 @@ helm install klag ./charts/klag \
 | `kafka.saslMechanism` | SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512) | `""` |
 | `kafka.saslJaasConfig` | JAAS configuration string | `""` |
 | `kafka.sslTruststoreLocation` | Path inside the container to the SSL truststore (emits `KAFKA_SSL_TRUSTSTORE_LOCATION`) | `""` |
+| `kafka.sslTruststorePassword` | Truststore password, stored in the Kafka Secret and injected as `KAFKA_SSL_TRUSTSTORE_PASSWORD` | `""` |
 | `kafka.existingSecret` | Name of existing secret for Kafka credentials | `""` |
 | `kafka.secretKeys.jaasConfig` | Key in secret for JAAS config | `jaas-config` |
+| `kafka.secretKeys.truststorePassword` | Key in secret for the truststore password | `truststore-password` |
 
 Any other `KAFKA_*` env var set on the pod is automatically picked up by klag and mapped to the equivalent Kafka client property (e.g. `KAFKA_SSL_TRUSTSTORE_PASSWORD` → `ssl.truststore.password`).
 
@@ -161,6 +164,16 @@ Set `KLAG_CONFIG_FILE` to the path of an external `application.properties` (typi
 | `app.healthCheckIntervalMs` | Kafka health check interval (ms) | `30000` |
 | `app.useVirtualThreads` | Enable Java 21 virtual threads | `false` |
 
+### MCP Configuration (AI agent endpoint)
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `mcp.enabled` | Expose the read-only `/mcp` endpoint (sets `MCP_ENABLED`) | `false` |
+| `mcp.path` | HTTP path of the MCP endpoint | `/mcp` |
+| `mcp.authToken` | Bearer token, stored in a chart-managed Secret and injected as `MCP_AUTH_TOKEN`. Empty = unauthenticated (klag logs a warning) | `""` |
+| `mcp.existingSecret` | Existing secret holding the MCP token | `""` |
+| `mcp.secretKeys.authToken` | Key in secret for the token | `mcp-auth-token` |
+
 ### Logging Configuration
 
 | Parameter | Description | Default |
@@ -200,16 +213,30 @@ Set `KLAG_CONFIG_FILE` to the path of an external `application.properties` (typi
 | `tolerations` | Tolerations | `[]` |
 | `affinity` | Affinity rules | `{}` |
 | `podAnnotations` | Pod annotations | `{}` |
-| `podSecurityContext` | Pod security context | `{}` |
-| `securityContext` | Container security context | `{}` |
+| `podSecurityContext` | Pod security context | non-root (UID 65532) + `RuntimeDefault` seccomp |
+| `securityContext` | Container security context | no privilege escalation, read-only root FS, all capabilities dropped |
 | `extraVolumes` | Additional pod-level volumes (e.g., truststore PVC, certs Secret) | `[]` |
 | `extraVolumeMounts` | Additional container volume mounts; pair with `extraVolumes` | `[]` |
+| `extraEnv` | Additional environment variables (verbatim `EnvVar` entries) for settings without first-class values (`HOT_PARTITION_*`, `TIME_LAG_*`, `KAFKA_CHUNK_*`, ...) | `[]` |
+| `extraEnvFrom` | Additional `envFrom` sources (ConfigMap/Secret refs) | `[]` |
+
+The pod always mounts an `emptyDir` at `/tmp` so the JVM and Netty work with the
+default `readOnlyRootFilesystem: true`. Chart-managed Secrets are checksummed into a pod
+annotation, so credential changes roll the Deployment automatically.
+
+### NetworkPolicy Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `networkPolicy.enabled` | Create a NetworkPolicy restricting ingress to the http port | `false` |
+| `networkPolicy.ingressFrom` | Allowed peers (`NetworkPolicyPeer` entries); empty = any peer, http port only | `[]` |
 
 ### ServiceAccount Configuration
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `serviceAccount.create` | Create ServiceAccount | `true` |
+| `serviceAccount.automount` | Mount the Kubernetes API token (klag never calls the API) | `false` |
 | `serviceAccount.name` | ServiceAccount name | `""` |
 | `serviceAccount.annotations` | ServiceAccount annotations | `{}` |
 

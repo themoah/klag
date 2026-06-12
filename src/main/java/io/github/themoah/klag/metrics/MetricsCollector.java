@@ -62,6 +62,16 @@ public class MetricsCollector {
   private final Map<String, Integer> cachedGroupPartitionCounts = new ConcurrentHashMap<>();
   private final Map<String, Integer> cachedTopicPartitionCounts = new ConcurrentHashMap<>();
 
+  // Per-cycle cache of topic offset futures: N groups consuming the same topic share one
+  // describeTopics + listOffsets round instead of issuing N identical queries per cycle.
+  // Cleared at the start of each cycle; cycles never overlap (in-flight guard below).
+  private final Map<String, Future<List<PartitionOffsets>>> cycleTopicOffsets =
+      new ConcurrentHashMap<>();
+
+  // Guards against overlapping collection cycles when a cycle exceeds the interval
+  // (large clusters, chunk delays). Only touched on the Vert.x event loop.
+  private boolean collectionInFlight;
+
   // Optional snapshot store for the MCP layer. When set, the collector publishes its
   // last cycle into it (best-effort, never affecting collection). Null = MCP disabled.
   private SnapshotStore snapshotStore;
@@ -184,7 +194,14 @@ public class MetricsCollector {
     return reporter.start()
       .compose(v -> collectAndReport())
       .onComplete(ar -> {
-        timerId = vertx.setPeriodic(intervalMs, id -> collectAndReport());
+        timerId = vertx.setPeriodic(intervalMs, id -> {
+          if (collectionInFlight) {
+            log.warn("Skipping collection tick: previous cycle still running "
+              + "(METRICS_INTERVAL_MS={} may be too short for this cluster)", intervalMs);
+            return;
+          }
+          collectAndReport();
+        });
         log.info("Metrics collector started, timer ID: {}", timerId);
       })
       .mapEmpty();
@@ -204,6 +221,8 @@ public class MetricsCollector {
 
   private Future<Void> collectAndReport() {
     log.debug("Collecting lag metrics");
+    collectionInFlight = true;
+    cycleTopicOffsets.clear();
 
     return kafkaClient.listConsumerGroups()
       .compose(groups -> {
@@ -227,7 +246,8 @@ public class MetricsCollector {
 
         return collectAllGroupsParallel(filteredGroups);
       })
-      .onFailure(err -> log.error("Failed to collect lag metrics", err));
+      .onFailure(err -> log.error("Failed to collect lag metrics", err))
+      .onComplete(ar -> collectionInFlight = false);
   }
 
   /**
@@ -238,24 +258,14 @@ public class MetricsCollector {
     Future<Map<String, ConsumerGroupState>> stateFuture =
         kafkaClient.describeConsumerGroups(filteredGroups);
 
+    CycleState cycle = new CycleState(newCycleSnapshot());
     return Future.all(lagFuture, stateFuture)
       .map(composite -> {
         List<ConsumerGroupLag> lagData = composite.resultAt(0);
         Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
 
-        Set<String> activeKeys = new HashSet<>();
-        Set<String> velocityKeys = new HashSet<>();
-        Set<String> throughputKeys = new HashSet<>();
-        CycleSnapshot cycleSnapshot = newCycleSnapshot();
-        reportMetrics(lagData, stateData, activeKeys, velocityKeys, throughputKeys, cycleSnapshot);
-        velocityTracker.cleanupStaleTopics(velocityKeys);
-        if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
-          hotPartitionDetector.cleanupStalePartitions(throughputKeys);
-        }
-        if (reporter instanceof MicrometerReporter micrometerReporter) {
-          micrometerReporter.cleanupStaleGauges(activeKeys);
-        }
-        publishSnapshot(cycleSnapshot);
+        reportMetrics(lagData, stateData, cycle);
+        finishCycle(cycle);
         return (Void) null;
       });
   }
@@ -271,38 +281,24 @@ public class MetricsCollector {
       filteredGroups, chunkConfig.chunkCount(),
       group -> cachedGroupPartitionCounts.getOrDefault(group, 1));
 
-    Set<String> cycleActiveKeys = new HashSet<>();
-    Set<String> cycleVelocityKeys = new HashSet<>();
-    Set<String> cycleThroughputKeys = new HashSet<>();
-    CycleSnapshot cycleSnapshot = newCycleSnapshot();
+    CycleState cycle = new CycleState(newCycleSnapshot());
 
     return ChunkProcessor.<String, Void>processSequentially(
       vertx, groupChunks, chunkConfig.chunkDelayMs(),
-      chunk -> processGroupChunk(chunk, cycleActiveKeys, cycleVelocityKeys,
-        cycleThroughputKeys, cycleSnapshot)
+      chunk -> processGroupChunk(chunk, cycle)
     ).compose(results -> {
-      velocityTracker.cleanupStaleTopics(cycleVelocityKeys);
-      if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
-        hotPartitionDetector.cleanupStalePartitions(cycleThroughputKeys);
-      }
-      if (reporter instanceof MicrometerReporter micrometerReporter) {
-        micrometerReporter.cleanupStaleGauges(cycleActiveKeys);
-      }
-      publishSnapshot(cycleSnapshot);
+      finishCycle(cycle);
       return Future.succeededFuture();
     });
   }
 
   /**
    * Processes a single chunk of consumer groups: collects lag, describes groups, reports metrics.
+   *
+   * <p>Recovers on failure so one failed chunk neither aborts the remaining chunks nor fails
+   * the cycle; the cycle is marked partial instead (see {@link #finishCycle(CycleState)}).
    */
-  private Future<Void> processGroupChunk(
-      List<String> chunk,
-      Set<String> cycleActiveKeys,
-      Set<String> cycleVelocityKeys,
-      Set<String> cycleThroughputKeys,
-      CycleSnapshot cycleSnapshot
-  ) {
+  private Future<Void> processGroupChunk(List<String> chunk, CycleState cycle) {
     log.debug("Processing group chunk with {} groups", chunk.size());
 
     Future<List<ConsumerGroupLag>> lagFuture;
@@ -316,21 +312,56 @@ public class MetricsCollector {
         kafkaClient.describeConsumerGroups(new HashSet<>(chunk));
 
     return Future.all(lagFuture, stateFuture)
-      .map(composite -> {
+      .<Void>map(composite -> {
         List<ConsumerGroupLag> lagData = composite.resultAt(0);
         Map<String, ConsumerGroupState> stateData = composite.resultAt(1);
 
-        reportMetrics(lagData, stateData, cycleActiveKeys, cycleVelocityKeys,
-          cycleThroughputKeys, cycleSnapshot);
+        reportMetrics(lagData, stateData, cycle);
 
         // Update cached group partition counts
         for (ConsumerGroupLag lag : lagData) {
           cachedGroupPartitionCounts.put(lag.consumerGroup(), lag.partitions().size());
         }
 
-        return (Void) null;
+        return null;
       })
-      .onFailure(err -> log.warn("Failed to process group chunk: {}", err.getMessage()));
+      .recover(err -> {
+        cycle.partial = true;
+        log.warn("Failed to process group chunk of {} groups (skipped this cycle): {}",
+          chunk.size(), err.getMessage());
+        return Future.succeededFuture(null);
+      });
+  }
+
+  /**
+   * Cycle-end cleanup and snapshot publish, called exactly once per collection cycle.
+   *
+   * <p>All stale-entry cleanups live here (not per chunk) because every cleanup is a
+   * retainAll against the keys observed in the whole cycle: running any of them with a
+   * chunk-local subset wipes the accumulated state of every other chunk.
+   *
+   * <p>Partial cycles (a chunk failed) skip cleanup and publish entirely: the failed
+   * chunk's keys are missing from the accumulators, and cleaning up against an incomplete
+   * key set would mark or delete live series. Stale values beat deleted series.
+   */
+  private void finishCycle(CycleState cycle) {
+    if (cycle.partial) {
+      log.warn("Collection cycle was partial (at least one chunk failed); "
+        + "keeping previous metrics and skipping stale cleanup until a full cycle succeeds");
+      return;
+    }
+    velocityTracker.cleanupStaleTopics(cycle.velocityKeys);
+    if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
+      hotPartitionDetector.cleanupStalePartitions(cycle.throughputKeys);
+    }
+    if (offsetTimestampTracker != null) {
+      offsetTimestampTracker.cleanupStalePartitions(cycle.timeLagKeys);
+    }
+    if (reporter instanceof MicrometerReporter micrometerReporter) {
+      micrometerReporter.cleanupStaleGauges(cycle.activeKeys);
+      micrometerReporter.cleanupStateTracker(cycle.stateGroupKeys);
+    }
+    publishSnapshot(cycle.snapshot);
   }
 
   /**
@@ -378,7 +409,7 @@ public class MetricsCollector {
           vertx, topicChunks, chunkConfig.chunkDelayMs(),
           topicChunk -> {
             List<Future<List<PartitionOffsets>>> offsetFutures = topicChunk.stream()
-              .map(kafkaClient::getLogEndOffsets)
+              .map(this::getLogEndOffsetsCached)
               .collect(Collectors.toList());
 
             return Future.all(offsetFutures)
@@ -413,7 +444,12 @@ public class MetricsCollector {
           return buildConsumerGroupLag(groupId, offsets, topicOffsets);
         });
       })
-      .onFailure(err -> log.warn("Failed to collect lag for group {}: {}", groupId, err.getMessage()));
+      // Same recovery as collectGroupLag: a single failed group must not abort the chunk.
+      .recover(err -> {
+        log.warn("Failed to collect lag for group {} (skipped this cycle): {}",
+          groupId, err.getMessage());
+        return Future.succeededFuture(null);
+      });
   }
 
   private Future<List<ConsumerGroupLag>> collectAllGroupLags(Set<String> groups) {
@@ -436,17 +472,20 @@ public class MetricsCollector {
 
   /**
    * Reports metrics for the given lag and state data.
-   * Adds active gauge keys to the provided set but does NOT perform cleanup.
-   * Velocity and throughput keys are accumulated across chunks for cycle-level cleanup.
+   * Accumulates all observed keys into the cycle state but does NOT perform cleanup:
+   * with chunking this method runs once per chunk, and every cleanup is a retainAll
+   * that must only see the full cycle's keys (see {@link #finishCycle(CycleState)}).
    */
   private void reportMetrics(
       List<ConsumerGroupLag> lagData,
       Map<String, ConsumerGroupState> stateData,
-      Set<String> activeKeys,
-      Set<String> velocityKeys,
-      Set<String> throughputKeys,
-      CycleSnapshot cycleSnapshot
+      CycleState cycle
   ) {
+    Set<String> activeKeys = cycle.activeKeys;
+    Set<String> velocityKeys = cycle.velocityKeys;
+    Set<String> throughputKeys = cycle.throughputKeys;
+    CycleSnapshot cycleSnapshot = cycle.snapshot;
+    cycle.stateGroupKeys.addAll(stateData.keySet());
     if (reporter instanceof MicrometerReporter micrometerReporter) {
       // Report topic partition counts (max partition number + 1)
       Map<String, Integer> topicPartitions = new HashMap<>();
@@ -472,7 +511,7 @@ public class MetricsCollector {
       groupTopicAggregates.forEach((consumerGroup, topicMap) ->
         topicMap.forEach((topic, agg) -> {
           recordVelocitySnapshot(consumerGroup, topic, agg);
-          velocityKeys.add(consumerGroup + ":" + topic);
+          velocityKeys.add(LagVelocityTracker.makeKey(consumerGroup, topic));
         })
       );
 
@@ -481,7 +520,7 @@ public class MetricsCollector {
       micrometerReporter.reportVelocity(velocities, activeKeys);
 
       // Calculate lag in ms from timestamps
-      List<LagMs> lagMsData = calculateLagMs(lagData);
+      List<LagMs> lagMsData = calculateLagMs(lagData, cycle.timeLagKeys);
       micrometerReporter.reportLagMs(lagMsData, activeKeys);
 
       // Time-to-close estimation (based on velocity data)
@@ -560,7 +599,7 @@ public class MetricsCollector {
 
         // Get log end offsets for all topics the group is consuming
         List<Future<List<PartitionOffsets>>> offsetFutures = topics.stream()
-          .map(kafkaClient::getLogEndOffsets)
+          .map(this::getLogEndOffsetsCached)
           .collect(Collectors.toList());
 
         return Future.all(offsetFutures)
@@ -576,7 +615,22 @@ public class MetricsCollector {
             return buildConsumerGroupLag(groupId, offsets, topicOffsets);
           });
       })
-      .onFailure(err -> log.warn("Failed to collect lag for group {}: {}", groupId, err.getMessage()));
+      // Recover to null so one failing group (deleted mid-cycle, coordinator hiccup, ACL gap)
+      // is skipped by the null-filter in collectAllGroupLags instead of failing Future.all
+      // and aborting the whole cycle for every other group.
+      .recover(err -> {
+        log.warn("Failed to collect lag for group {} (skipped this cycle): {}",
+          groupId, err.getMessage());
+        return Future.succeededFuture(null);
+      });
+  }
+
+  /**
+   * Per-cycle cached variant of {@link KafkaClientService#getLogEndOffsets(String)}.
+   * Multiple groups consuming the same topic reuse one in-flight (or completed) future.
+   */
+  private Future<List<PartitionOffsets>> getLogEndOffsetsCached(String topic) {
+    return cycleTopicOffsets.computeIfAbsent(topic, kafkaClient::getLogEndOffsets);
   }
 
   private ConsumerGroupLag buildConsumerGroupLag(
@@ -671,8 +725,10 @@ public class MetricsCollector {
       // Create RetentionRisk for each topic
       for (var entry : topicMaxPercent.entrySet()) {
         risks.add(new RetentionRisk(group.consumerGroup(), entry.getKey(), entry.getValue()));
-        log.debug("Retention risk for {}:{}: {:.2f}%",
-          group.consumerGroup(), entry.getKey(), entry.getValue());
+        if (log.isDebugEnabled()) {
+          log.debug("Retention risk for {}:{}: {}%",
+            group.consumerGroup(), entry.getKey(), String.format("%.2f", entry.getValue()));
+        }
       }
     }
 
@@ -691,9 +747,12 @@ public class MetricsCollector {
    * timestamps are unavailable; fallback does not extrapolate beyond the oldest retained sample.
    *
    * @param lagData list of consumer group lag data
+   * @param timeLagKeys cycle-level accumulator of tracked "topic:partition" keys; the
+   *     tracker is cleaned against the full cycle's keys in {@link #finishCycle(CycleState)},
+   *     never here, so one chunk cannot wipe another chunk's poll history
    * @return list of lag in milliseconds per consumer group and topic
    */
-  private List<LagMs> calculateLagMs(List<ConsumerGroupLag> lagData) {
+  private List<LagMs> calculateLagMs(List<ConsumerGroupLag> lagData, Set<String> timeLagKeys) {
     if (offsetTimestampTracker == null) {
       return List.of();
     }
@@ -701,12 +760,11 @@ public class MetricsCollector {
     List<LagMs> lagMsList = new ArrayList<>();
     int skippedPartitions = 0;
     long currentTime = System.currentTimeMillis();
-    Set<String> trackedPartitions = new HashSet<>();
 
     for (ConsumerGroupLag group : lagData) {
       for (PartitionLag p : group.partitions()) {
         offsetTimestampTracker.recordOffset(p.topic(), p.partition(), p.logEndOffset());
-        trackedPartitions.add(p.topic() + ":" + p.partition());
+        timeLagKeys.add(p.topic() + ":" + p.partition());
       }
 
       Map<String, TopicLagMsAggregates> topicAggregates = new HashMap<>();
@@ -737,8 +795,6 @@ public class MetricsCollector {
         }
       }
     }
-
-    offsetTimestampTracker.cleanupStalePartitions(trackedPartitions);
 
     if (skippedPartitions > 0) {
       log.debug("Skipped {} partitions with no lag_ms estimate", skippedPartitions);
@@ -781,6 +837,27 @@ public class MetricsCollector {
 
     int count() {
       return count;
+    }
+  }
+
+  /**
+   * Cycle-level accumulators shared by every chunk of one collection cycle.
+   *
+   * <p>Each set gathers the keys observed across all chunks so the retainAll-based
+   * cleanups in {@link #finishCycle(CycleState)} see the complete cycle. {@code partial}
+   * is set when a chunk fails, which suppresses cleanup and snapshot publish for the cycle.
+   */
+  private static class CycleState {
+    final Set<String> activeKeys = new HashSet<>();
+    final Set<String> velocityKeys = new HashSet<>();
+    final Set<String> throughputKeys = new HashSet<>();
+    final Set<String> stateGroupKeys = new HashSet<>();
+    final Set<String> timeLagKeys = new HashSet<>();
+    final CycleSnapshot snapshot; // null when no snapshot store is attached
+    boolean partial;
+
+    CycleState(CycleSnapshot snapshot) {
+      this.snapshot = snapshot;
     }
   }
 

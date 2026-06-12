@@ -139,8 +139,8 @@ public class LagVelocityTrackerTest {
     // Verify we have 2 velocities before cleanup
     assertEquals(2, tracker.calculateVelocities().size());
 
-    // Cleanup, keeping only group1:topic1
-    tracker.cleanupStaleTopics(Set.of("group1:topic1"));
+    // Cleanup, keeping only group1/topic1
+    tracker.cleanupStaleTopics(Set.of(LagVelocityTracker.makeKey("group1", "topic1")));
 
     // After cleanup, only group1:topic1 should remain
     List<LagVelocity> velocities = tracker.calculateVelocities();

@@ -136,6 +136,28 @@ class McpHttpIntegrationTest {
   }
 
   @Test
+  void batchArrayIsInvalidRequestNotParseError(VertxTestContext ctx) {
+    // A JSON array is valid JSON, so it must not be reported as a -32700 parse error;
+    // batching is unsupported, which is -32600 Invalid Request.
+    deployThen(enabled(null), new SnapshotStore(), ctx, () ->
+      client.request(HttpMethod.POST, port, "localhost", "/mcp")
+        .compose(req -> {
+          req.putHeader("content-type", "application/json");
+          return req.send(Buffer.buffer(
+            "[{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"},"
+              + "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}]"));
+        })
+        .compose(resp -> resp.body().map(b -> new HttpResult(resp.statusCode(), b)))
+        .onSuccess(r -> ctx.verify(() -> {
+          // JSON-RPC errors ride on HTTP 200; only the envelope carries the failure.
+          assertEquals(200, r.status());
+          assertEquals(-32600, r.json().getJsonObject("error").getInteger("code"));
+          ctx.completeNow();
+        }))
+        .onFailure(ctx::failNow));
+  }
+
+  @Test
   void fullToolsCallFlow(VertxTestContext ctx) {
     deployThen(enabled(null), storeWithPayments(), ctx, () ->
       post(null, new JsonObject()

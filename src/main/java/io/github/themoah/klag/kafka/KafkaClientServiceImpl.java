@@ -176,12 +176,22 @@ public class KafkaClientServiceImpl implements KafkaClientService {
           for (PartitionInfo partition : partitions) {
             TopicPartition tp = new TopicPartition(topic, partition.partition());
 
-            // Get earliest offset and timestamp from TIMESTAMP(0)
-            long logStartOffset = earliestTimestampOffsets.get(tp).getOffset();
-            long logStartTimestamp = earliestTimestampOffsets.get(tp).getTimestamp();
-
+            ListOffsetsResultInfo earliestResult = earliestTimestampOffsets.get(tp);
             ListOffsetsResultInfo maxTimestampResult = maxTimestampOffsets.get(tp);
             ListOffsetsResultInfo latestOffsetResult = latestOffsets.get(tp);
+
+            // The partition list comes from a separate describeTopics call; a partition can
+            // be missing from a listOffsets response (leaderless partition, partition added
+            // mid-call, per-partition broker error). Skip it instead of NPEing the whole topic.
+            if (earliestResult == null || latestOffsetResult == null) {
+              log.warn("Missing listOffsets result for {}-{} (earliest={}, latest={}); skipping partition",
+                topic, partition.partition(), earliestResult != null, latestOffsetResult != null);
+              continue;
+            }
+
+            // Get earliest offset and timestamp from TIMESTAMP(0)
+            long logStartOffset = earliestResult.getOffset();
+            long logStartTimestamp = earliestResult.getTimestamp();
 
             // logEndOffset is ALWAYS the true end-of-log (LATEST). This is the boundary
             // for lag = logEndOffset - committedOffset, throughput, and retention.
@@ -300,7 +310,13 @@ public class KafkaClientServiceImpl implements KafkaClientService {
       .map(listings -> listings.stream()
         .map(listing -> listing.getGroupId())
         .collect(Collectors.toSet()))
-      .onSuccess(groups -> log.info("Listed {} consumer groups", groups.size()))
+      .onSuccess(groups -> {
+        // Prune log-dedup state for groups that no longer exist, otherwise churning
+        // ephemeral group IDs (console-consumer-*, CI runs) leak entries for the
+        // process lifetime.
+        lastMissingByGroup.keySet().retainAll(groups);
+        log.info("Listed {} consumer groups", groups.size());
+      })
       .onFailure(err -> log.error("Failed to list consumer groups", err));
   }
 
