@@ -1,7 +1,7 @@
 {
   "name": "klag-website",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "klag.dev — docs and promotional site for Klag, the Kafka consumer lag exporter.",
   "scripts": {
@@ -29,6 +29,7 @@
   },
   "overrides": {
     "undici": "^7.24.0",
-    "ws": "^8.20.1"
+    "ws": "^8.20.1",
+    "esbuild": "^0.28.1"
   }
 }
