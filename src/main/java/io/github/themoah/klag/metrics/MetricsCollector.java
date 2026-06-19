@@ -242,6 +242,10 @@ public class MetricsCollector {
 
         if (filteredGroups.isEmpty()) {
           reporter.cleanupStaleGauges(Set.of());
+          reporter.cleanupStateTracker(Set.of());
+          if (commitFreshnessTracker != null) {
+            commitFreshnessTracker.cleanupStale(Set.of());
+          }
           return Future.succeededFuture();
         }
 

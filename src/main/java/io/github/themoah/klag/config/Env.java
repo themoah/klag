@@ -58,6 +58,14 @@ public final class Env {
     if (value == null || value.isBlank()) {
       return defaultValue;
     }
-    return Boolean.parseBoolean(value);
+    String normalized = value.trim().toLowerCase(java.util.Locale.ROOT);
+    if ("true".equals(normalized)) {
+      return true;
+    }
+    if ("false".equals(normalized)) {
+      return false;
+    }
+    log.warn("Invalid value for {}: '{}', using default: {}", name, value, defaultValue);
+    return defaultValue;
   }
 }
