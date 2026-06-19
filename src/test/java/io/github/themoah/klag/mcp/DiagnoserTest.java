@@ -182,4 +182,35 @@ class DiagnoserTest {
 
     assertEquals(Severity.CRITICAL, d.overall());
   }
+
+  // Builds a STABLE group with lag and a given commit staleness (seconds) and no other signals.
+  private static GroupSnapshot groupWithStaleness(long totalLag, long stalenessSeconds) {
+    PartitionLag p = PartitionLag.of("orders", 0, 1000, 0, 0, 0, 1000 - totalLag);
+    return new GroupSnapshot("payments", State.STABLE, totalLag, totalLag, 0,
+      List.of(p), List.of(), List.of(), List.of(), List.of(), List.of(),
+      List.of(), List.of(), Direction.STABLE, stalenessSeconds);
+  }
+
+  @Test
+  void stuckConsumerWarns() {
+    Diagnosis d = Diagnoser.diagnose(groupWithStaleness(500, 600));
+
+    assertEquals(Severity.WARNING, d.overall());
+    assertTrue(hasFindingContaining(d, "stuck"));
+  }
+
+  @Test
+  void freshCommitsAreNotStuck() {
+    Diagnosis d = Diagnoser.diagnose(groupWithStaleness(500, 30));
+
+    assertEquals(Severity.OK, d.overall());
+  }
+
+  @Test
+  void idleWithNoLagIsNotStuck() {
+    // staleness high but no lag: nothing to make progress on, so not stuck.
+    Diagnosis d = Diagnoser.diagnose(groupWithStaleness(0, 9999));
+
+    assertEquals(Severity.OK, d.overall());
+  }
 }

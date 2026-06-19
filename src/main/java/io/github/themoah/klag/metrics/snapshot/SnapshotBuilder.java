@@ -55,7 +55,7 @@ public final class SnapshotBuilder {
     List<HotPartitionThroughput> hotByThroughput
   ) {
     return build(timestampMs, lagData, stateData, velocities, lagMsData, timeToClose,
-      retentionRisks, hotByLag, hotByThroughput, Map.of(), 1.0);
+      retentionRisks, hotByLag, hotByThroughput, Map.of(), 1.0, Map.of());
   }
 
   /**
@@ -73,6 +73,7 @@ public final class SnapshotBuilder {
    * @param hotByThroughput topic-level throughput outliers (no consumer dimension)
    * @param transitionsByGroup recent state transitions per group (empty if untracked)
    * @param lagTrendDeadband STABLE band magnitude (msg/s) for trend classification
+   * @param stalenessByGroup max commit staleness seconds per group (missing = -1, unknown/none)
    * @return the assembled snapshot
    */
   public static MetricsSnapshot build(
@@ -87,6 +88,30 @@ public final class SnapshotBuilder {
     List<HotPartitionThroughput> hotByThroughput,
     Map<String, List<StateTransition>> transitionsByGroup,
     double lagTrendDeadband
+  ) {
+    return build(timestampMs, lagData, stateData, velocities, lagMsData, timeToClose,
+      retentionRisks, hotByLag, hotByThroughput, transitionsByGroup, lagTrendDeadband, Map.of());
+  }
+
+  /**
+   * Builds a snapshot including commit staleness. See the 11-argument overload for shared params.
+   *
+   * @param stalenessByGroup max commit staleness seconds per group (missing = -1, unknown/none)
+   * @return the assembled snapshot
+   */
+  public static MetricsSnapshot build(
+    long timestampMs,
+    List<ConsumerGroupLag> lagData,
+    Map<String, ConsumerGroupState> stateData,
+    List<LagVelocity> velocities,
+    List<LagMs> lagMsData,
+    List<TimeToCloseEstimate> timeToClose,
+    List<RetentionRisk> retentionRisks,
+    List<HotPartitionLag> hotByLag,
+    List<HotPartitionThroughput> hotByThroughput,
+    Map<String, List<StateTransition>> transitionsByGroup,
+    double lagTrendDeadband,
+    Map<String, Long> stalenessByGroup
   ) {
     Map<String, List<LagVelocity>> velByGroup = groupBy(velocities, LagVelocity::consumerGroup);
     Map<String, List<LagMs>> lagMsByGroup = groupBy(lagMsData, LagMs::consumerGroup);
@@ -115,7 +140,8 @@ public final class SnapshotBuilder {
         hotByGroup.getOrDefault(group, List.of()),
         transitionsByGroup.getOrDefault(group, List.of()),
         trends,
-        overallTrend
+        overallTrend,
+        stalenessByGroup.getOrDefault(group, -1L)
       ));
     }
 

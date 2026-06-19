@@ -39,6 +39,8 @@ public record MetricsSnapshot(
    * @param recentTransitions rolling history of recent state changes (oldest first)
    * @param trends per-topic basic lag trend (growing/shrinking/stable)
    * @param overallTrend group-level lag trend rollup
+   * @param maxCommitStalenessSeconds max seconds since a lagging topic last advanced its committed
+   *        offset (across topics with lag &gt; 0); -1 when no lagging topic or freshness disabled
    */
   public record GroupSnapshot(
     String consumerGroup,
@@ -54,7 +56,8 @@ public record MetricsSnapshot(
     List<HotPartitionLag> hotPartitionsByLag,
     List<StateTransition> recentTransitions,
     List<LagTrend> trends,
-    Direction overallTrend
+    Direction overallTrend,
+    long maxCommitStalenessSeconds
   ) {
 
     /**
@@ -76,6 +79,30 @@ public record MetricsSnapshot(
     ) {
       this(consumerGroup, state, totalLag, maxLag, minLag, partitions, velocities, lagMs,
         timeToClose, retentionRisks, hotPartitionsByLag, List.of(), List.of(), Direction.STABLE);
+    }
+
+    /**
+     * Backward-compatible constructor defaulting commit staleness to -1 (unknown/none).
+     * Used by tests and callers that do not supply commit freshness data.
+     */
+    public GroupSnapshot(
+      String consumerGroup,
+      State state,
+      long totalLag,
+      long maxLag,
+      long minLag,
+      List<PartitionLag> partitions,
+      List<LagVelocity> velocities,
+      List<LagMs> lagMs,
+      List<TimeToCloseEstimate> timeToClose,
+      List<RetentionRisk> retentionRisks,
+      List<HotPartitionLag> hotPartitionsByLag,
+      List<StateTransition> recentTransitions,
+      List<LagTrend> trends,
+      Direction overallTrend
+    ) {
+      this(consumerGroup, state, totalLag, maxLag, minLag, partitions, velocities, lagMs,
+        timeToClose, retentionRisks, hotPartitionsByLag, recentTransitions, trends, overallTrend, -1);
     }
   }
 

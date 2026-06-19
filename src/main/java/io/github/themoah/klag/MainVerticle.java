@@ -13,7 +13,6 @@ import io.github.themoah.klag.mcp.McpTools;
 import io.github.themoah.klag.metrics.snapshot.SnapshotStore;
 import io.github.themoah.klag.metrics.MetricsCollector;
 import io.github.themoah.klag.metrics.MetricsConfig;
-import io.github.themoah.klag.metrics.MetricsReporter;
 import io.github.themoah.klag.metrics.MicrometerConfig;
 import io.github.themoah.klag.metrics.MicrometerReporter;
 import io.github.themoah.klag.metrics.PrometheusHandler;
@@ -156,7 +155,7 @@ public class MainVerticle extends AbstractVerticle {
     // Load hot partition config
     HotPartitionConfig hotPartitionConfig = HotPartitionConfig.fromEnvironment();
 
-    MetricsReporter reporter = new MicrometerReporter(registry);
+    MicrometerReporter reporter = new MicrometerReporter(registry);
     MetricsCollector collector = new MetricsCollector(
       vertx,
       kafkaClientService,

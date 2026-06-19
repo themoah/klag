@@ -2,6 +2,7 @@ package io.github.themoah.klag.metrics;
 
 import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
+import io.github.themoah.klag.model.CommitStaleness;
 import io.github.themoah.klag.model.ConsumerGroupState;
 import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.HotPartitionThroughput;
@@ -27,7 +28,7 @@ import org.slf4j.LoggerFactory;
  * Reports metrics using Micrometer MeterRegistry.
  * Works with any Micrometer-supported backend (Datadog, Prometheus, etc).
  */
-public class MicrometerReporter implements MetricsReporter {
+public class MicrometerReporter {
 
   private static final Logger log = LoggerFactory.getLogger(MicrometerReporter.class);
 
@@ -38,11 +39,6 @@ public class MicrometerReporter implements MetricsReporter {
 
   public MicrometerReporter(MeterRegistry registry) {
     this.registry = registry;
-  }
-
-  @Override
-  public Future<Void> reportLag(List<ConsumerGroupLag> lagData) {
-    return reportLag(lagData, null);
   }
 
   /**
@@ -270,7 +266,6 @@ public class MicrometerReporter implements MetricsReporter {
    * @param risks list of retention risk data
    * @param activeKeys set to populate with active gauge keys (can be null)
    */
-  @Override
   public void reportRetentionPercent(List<RetentionRisk> risks, Set<String> activeKeys) {
     log.debug("Reporting {} retention risk metrics", risks.size());
 
@@ -286,13 +281,31 @@ public class MicrometerReporter implements MetricsReporter {
     }
   }
 
-  @Override
+  /**
+   * Reports commit staleness in seconds (time since the committed offset last advanced).
+   * Only populated for group/topics with lag &gt; 0.
+   *
+   * @param stalenessData list of commit staleness data
+   * @param activeKeys set to populate with active gauge keys (can be null)
+   */
+  public void reportCommitStaleness(List<CommitStaleness> stalenessData, Set<String> activeKeys) {
+    log.debug("Reporting {} commit staleness metrics", stalenessData.size());
+
+    for (CommitStaleness staleness : stalenessData) {
+      Tags tags = Tags.of(
+        "consumer_group", staleness.consumerGroup(),
+        "topic", staleness.topic()
+      );
+
+      trackKey(activeKeys, recordGauge("klag.consumer.commit.staleness_seconds", tags, staleness.stalenessSeconds()));
+    }
+  }
+
   public Future<Void> start() {
     log.info("MicrometerReporter started");
     return Future.succeededFuture();
   }
 
-  @Override
   public Future<Void> close() {
     log.info("Closing MicrometerReporter");
     if (registry != null) {

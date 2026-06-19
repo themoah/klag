@@ -1,5 +1,6 @@
 package io.github.themoah.klag.metrics.timelag;
 
+import io.github.themoah.klag.config.Env;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,49 +38,15 @@ public record TimeLagConfig(
    * </ul>
    */
   public static TimeLagConfig fromEnvironment() {
-    boolean enabled = parseBoolean("TIME_LAG_ENABLED", DEFAULT_ENABLED);
-    long minLagMessages = parseLong("TIME_LAG_MIN_MESSAGES", DEFAULT_MIN_LAG_MESSAGES);
-    int interpolationBufferSize = parseInt("TIME_LAG_INTERPOLATION_BUFFER_SIZE", DEFAULT_INTERPOLATION_BUFFER_SIZE);
-    long staleProducerThresholdMs = parseLong("TIME_LAG_STALE_PRODUCER_THRESHOLD_MS", DEFAULT_STALE_PRODUCER_THRESHOLD_MS);
+    boolean enabled = Env.getBool("TIME_LAG_ENABLED", DEFAULT_ENABLED);
+    long minLagMessages = Env.getLong("TIME_LAG_MIN_MESSAGES", DEFAULT_MIN_LAG_MESSAGES);
+    int interpolationBufferSize = Env.getInt("TIME_LAG_INTERPOLATION_BUFFER_SIZE", DEFAULT_INTERPOLATION_BUFFER_SIZE);
+    long staleProducerThresholdMs = Env.getLong("TIME_LAG_STALE_PRODUCER_THRESHOLD_MS", DEFAULT_STALE_PRODUCER_THRESHOLD_MS);
 
     TimeLagConfig config = new TimeLagConfig(enabled, minLagMessages, interpolationBufferSize, staleProducerThresholdMs);
     log.info("Time lag config: enabled={}, minLagMessages={}, interpolationBufferSize={}, staleProducerThresholdMs={}",
       enabled, minLagMessages, interpolationBufferSize, staleProducerThresholdMs);
 
     return config;
-  }
-
-  private static boolean parseBoolean(String envVar, boolean defaultValue) {
-    String value = System.getenv(envVar);
-    if (value == null || value.isBlank()) {
-      return defaultValue;
-    }
-    return Boolean.parseBoolean(value);
-  }
-
-  private static int parseInt(String envVar, int defaultValue) {
-    String value = System.getenv(envVar);
-    if (value == null || value.isBlank()) {
-      return defaultValue;
-    }
-    try {
-      return Integer.parseInt(value);
-    } catch (NumberFormatException e) {
-      log.warn("Invalid value for {}: '{}', using default: {}", envVar, value, defaultValue);
-      return defaultValue;
-    }
-  }
-
-  private static long parseLong(String envVar, long defaultValue) {
-    String value = System.getenv(envVar);
-    if (value == null || value.isBlank()) {
-      return defaultValue;
-    }
-    try {
-      return Long.parseLong(value);
-    } catch (NumberFormatException e) {
-      log.warn("Invalid value for {}: '{}', using default: {}", envVar, value, defaultValue);
-      return defaultValue;
-    }
   }
 }
