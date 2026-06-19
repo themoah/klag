@@ -5,6 +5,52 @@ entries:
       artifacthub.io/category: monitoring-logging
       artifacthub.io/changes: |
         - kind: added
+          description: Consumer commit freshness - klag.consumer.commit.staleness_seconds metric and MCP diagnose stuck-consumer flag (lag > 0 but committed offset frozen)
+      artifacthub.io/images: |
+        - name: klag
+          image: themoah/klag:0.2.4
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: source
+          url: https://github.com/themoah/klag
+        - name: issues
+          url: https://github.com/themoah/klag/issues
+        - name: documentation
+          url: https://github.com/themoah/klag/blob/main/README.md
+      artifacthub.io/maintainers: |
+        - name: themoah
+          email: aviv@dozorets.com
+      artifacthub.io/prerelease: "false"
+    apiVersion: v2
+    appVersion: 0.2.4
+    created: "2026-06-19T07:14:43.566581394Z"
+    description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter
+      with pluggable metrics sinks.
+    digest: 28fe09218d7305c072b10a304849ced516cef8619faa6e88ad221be67803e31f
+    home: https://github.com/themoah/klag
+    icon: https://avatars.githubusercontent.com/themoah
+    keywords:
+    - kafka
+    - lag
+    - monitoring
+    - prometheus
+    - metrics
+    - consumer-groups
+    maintainers:
+    - email: aviv@dozorets.com
+      name: themoah
+      url: https://github.com/themoah
+    name: klag
+    sources:
+    - https://github.com/themoah/klag
+    type: application
+    urls:
+    - https://github.com/themoah/klag/releases/download/klag-0.3.2/klag-0.3.2.tgz
+    version: 0.3.2
+  - annotations:
+      artifacthub.io/category: monitoring-logging
+      artifacthub.io/changes: |
+        - kind: added
           description: Initial publication of the Klag Helm chart to Artifact Hub
       artifacthub.io/images: |
         - name: klag
@@ -185,4 +231,4 @@ entries:
     urls:
     - https://github.com/themoah/klag/releases/download/klag-0.1.12/klag-0.1.12.tgz
     version: 0.1.12
-generated: "2026-06-12T07:57:23.190545313Z"
+generated: "2026-06-19T07:14:43.566608214Z"
