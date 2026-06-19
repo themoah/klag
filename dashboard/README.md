@@ -25,8 +25,10 @@ Consumer lag counts how far a consumer group trails the latest produced offset. 
 ## Import
 
 1. Grafana → **Dashboards → New → Import**
-2. Paste this dashboard ID, click **Load**
+2. Enter dashboard ID **[25379](https://grafana.com/grafana/dashboards/25379-klag-kafka-lag-monitoring/)**, click **Load**
 3. Pick your Prometheus source, click **Import**
+
+Or upload `demo-dashboard.json` from this directory directly.
 
 ## Keywords
 
