@@ -2,8 +2,8 @@ apiVersion: v2
 name: klag
 description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter with pluggable metrics sinks.
 type: application
-version: 0.3.0
-appVersion: "0.2.3"
+version: 0.3.2
+appVersion: "0.2.4"
 home: https://github.com/themoah/klag
 icon: https://avatars.githubusercontent.com/themoah
 sources:
@@ -32,10 +32,10 @@ annotations:
       url: https://github.com/themoah/klag/blob/main/README.md
   artifacthub.io/images: |
     - name: klag
-      image: themoah/klag:0.2.3
+      image: themoah/klag:0.2.4
   artifacthub.io/maintainers: |
     - name: themoah
       email: aviv@dozorets.com
   artifacthub.io/changes: |
     - kind: added
-      description: Initial publication of the Klag Helm chart to Artifact Hub
+      description: Consumer commit freshness - klag.consumer.commit.staleness_seconds metric and MCP diagnose stuck-consumer flag (lag > 0 but committed offset frozen)

@@ -90,6 +90,9 @@ src/main/java/io/github/themoah/klag/
 - `TIME_LAG_INTERPOLATION_BUFFER_SIZE` (60) - Number of offset/timestamp points per partition for interpolation
 - `TIME_LAG_STALE_PRODUCER_THRESHOLD_MS` (180000) - Time in ms before a producer with no offset progress is considered stale
 
+**Commit Freshness:**
+- `COMMIT_FRESHNESS_ENABLED` (true) - Track time since each group+topic last advanced its committed offset. Kafka exposes no commit timestamp, so freshness is *inferred*: klag timestamps when the observed committed offset changes. The clock starts at klag startup and resets on restart (it measures time since klag last *observed* a commit, not the absolute commit time). Staleness is only reported while lag > 0. The MCP `diagnose` stuck-consumer flag fires at 300s (constant; alert on the raw gauge at any threshold).
+
 **MCP (AI agent access):**
 - `MCP_ENABLED` (false) - Expose the `/mcp` endpoint for AI agents (SRE/dev). Opt-in; zero impact when off.
 - `MCP_AUTH_TOKEN` (empty) - When set, requires `Authorization: Bearer <token>`. Empty = open (logged warning).
@@ -105,7 +108,9 @@ Each group snapshot also carries a **basic lag trend** (`growing`/`shrinking`/`s
 `overallTrend` rollup, derived from lag velocity via `LAG_TREND_DEADBAND_MSG_PER_SEC`) and a rolling
 **state-change history** (last 10 `from→to` transitions). `get_consumer_group_lag` returns `trends`,
 `overallTrend`, and `recentTransitions`; `list_consumer_groups`/`find_lagging_groups` include
-`overallTrend`; `diagnose` flags frequent state changes (rebalance storm / flapping).
+`overallTrend`; `diagnose` flags frequent state changes (rebalance storm / flapping) and **stuck
+consumers** (lag > 0 but committed offset frozen). `get_consumer_group_lag`/`find_lagging_groups`
+also expose `commitStalenessSeconds` (max across the group's lagging topics; -1 when none).
 See `docs/superpowers/specs/2026-06-01-mcp-support-design.md`.
 
 **Logging:** `LOG_LEVEL`, `LOG_LEVEL_KLAG` (falls back to `LOG_LEVEL`, then `INFO`), `LOG_LEVEL_KAFKA`, `LOG_LEVEL_HEALTH`, `LOG_LEVEL_METRICS`, `LOG_LEVEL_KAFKA_CLIENT` (Apache kafka-clients, default `INFO`), `LOG_LEVEL_KAFKA_LIST_OFFSETS_HANDLER` (Apache `ListOffsetsHandler`, default `ERROR` — silences the redundant per-scrape MAX_TIMESTAMP WARN on Kafka <3.0; raise to `WARN`/`DEBUG` when investigating other listOffsets issues)
@@ -165,9 +170,13 @@ OTEL_RESOURCE_ATTRIBUTES=environment=development,cluster=local
 **Data Loss Prevention (DLP) Metrics:**
 - `klag.consumer.lag.retention_percent` - Percentage of retention window consumed by lag (value × 100 for precision); enables alerting before data loss. Formula: `(lag / (logEndOffset - logStartOffset)) * 100`. Value of 100% means data loss has occurred (consumer behind logStartOffset). Excludes empty partitions.
 
+**Commit Freshness Metrics:**
+- `klag.consumer.commit.staleness_seconds` - Seconds since the committed offset last advanced for a group+topic. Only reported while lag > 0 (a frozen-but-idle consumer is not stuck). High/rising = a wedged consumer with pending work that lag alone misses. Inferred — Kafka exposes no commit timestamp, so this measures time since klag *observed* a commit and resets on klag restart.
+
 Note: `klag.hot_partition` only has `topic` and `partition` tags (throughput is partition-level, independent of consumers)
 Note: Time-based lag metrics only have `consumer_group` and `topic` tags (per-topic granularity)
 Note: DLP metrics only have `consumer_group` and `topic` tags (per-topic granularity)
+Note: Commit freshness metric only has `consumer_group` and `topic` tags (per-topic granularity)
 Note: `klag.consumer.group.state` carries the state as a *tag*; on a state change the old-state series survives 1–2 collection intervals (two-phase stale-gauge cleanup), so both states export during that window. Key alerts on the most recent sample rather than series existence.
 
 ## Grafana Dashboard
@@ -194,6 +203,7 @@ A pre-built comprehensive Grafana dashboard is available in `dashboard/demo-dash
 - Top 10 partition offset gaps
 - Hot Partition Detection (count, table, time series)
 - Time-Based Lag Estimation (max time lag, groups catching up, time lag chart, time-to-close chart)
+- Commit Staleness by Consumer Group (seconds since last observed commit, while lagging)
 - Data Loss Prevention (max retention risk, at-risk topics count, retention percent chart, at-risk table)
 - JVM Memory Usage (heap/non-heap)
 - JVM GC Pause Time

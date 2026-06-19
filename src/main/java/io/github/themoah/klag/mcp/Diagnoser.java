@@ -51,6 +51,9 @@ public final class Diagnoser {
   private static final long NOTABLE_LAG = 100;
   // Number of recent state transitions at/above which the group is flagged as churning.
   private static final int CHURN_THRESHOLD = 3;
+  // Commit staleness (seconds) at/above which a lagging group is flagged as a stuck consumer.
+  // The raw klag.consumer.commit.staleness_seconds gauge supports alerting at any threshold.
+  private static final long STUCK_STALENESS_SECONDS = 300;
 
   /**
    * Diagnoses a consumer group.
@@ -66,6 +69,7 @@ public final class Diagnoser {
     addRetentionFinding(g, findings);
     addVelocityFindings(g, findings);
     addHotPartitionFinding(g, findings);
+    addStuckConsumerFinding(g, findings);
 
     Severity overall = findings.stream()
       .map(Finding::severity)
@@ -158,6 +162,18 @@ public final class Diagnoser {
           "Partition %d of topic %s is a lag hot spot (z=%.1f, lag=%d vs mean %.0f). Likely a key "
           + "skew or a slow/stuck consumer for that partition.", h.partition(), h.topic(),
           h.zScore(), h.lag(), h.mean())));
+    }
+  }
+
+  private static void addStuckConsumerFinding(GroupSnapshot g, List<Finding> findings) {
+    long staleness = g.maxCommitStalenessSeconds();
+    if (g.totalLag() > 0 && staleness >= STUCK_STALENESS_SECONDS) {
+      findings.add(new Finding(Severity.WARNING, "Stuck consumer",
+        String.format(Locale.ROOT,
+          "Lag is %d but the committed offset has not advanced for %ds. The consumer is likely "
+          + "hung, deadlocked, or stuck on a poison message — its members appear alive but are "
+          + "making no progress. (Staleness is measured since klag observed the last commit; it "
+          + "resets on klag restart.)", g.totalLag(), staleness)));
     }
   }
 

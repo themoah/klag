@@ -125,6 +125,19 @@ class McpToolsTest {
   }
 
   @Test
+  void getConsumerGroupLagIncludesCommitStaleness() {
+    PartitionLag p = PartitionLag.of("orders", 0, 1000, 0, 0, 0, 950);
+    GroupSnapshot g = new GroupSnapshot("payments", State.STABLE, 50, 50, 0, List.of(p),
+      List.of(), List.of(), List.of(), List.of(), List.of(),
+      List.of(), List.of(), Direction.STABLE, 420);
+    McpTools tools = new McpTools(storeWith(g));
+
+    JsonObject r = tools.call("get_consumer_group_lag", new JsonObject().put("group", "payments"));
+    JsonObject body = new JsonObject(textOf(r));
+    assertEquals(420L, body.getLong("commitStalenessSeconds"));
+  }
+
+  @Test
   void getConsumerGroupLagIncludesTrendAndTransitions() {
     StateTransition t = new StateTransition(State.STABLE, State.EMPTY, 500L);
     McpTools tools = new McpTools(storeWith(

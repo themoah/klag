@@ -3,6 +3,8 @@ package io.github.themoah.klag.metrics;
 import io.github.themoah.klag.kafka.ChunkConfig;
 import io.github.themoah.klag.kafka.ChunkProcessor;
 import io.github.themoah.klag.kafka.KafkaClientService;
+import io.github.themoah.klag.metrics.freshness.CommitFreshnessConfig;
+import io.github.themoah.klag.metrics.freshness.CommitFreshnessTracker;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionConfig;
 import io.github.themoah.klag.metrics.hotpartition.HotPartitionDetector;
 import io.github.themoah.klag.metrics.snapshot.SnapshotBuilder;
@@ -12,6 +14,7 @@ import io.github.themoah.klag.metrics.timelag.OffsetTimestampTracker;
 import io.github.themoah.klag.metrics.timelag.TimeLagConfig;
 import io.github.themoah.klag.metrics.timelag.TimeLagEstimator;
 import io.github.themoah.klag.metrics.velocity.LagVelocityTracker;
+import io.github.themoah.klag.model.CommitStaleness;
 import io.github.themoah.klag.model.ConsumerGroupLag;
 import io.github.themoah.klag.model.ConsumerGroupLag.PartitionLag;
 import io.github.themoah.klag.model.StateTransition;
@@ -50,13 +53,14 @@ public class MetricsCollector {
 
   private final Vertx vertx;
   private final KafkaClientService kafkaClient;
-  private final MetricsReporter reporter;
+  private final MicrometerReporter reporter;
   private final long intervalMs;
   private final GroupFilter groupFilter;
   private final LagVelocityTracker velocityTracker;
   private final HotPartitionDetector hotPartitionDetector;
   private final TimeLagEstimator timeLagEstimator;
   private final OffsetTimestampTracker offsetTimestampTracker;
+  private final CommitFreshnessTracker commitFreshnessTracker;  // null when disabled
   private final ChunkConfig chunkConfig;
 
   private final Map<String, Integer> cachedGroupPartitionCounts = new ConcurrentHashMap<>();
@@ -84,7 +88,7 @@ public class MetricsCollector {
   public MetricsCollector(
     Vertx vertx,
     KafkaClientService kafkaClient,
-    MetricsReporter reporter,
+    MicrometerReporter reporter,
     long intervalMs,
     String groupFilter
   ) {
@@ -96,7 +100,7 @@ public class MetricsCollector {
   public MetricsCollector(
     Vertx vertx,
     KafkaClientService kafkaClient,
-    MetricsReporter reporter,
+    MicrometerReporter reporter,
     long intervalMs,
     String groupFilter,
     HotPartitionConfig hotPartitionConfig
@@ -109,7 +113,7 @@ public class MetricsCollector {
   public MetricsCollector(
     Vertx vertx,
     KafkaClientService kafkaClient,
-    MetricsReporter reporter,
+    MicrometerReporter reporter,
     long intervalMs,
     String groupFilter,
     String groupExclude,
@@ -126,7 +130,7 @@ public class MetricsCollector {
   MetricsCollector(
     Vertx vertx,
     KafkaClientService kafkaClient,
-    MetricsReporter reporter,
+    MicrometerReporter reporter,
     long intervalMs,
     String groupFilter,
     String groupExclude,
@@ -150,6 +154,9 @@ public class MetricsCollector {
     this.offsetTimestampTracker = timeLagConfig.enabled()
       ? new OffsetTimestampTracker(timeLagConfig.interpolationBufferSize(),
                                    timeLagConfig.staleProducerThresholdMs())
+      : null;
+    this.commitFreshnessTracker = CommitFreshnessConfig.fromEnvironment().enabled()
+      ? new CommitFreshnessTracker()
       : null;
     this.chunkConfig = chunkConfig;
   }
@@ -234,8 +241,10 @@ public class MetricsCollector {
           groups.size(), filteredGroups.size());
 
         if (filteredGroups.isEmpty()) {
-          if (reporter instanceof MicrometerReporter micrometerReporter) {
-            micrometerReporter.cleanupStaleGauges(Set.of());
+          reporter.cleanupStaleGauges(Set.of());
+          reporter.cleanupStateTracker(Set.of());
+          if (commitFreshnessTracker != null) {
+            commitFreshnessTracker.cleanupStale(Set.of());
           }
           return Future.succeededFuture();
         }
@@ -357,10 +366,11 @@ public class MetricsCollector {
     if (offsetTimestampTracker != null) {
       offsetTimestampTracker.cleanupStalePartitions(cycle.timeLagKeys);
     }
-    if (reporter instanceof MicrometerReporter micrometerReporter) {
-      micrometerReporter.cleanupStaleGauges(cycle.activeKeys);
-      micrometerReporter.cleanupStateTracker(cycle.stateGroupKeys);
+    if (commitFreshnessTracker != null) {
+      commitFreshnessTracker.cleanupStale(cycle.commitStalenessKeys);
     }
+    reporter.cleanupStaleGauges(cycle.activeKeys);
+    reporter.cleanupStateTracker(cycle.stateGroupKeys);
     publishSnapshot(cycle.snapshot);
   }
 
@@ -486,104 +496,124 @@ public class MetricsCollector {
     Set<String> throughputKeys = cycle.throughputKeys;
     CycleSnapshot cycleSnapshot = cycle.snapshot;
     cycle.stateGroupKeys.addAll(stateData.keySet());
-    if (reporter instanceof MicrometerReporter micrometerReporter) {
-      // Report topic partition counts (max partition number + 1)
-      Map<String, Integer> topicPartitions = new HashMap<>();
-      for (ConsumerGroupLag group : lagData) {
-        for (PartitionLag p : group.partitions()) {
-          topicPartitions.merge(p.topic(), p.partition() + 1, Integer::max);
+    // Report topic partition counts (max partition number + 1)
+    Map<String, Integer> topicPartitions = new HashMap<>();
+    for (ConsumerGroupLag group : lagData) {
+      for (PartitionLag p : group.partitions()) {
+        topicPartitions.merge(p.topic(), p.partition() + 1, Integer::max);
+      }
+    }
+
+    // Aggregate partition data by topic for velocity tracking
+    Map<String, Map<String, TopicAggregates>> groupTopicAggregates = new HashMap<>();
+    for (ConsumerGroupLag group : lagData) {
+      Map<String, TopicAggregates> topicAggregates = groupTopicAggregates
+        .computeIfAbsent(group.consumerGroup(), k -> new HashMap<>());
+
+      for (PartitionLag p : group.partitions()) {
+        topicAggregates.computeIfAbsent(p.topic(), k -> new TopicAggregates())
+          .add(p.logEndOffset(), p.committedOffset(), p.lag());
+      }
+    }
+
+    // Record snapshots for velocity calculation (velocityKeys accumulates across chunks)
+    groupTopicAggregates.forEach((consumerGroup, topicMap) ->
+      topicMap.forEach((topic, agg) -> {
+        recordVelocitySnapshot(consumerGroup, topic, agg);
+        velocityKeys.add(LagVelocityTracker.makeKey(consumerGroup, topic));
+      })
+    );
+
+    // Commit freshness: track when each group+topic last advanced its committed offset.
+    // Staleness is only reported when lag > 0 (a frozen-but-idle consumer is not stuck).
+    Map<String, Long> stalenessByGroup = new HashMap<>();
+    if (commitFreshnessTracker != null) {
+      long now = System.currentTimeMillis();
+      List<CommitStaleness> stalenessData = new ArrayList<>();
+      for (var groupEntry : groupTopicAggregates.entrySet()) {
+        String consumerGroup = groupEntry.getKey();
+        for (var topicEntry : groupEntry.getValue().entrySet()) {
+          String topic = topicEntry.getKey();
+          TopicAggregates agg = topicEntry.getValue();
+          commitFreshnessTracker.record(consumerGroup, topic, agg.totalCommittedOffset(), now);
+          if (agg.totalLag() > 0) {
+            commitFreshnessTracker.stalenessSeconds(consumerGroup, topic, now).ifPresent(seconds -> {
+              stalenessData.add(new CommitStaleness(consumerGroup, topic, seconds, agg.totalLag()));
+              cycle.commitStalenessKeys.add(LagVelocityTracker.makeKey(consumerGroup, topic));
+              stalenessByGroup.merge(consumerGroup, seconds, Math::max);
+            });
+          }
         }
       }
+      reporter.reportCommitStaleness(stalenessData, activeKeys);
+    }
 
-      // Aggregate partition data by topic for velocity tracking
-      Map<String, Map<String, TopicAggregates>> groupTopicAggregates = new HashMap<>();
-      for (ConsumerGroupLag group : lagData) {
-        Map<String, TopicAggregates> topicAggregates = groupTopicAggregates
-          .computeIfAbsent(group.consumerGroup(), k -> new HashMap<>());
+    // Calculate and report velocities
+    List<LagVelocity> velocities = velocityTracker.calculateVelocities();
+    reporter.reportVelocity(velocities, activeKeys);
 
-        for (PartitionLag p : group.partitions()) {
-          topicAggregates.computeIfAbsent(p.topic(), k -> new TopicAggregates())
-            .add(p.logEndOffset(), p.committedOffset(), p.lag());
-        }
-      }
+    // Calculate lag in ms from timestamps
+    List<LagMs> lagMsData = calculateLagMs(lagData, cycle.timeLagKeys);
+    reporter.reportLagMs(lagMsData, activeKeys);
 
-      // Record snapshots for velocity calculation (velocityKeys accumulates across chunks)
-      groupTopicAggregates.forEach((consumerGroup, topicMap) ->
-        topicMap.forEach((topic, agg) -> {
-          recordVelocitySnapshot(consumerGroup, topic, agg);
-          velocityKeys.add(LagVelocityTracker.makeKey(consumerGroup, topic));
-        })
+    // Time-to-close estimation (based on velocity data)
+    List<TimeToCloseEstimate> timeToCloseEstimates = List.of();
+    if (timeLagEstimator != null && timeLagEstimator.isEnabled()) {
+      // Build lag map: group -> topic -> totalLag
+      Map<String, Map<String, Long>> lagByGroupTopic = new HashMap<>();
+      groupTopicAggregates.forEach((group, topicMap) ->
+        topicMap.forEach((topic, agg) ->
+          lagByGroupTopic.computeIfAbsent(group, k -> new HashMap<>())
+            .put(topic, agg.totalLag())
+        )
       );
 
-      // Calculate and report velocities
-      List<LagVelocity> velocities = velocityTracker.calculateVelocities();
-      micrometerReporter.reportVelocity(velocities, activeKeys);
-
-      // Calculate lag in ms from timestamps
-      List<LagMs> lagMsData = calculateLagMs(lagData, cycle.timeLagKeys);
-      micrometerReporter.reportLagMs(lagMsData, activeKeys);
-
-      // Time-to-close estimation (based on velocity data)
-      List<TimeToCloseEstimate> timeToCloseEstimates = List.of();
-      if (timeLagEstimator != null && timeLagEstimator.isEnabled()) {
-        // Build lag map: group -> topic -> totalLag
-        Map<String, Map<String, Long>> lagByGroupTopic = new HashMap<>();
-        groupTopicAggregates.forEach((group, topicMap) ->
-          topicMap.forEach((topic, agg) ->
-            lagByGroupTopic.computeIfAbsent(group, k -> new HashMap<>())
-              .put(topic, agg.totalLag())
-          )
-        );
-
-        timeToCloseEstimates = timeLagEstimator.calculateTimeToClose(velocities, lagByGroupTopic);
-        micrometerReporter.reportTimeToClose(timeToCloseEstimates, activeKeys);
-      }
-
-      // Retention risk percentage calculation (offset-based)
-      List<RetentionRisk> retentionRisks = calculateRetentionRisks(lagData);
-      if (!retentionRisks.isEmpty()) {
-        micrometerReporter.reportRetentionPercent(retentionRisks, activeKeys);
-      }
-
-      // Report lag and state metrics
-      micrometerReporter.reportTopicPartitions(topicPartitions, activeKeys);
-      micrometerReporter.reportLag(lagData, activeKeys);
-      micrometerReporter.reportConsumerGroupStates(stateData, activeKeys);
-
-      // Hot partition detection and reporting
-      List<HotPartitionLag> hotByLag = List.of();
-      List<HotPartitionThroughput> hotByThroughput = List.of();
-      if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
-        // Accumulate active throughput keys across chunks; cleanup happens once per
-        // cycle (see collectAndReportChunked / collectAllGroupsParallel). Cleaning up
-        // here per-chunk would retainAll() away other chunks' throughput histories.
-        throughputKeys.addAll(hotPartitionDetector.recordThroughputSnapshots(lagData));
-
-        hotByLag = hotPartitionDetector.detectHotPartitionsByLag(lagData);
-        micrometerReporter.reportHotPartitionLag(hotByLag, activeKeys);
-
-        hotByThroughput = hotPartitionDetector.detectHotPartitionsByThroughput();
-        micrometerReporter.reportHotPartitionThroughput(hotByThroughput, activeKeys);
-      }
-
-      // Accumulate this call's derived metrics into the cycle snapshot for the MCP layer.
-      if (cycleSnapshot != null) {
-        Map<String, List<StateTransition>> transitionsByGroup = new HashMap<>();
-        for (ConsumerGroupLag lag : lagData) {
-          transitionsByGroup.put(lag.consumerGroup(),
-            micrometerReporter.recentStateTransitions(lag.consumerGroup()));
-        }
-        MetricsSnapshot partial = SnapshotBuilder.build(0L, lagData, stateData, velocities,
-          lagMsData, timeToCloseEstimates, retentionRisks, hotByLag, hotByThroughput,
-          transitionsByGroup, lagTrendDeadband);
-        cycleSnapshot.groups.addAll(partial.groups());
-        cycleSnapshot.throughput.addAll(hotByThroughput);
-      }
-
-      log.debug("Reported metrics for {} consumer groups", lagData.size());
-    } else {
-      reporter.reportLag(lagData);
+      timeToCloseEstimates = timeLagEstimator.calculateTimeToClose(velocities, lagByGroupTopic);
+      reporter.reportTimeToClose(timeToCloseEstimates, activeKeys);
     }
+
+    // Retention risk percentage calculation (offset-based)
+    List<RetentionRisk> retentionRisks = calculateRetentionRisks(lagData);
+    if (!retentionRisks.isEmpty()) {
+      reporter.reportRetentionPercent(retentionRisks, activeKeys);
+    }
+
+    // Report lag and state metrics
+    reporter.reportTopicPartitions(topicPartitions, activeKeys);
+    reporter.reportLag(lagData, activeKeys);
+    reporter.reportConsumerGroupStates(stateData, activeKeys);
+
+    // Hot partition detection and reporting
+    List<HotPartitionLag> hotByLag = List.of();
+    List<HotPartitionThroughput> hotByThroughput = List.of();
+    if (hotPartitionDetector != null && hotPartitionDetector.isEnabled()) {
+      // Accumulate active throughput keys across chunks; cleanup happens once per
+      // cycle (see collectAndReportChunked / collectAllGroupsParallel). Cleaning up
+      // here per-chunk would retainAll() away other chunks' throughput histories.
+      throughputKeys.addAll(hotPartitionDetector.recordThroughputSnapshots(lagData));
+
+      hotByLag = hotPartitionDetector.detectHotPartitionsByLag(lagData);
+      reporter.reportHotPartitionLag(hotByLag, activeKeys);
+
+      hotByThroughput = hotPartitionDetector.detectHotPartitionsByThroughput();
+      reporter.reportHotPartitionThroughput(hotByThroughput, activeKeys);
+    }
+
+    // Accumulate this call's derived metrics into the cycle snapshot for the MCP layer.
+    if (cycleSnapshot != null) {
+      Map<String, List<StateTransition>> transitionsByGroup = new HashMap<>();
+      for (ConsumerGroupLag lag : lagData) {
+        transitionsByGroup.put(lag.consumerGroup(),
+          reporter.recentStateTransitions(lag.consumerGroup()));
+      }
+      MetricsSnapshot partial = SnapshotBuilder.build(0L, lagData, stateData, velocities,
+        lagMsData, timeToCloseEstimates, retentionRisks, hotByLag, hotByThroughput,
+        transitionsByGroup, lagTrendDeadband, stalenessByGroup);
+      cycleSnapshot.groups.addAll(partial.groups());
+      cycleSnapshot.throughput.addAll(hotByThroughput);
+    }
+
+    log.debug("Reported metrics for {} consumer groups", lagData.size());
   }
 
   private Future<ConsumerGroupLag> collectGroupLag(String groupId) {
@@ -853,6 +883,7 @@ public class MetricsCollector {
     final Set<String> throughputKeys = new HashSet<>();
     final Set<String> stateGroupKeys = new HashSet<>();
     final Set<String> timeLagKeys = new HashSet<>();
+    final Set<String> commitStalenessKeys = new HashSet<>();
     final CycleSnapshot snapshot; // null when no snapshot store is attached
     boolean partial;
 

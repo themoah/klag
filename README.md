@@ -91,7 +91,9 @@ and [charts/klag/README.md](charts/klag/README.md).
 | `klag.hot_partition[.lag]` | Partitions with statistically abnormal throughput         |
 
 Full metrics reference and the pre-built [Grafana dashboard](https://klag.dev/integrations/grafana-dashboard/)
-are documented at [klag.dev/metrics](https://klag.dev/metrics/overview/).
+are documented at [klag.dev/metrics](https://klag.dev/metrics/overview/). The dashboard is on
+[Grafana.com (ID 25379)](https://grafana.com/grafana/dashboards/25379-klag-kafka-lag-monitoring/) —
+import by ID or use `dashboard/demo-dashboard.json`.
 
 [![Grafana Dashboard](dashboard/grafana.png)](dashboard/demo-dashboard.json)
 

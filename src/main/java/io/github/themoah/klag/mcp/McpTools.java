@@ -144,7 +144,8 @@ public class McpTools {
       .put("recentTransitions", transitionArray(g.recentTransitions()))
       .put("lagMs", lagMsArray(g.lagMs()))
       .put("timeToClose", timeToCloseArray(g.timeToClose()))
-      .put("retentionRisk", retentionArray(g.retentionRisks()));
+      .put("retentionRisk", retentionArray(g.retentionRisks()))
+      .put("commitStalenessSeconds", g.maxCommitStalenessSeconds());
     return text(body.encodePrettily());
   }
 
@@ -180,7 +181,8 @@ public class McpTools {
         .put("totalLag", g.totalLag())
         .put("overallTrend", g.overallTrend().name().toLowerCase())
         .put("maxVelocity", maxVelocity(g))
-        .put("maxRetentionPercent", maxRetention(g)));
+        .put("maxRetentionPercent", maxRetention(g))
+        .put("commitStalenessSeconds", g.maxCommitStalenessSeconds()));
     }
     JsonObject body = new JsonObject()
       .put("sortBy", sortBy)
