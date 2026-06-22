@@ -17,6 +17,15 @@ gradle_ver=$(grep -oE '^version = "[^"]+"' build.gradle.kts | sed -E 's/.*"([^"]
 app_ver=$(grep -oE '^appVersion: "[^"]+"' charts/klag/Chart.yaml | sed -E 's/.*"([^"]+)".*/\1/')
 img_tag=$(grep -oE 'image: themoah/klag:[^[:space:]]+' charts/klag/Chart.yaml | sed -E 's/.*://')
 
+# Empty = grep matched nothing (file moved/reformatted). Without this the later
+# "$a" != "$b" checks pass on "" == "" and report a false OK.
+for v in gradle_ver app_ver img_tag; do
+  if [[ -z "${!v}" ]]; then
+    echo "::error::Could not extract $v — build.gradle.kts / Chart.yaml format changed?"
+    exit 1
+  fi
+done
+
 fail=0
 if [[ "$app_ver" != "$gradle_ver" ]]; then
   echo "::error::Chart appVersion ($app_ver) != build.gradle.kts version ($gradle_ver)"
