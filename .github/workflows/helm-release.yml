@@ -38,6 +38,12 @@ jobs:
       - name: Lint chart
         run: helm lint charts/klag
 
+      # Block publishing a chart whose appVersion / image annotation drifted from
+      # the version release.yml actually builds (that drift broke Artifact Hub on
+      # klag:0.1.14). See scripts/check-version-consistency.sh.
+      - name: Check version consistency
+        run: ./scripts/check-version-consistency.sh
+
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@v1.6.0
         with:

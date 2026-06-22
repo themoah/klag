@@ -30,6 +30,8 @@ jobs:
             helm:
               - 'charts/**'
               - 'scripts/test-helm-chart.sh'
+              - 'scripts/check-version-consistency.sh'
+              - 'build.gradle.kts'
 
   test-helm-chart:
     runs-on: ubuntu-latest
@@ -46,6 +48,9 @@ jobs:
 
       - name: Run Helm chart tests
         run: ./scripts/test-helm-chart.sh
+
+      - name: Check version consistency
+        run: ./scripts/check-version-consistency.sh
 
   build-and-test:
     runs-on: ubuntu-latest
