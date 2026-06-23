@@ -107,6 +107,9 @@ metrics:
     serviceName: "klag"
     # Additional resource attributes (format: key1=value1,key2=value2)
     resourceAttributes: ""
+    # OTLP export interval in milliseconds (maps to OTLP_STEP_MS env var).
+    # Leave empty to fall back to OTEL_METRIC_EXPORT_INTERVAL or the app default (60000).
+    stepMs: ""
     # Use an existing secret for OTLP headers
     existingSecret: ""
     secretKeys:

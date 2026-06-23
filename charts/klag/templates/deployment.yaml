@@ -110,6 +110,10 @@ spec:
             - name: OTEL_RESOURCE_ATTRIBUTES
               value: {{ .Values.metrics.otlp.resourceAttributes | quote }}
             {{- end }}
+            {{- if .Values.metrics.otlp.stepMs }}
+            - name: OTLP_STEP_MS
+              value: {{ .Values.metrics.otlp.stepMs | quote }}
+            {{- end }}
             {{- end }}
             # Datadog configuration (when reporter is datadog)
             {{- if eq .Values.metrics.reporter "datadog" }}
