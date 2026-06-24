@@ -55,6 +55,12 @@ class EnvTest {
   }
 
   @Test
+  void blankUsesDefault() {
+    System.setProperty(NAME, "   ");
+    assertEquals(8888, Env.getInt(NAME, 8888));
+  }
+
+  @Test
   void boolFromProperty() {
     System.setProperty(DOTTED, "true");
     assertTrue(Env.getBool(NAME, false));

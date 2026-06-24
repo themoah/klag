@@ -73,7 +73,7 @@ src/main/java/io/github/themoah/klag/
 
 **App:** `HTTP_PORT` (8888), `KAFKA_HEALTH_CHECK_INTERVAL_MS` (30000), `VERTX_USE_VIRTUAL_THREADS` (false), `KLAG_CONFIG_FILE` (path to external `application.properties`, optional)
 
-Any `Env`-backed variable resolves in order (first non-blank wins): env var `NAME` → JVM property `-DNAME` → dotted `-Dname.dotted` (e.g. `HTTP_PORT` → `-Dhttp.port`). Lets jar/native users configure via `-D`; env keeps precedence. See `config/Env.java#resolve`.
+Any `Env`-backed variable resolves in order (first non-blank wins): env var `NAME` → JVM property `-DNAME` → dotted `-Dname.dotted` (e.g. `HTTP_PORT` → `-Dhttp.port`). This lets jar/native users configure via `-D`; env keeps precedence. See `config/Env.java#resolve`.
 
 **Kafka:** `KAFKA_BOOTSTRAP_SERVERS` (localhost:9092), `KAFKA_REQUEST_TIMEOUT_MS` (30000), `KAFKA_CHUNK_COUNT` (1), `KAFKA_CHUNK_DELAY_MS` (0). Any other `KAFKA_X_Y_Z` env var maps to `kafka.x.y.z` and is forwarded to the AdminClient. Config precedence: classpath `application.properties` < external file at `KLAG_CONFIG_FILE` < `KAFKA_*` env vars.
 
