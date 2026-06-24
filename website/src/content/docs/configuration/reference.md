@@ -7,6 +7,12 @@ Klag is configured via `src/main/resources/application.properties`, an external 
 file, or environment variables. Resolution order is **classpath → external file → env
 vars** (env vars win).
 
+Every environment variable below can also be set as a JVM system property — `-DNAME` or
+its dotted-lowercase form `-Dname.dotted` (e.g. `HTTP_PORT` → `-Dhttp.port=8881`). Handy
+when running the jar or [native binary](/deployment/native-image/) directly without
+exporting env vars. Resolution per key: env var → `-DNAME` → `-Dname.dotted`; env vars
+keep precedence.
+
 ## Application
 
 | Variable | Default | Description |

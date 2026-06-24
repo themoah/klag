@@ -34,6 +34,15 @@ Benchmark startup and memory:
 scripts/benchmark-startup.sh native - build/native/nativeCompile/klag
 ```
 
+Config works like the JVM build: env vars, or JVM system properties via runtime `-D`
+flags. To run several instances on one host, give each a port:
+
+```bash
+./build/native/nativeCompile/klag -Dhttp.port=8881
+```
+
+See the [configuration reference](/configuration/reference/) for all keys.
+
 ## How it's configured
 
 Native config lives in `build.gradle.kts` (the `graalvmNative` block) plus reachability
