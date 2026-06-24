@@ -3,7 +3,7 @@ name: klag
 description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter with pluggable metrics sinks.
 type: application
 version: 0.3.3
-appVersion: "0.2.4"
+appVersion: "0.2.5"
 home: https://github.com/themoah/klag
 icon: https://avatars.githubusercontent.com/themoah
 sources:
@@ -32,7 +32,7 @@ annotations:
       url: https://github.com/themoah/klag/blob/main/README.md
   artifacthub.io/images: |
     - name: klag
-      image: themoah/klag:0.2.4
+      image: themoah/klag:0.2.5
   artifacthub.io/maintainers: |
     - name: themoah
       email: aviv@dozorets.com
