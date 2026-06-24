@@ -4,7 +4,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Reads typed values from environment variables with defaults.
+ * Reads typed values from configuration with defaults.
+ * Each key is resolved in order (first non-blank wins): environment variable {@code NAME},
+ * then JVM system property {@code -DNAME}, then dotted-lowercase property {@code -Dname.dotted}
+ * (e.g. {@code HTTP_PORT} -> {@code -Dhttp.port}). This lets jar/native users set config via
+ * {@code -D} flags while env vars (Docker/k8s) keep precedence.
  * A null or blank value yields the default; an unparseable value logs a warning
  * and falls back to the default.
  */
@@ -14,8 +18,23 @@ public final class Env {
 
   private Env() {}
 
-  public static int getInt(String name, int defaultValue) {
+  /**
+   * Resolves a config value from env var, then -DNAME, then -Dname.dotted. Null if none set.
+   */
+  static String resolve(String name) {
     String value = System.getenv(name);
+    if (value != null && !value.isBlank()) {
+      return value;
+    }
+    value = System.getProperty(name);
+    if (value != null && !value.isBlank()) {
+      return value;
+    }
+    return System.getProperty(name.toLowerCase(java.util.Locale.ROOT).replace('_', '.'));
+  }
+
+  public static int getInt(String name, int defaultValue) {
+    String value = resolve(name);
     if (value == null || value.isBlank()) {
       return defaultValue;
     }
@@ -28,7 +47,7 @@ public final class Env {
   }
 
   public static long getLong(String name, long defaultValue) {
-    String value = System.getenv(name);
+    String value = resolve(name);
     if (value == null || value.isBlank()) {
       return defaultValue;
     }
@@ -41,7 +60,7 @@ public final class Env {
   }
 
   public static double getDouble(String name, double defaultValue) {
-    String value = System.getenv(name);
+    String value = resolve(name);
     if (value == null || value.isBlank()) {
       return defaultValue;
     }
@@ -54,7 +73,7 @@ public final class Env {
   }
 
   public static boolean getBool(String name, boolean defaultValue) {
-    String value = System.getenv(name);
+    String value = resolve(name);
     if (value == null || value.isBlank()) {
       return defaultValue;
     }
