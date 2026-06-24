@@ -18,7 +18,7 @@
   "dependencies": {
     "@astrojs/sitemap": "^3.7.3",
     "@astrojs/starlight": "^0.39.3",
-    "astro": "^6.4.4",
+    "astro": "^6.4.6",
     "sharp": "^0.34.0"
   },
   "engines": {
@@ -28,7 +28,7 @@
     "wrangler": "^4.98.0"
   },
   "overrides": {
-    "undici": "^7.24.0",
+    "undici": "^7.28.0",
     "ws": "^8.20.1",
     "esbuild": "^0.28.1"
   }
