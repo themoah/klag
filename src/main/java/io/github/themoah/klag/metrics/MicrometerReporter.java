@@ -6,8 +6,10 @@ import io.github.themoah.klag.model.CommitStaleness;
 import io.github.themoah.klag.model.ConsumerGroupState;
 import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.HotPartitionThroughput;
+import io.github.themoah.klag.model.ConsumerGroupOffsets.TopicPartitionKey;
 import io.github.themoah.klag.model.LagMs;
 import io.github.themoah.klag.model.LagVelocity;
+import io.github.themoah.klag.model.MemberAssignment;
 import io.github.themoah.klag.model.RetentionRisk;
 import io.github.themoah.klag.model.TimeToCloseEstimate;
 import io.micrometer.core.instrument.Gauge;
@@ -33,12 +35,18 @@ public class MicrometerReporter {
   private static final Logger log = LoggerFactory.getLogger(MicrometerReporter.class);
 
   private final MeterRegistry registry;
+  private final boolean memberLabelsEnabled;
   private final Map<String, AtomicLong> gaugeValues = new ConcurrentHashMap<>();
   private final Set<String> markedForDeletion = ConcurrentHashMap.newKeySet();
   private final ConsumerGroupStateTracker stateTracker = new ConsumerGroupStateTracker();
 
   public MicrometerReporter(MeterRegistry registry) {
+    this(registry, true);
+  }
+
+  public MicrometerReporter(MeterRegistry registry, boolean memberLabelsEnabled) {
     this.registry = registry;
+    this.memberLabelsEnabled = memberLabelsEnabled;
   }
 
   /**
@@ -48,6 +56,21 @@ public class MicrometerReporter {
    * @param activeKeys set to populate with active gauge keys (can be null)
    */
   public Future<Void> reportLag(List<ConsumerGroupLag> lagData, Set<String> activeKeys) {
+    return reportLag(lagData, Map.of(), activeKeys);
+  }
+
+  /**
+   * Reports lag metrics, optionally tagging consumer-owned series with member labels.
+   *
+   * @param lagData the lag data to report
+   * @param owners  per-group (topic,partition) -> owning member; ignored when member labels
+   *                are disabled. Partitions absent from the map get empty-string member labels.
+   * @param activeKeys set to populate with active gauge keys (can be null)
+   */
+  public Future<Void> reportLag(
+      List<ConsumerGroupLag> lagData,
+      Map<String, Map<TopicPartitionKey, MemberAssignment>> owners,
+      Set<String> activeKeys) {
     log.debug("Reporting lag metrics for {} consumer groups", lagData.size());
 
     for (ConsumerGroupLag group : lagData) {
@@ -58,6 +81,9 @@ public class MicrometerReporter {
       trackKey(activeKeys, recordGauge("klag.consumer.lag.max", groupTags, group.maxLag()));
       trackKey(activeKeys, recordGauge("klag.consumer.lag.min", groupTags, group.minLag()));
 
+      Map<TopicPartitionKey, MemberAssignment> groupOwners =
+        owners.getOrDefault(group.consumerGroup(), Map.of());
+
       // Per-partition metrics
       for (PartitionLag p : group.partitions()) {
         Tags partitionTags = Tags.of(
@@ -66,14 +92,30 @@ public class MicrometerReporter {
           "partition", String.valueOf(p.partition())
         );
 
-        trackKey(activeKeys, recordGauge("klag.consumer.lag", partitionTags, p.lag()));
+        // Member labels apply only to consumer-owned series (lag, committed offset) — the
+        // log_end/log_start offsets are partition-level and stay member-agnostic, matching
+        // kafka-lag-exporter's kafka_partition_* metrics.
+        Tags memberTags = memberLabelsEnabled
+          ? partitionTags.and(memberTags(groupOwners.get(new TopicPartitionKey(p.topic(), p.partition()))))
+          : partitionTags;
+
+        trackKey(activeKeys, recordGauge("klag.consumer.lag", memberTags, p.lag()));
         trackKey(activeKeys, recordGauge("klag.partition.log_end_offset", partitionTags, p.logEndOffset()));
         trackKey(activeKeys, recordGauge("klag.partition.log_start_offset", partitionTags, p.logStartOffset()));
-        trackKey(activeKeys, recordGauge("klag.consumer.committed_offset", partitionTags, p.committedOffset()));
+        trackKey(activeKeys, recordGauge("klag.consumer.committed_offset", memberTags, p.committedOffset()));
       }
     }
 
     return Future.succeededFuture();
+  }
+
+  private static Tags memberTags(MemberAssignment owner) {
+    MemberAssignment m = owner != null ? owner : MemberAssignment.UNASSIGNED;
+    return Tags.of(
+      "member_host", m.memberHost(),
+      "consumer_id", m.consumerId(),
+      "client_id", m.clientId()
+    );
   }
 
   private void trackKey(Set<String> activeKeys, String key) {
@@ -377,7 +419,11 @@ public class MicrometerReporter {
     }
   }
 
+  // Must match recordGauge's key exactly. Meter.Id#getTags() returns a List<Tag> whose
+  // toString() puts a space after each comma ("[tag(a=b), tag(c=d)]"), whereas Tags#toString()
+  // does not ("[tag(a=b),tag(c=d)]"). Wrapping in Tags.of() reproduces the recordGauge format,
+  // otherwise stale meters are dropped from gaugeValues but never removed from the registry.
   private String buildMeterKey(Meter meter) {
-    return meter.getId().getName() + meter.getId().getTags().toString();
+    return meter.getId().getName() + Tags.of(meter.getId().getTags()).toString();
   }
 }

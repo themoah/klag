@@ -1,6 +1,7 @@
 package io.github.themoah.klag;
 
 import io.github.themoah.klag.config.AppConfig;
+import io.github.themoah.klag.config.Env;
 import io.github.themoah.klag.health.HealthCheckHandler;
 import io.github.themoah.klag.health.KafkaHealthMonitor;
 import io.github.themoah.klag.health.VersionHandler;
@@ -155,7 +156,8 @@ public class MainVerticle extends AbstractVerticle {
     // Load hot partition config
     HotPartitionConfig hotPartitionConfig = HotPartitionConfig.fromEnvironment();
 
-    MicrometerReporter reporter = new MicrometerReporter(registry);
+    boolean memberLabelsEnabled = Env.getBool("CONSUMER_MEMBER_LABELS_ENABLED", true);
+    MicrometerReporter reporter = new MicrometerReporter(registry, memberLabelsEnabled);
     MetricsCollector collector = new MetricsCollector(
       vertx,
       kafkaClientService,

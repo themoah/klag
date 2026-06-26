@@ -41,6 +41,11 @@ if (cfToken) {
 export default defineConfig({
   site: SITE,
 
+  // Short links for the README and external references.
+  redirects: {
+    '/migration': '/getting-started/migrating-from-kafka-lag-exporter/',
+  },
+
   integrations: [
     starlight({
       title: 'Klag',
@@ -63,6 +68,7 @@ export default defineConfig({
             { label: 'Quick Start', slug: 'getting-started/quick-start' },
             { label: 'Installation', slug: 'getting-started/installation' },
             { label: 'Comparison', slug: 'getting-started/comparison' },
+            { label: 'Migrating from kafka-lag-exporter', slug: 'getting-started/migrating-from-kafka-lag-exporter' },
           ],
         },
         {

@@ -1,15 +1,31 @@
 package io.github.themoah.klag.model;
 
+import io.github.themoah.klag.model.ConsumerGroupOffsets.TopicPartitionKey;
+import java.util.Map;
+
 /**
  * Consumer group state information.
  *
  * @param groupId the consumer group ID
  * @param state the current state of the consumer group
+ * @param partitionOwners which member instance currently owns each partition; empty for
+ *                        Empty/Dead groups. Powers the per-instance member labels on lag metrics.
  */
 public record ConsumerGroupState(
   String groupId,
-  State state
+  State state,
+  Map<TopicPartitionKey, MemberAssignment> partitionOwners
 ) {
+
+  /** Defensively copies partitionOwners so the record stays immutable. */
+  public ConsumerGroupState {
+    partitionOwners = Map.copyOf(partitionOwners);
+  }
+
+  /** Backwards-compatible constructor for callers that don't track member ownership. */
+  public ConsumerGroupState(String groupId, State state) {
+    this(groupId, state, Map.of());
+  }
 
   /**
    * Enumeration of possible consumer group states.

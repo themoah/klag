@@ -3,6 +3,7 @@ package io.github.themoah.klag.kafka;
 import io.github.themoah.klag.model.ConsumerGroupOffsets;
 import io.github.themoah.klag.model.ConsumerGroupOffsets.TopicPartitionKey;
 import io.github.themoah.klag.model.ConsumerGroupState;
+import io.github.themoah.klag.model.MemberAssignment;
 import io.github.themoah.klag.model.PartitionInfo;
 import io.github.themoah.klag.model.PartitionOffsets;
 import io.vertx.core.Future;
@@ -335,13 +336,35 @@ public class KafkaClientServiceImpl implements KafkaClientService {
         descriptions.forEach((groupId, description) -> {
           ConsumerGroupState.State state = ConsumerGroupState.State
               .fromKafkaState(description.getState());
-          result.put(groupId, new ConsumerGroupState(groupId, state));
+          result.put(groupId, new ConsumerGroupState(groupId, state, partitionOwners(description)));
           log.debug("Consumer group {} state: {}", groupId, state);
         });
         log.info("Described {} consumer groups", result.size());
         return result;
       })
       .onFailure(err -> log.error("Failed to describe consumer groups", err));
+  }
+
+  // Flattens member assignments into a (topic, partition) -> owning member lookup.
+  // A partition can be owned by at most one member; Empty/Dead groups have no members
+  // and yield an empty map (callers emit empty-string member labels for those).
+  // Package-private for unit testing.
+  static Map<TopicPartitionKey, MemberAssignment> partitionOwners(
+      io.vertx.kafka.admin.ConsumerGroupDescription description) {
+    Map<TopicPartitionKey, MemberAssignment> owners = new HashMap<>();
+    if (description.getMembers() == null) {
+      return owners;
+    }
+    description.getMembers().forEach(member -> {
+      if (member.getAssignment() == null || member.getAssignment().getTopicPartitions() == null) {
+        return;
+      }
+      MemberAssignment owner = new MemberAssignment(
+        member.getHost(), member.getConsumerId(), member.getClientId());
+      member.getAssignment().getTopicPartitions().forEach(tp ->
+        owners.put(new TopicPartitionKey(tp.getTopic(), tp.getPartition()), owner));
+    });
+    return owners;
   }
 
   @Override

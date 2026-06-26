@@ -77,7 +77,7 @@ Any `Env`-backed variable resolves in order (first non-blank wins): env var `NAM
 
 **Kafka:** `KAFKA_BOOTSTRAP_SERVERS` (localhost:9092), `KAFKA_REQUEST_TIMEOUT_MS` (30000), `KAFKA_CHUNK_COUNT` (1), `KAFKA_CHUNK_DELAY_MS` (0). Any other `KAFKA_X_Y_Z` env var maps to `kafka.x.y.z` and is forwarded to the AdminClient. Config precedence: classpath `application.properties` < external file at `KLAG_CONFIG_FILE` < `KAFKA_*` env vars.
 
-**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false), `LAG_TREND_DEADBAND_MSG_PER_SEC` (1.0 — STABLE band for the MCP basic lag-trend classifier; |velocity| within the band is STABLE). A group is monitored iff it matches any include segment AND no exclude segment.
+**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false), `CONSUMER_MEMBER_LABELS_ENABLED` (true — tag `klag.consumer.lag` and `klag.consumer.committed_offset` with `member_host`/`consumer_id`/`client_id` for the owning consumer instance; kafka-lag-exporter parity. Empty-string values for unowned partitions; set `false` to drop the labels and cut cardinality), `LAG_TREND_DEADBAND_MSG_PER_SEC` (1.0 — STABLE band for the MCP basic lag-trend classifier; |velocity| within the band is STABLE). A group is monitored iff it matches any include segment AND no exclude segment.
 
 **Hot Partition Detection:**
 - `HOT_PARTITION_ENABLED` (true) - Enable/disable hot partition detection
@@ -179,6 +179,7 @@ Note: `klag.hot_partition` only has `topic` and `partition` tags (throughput is 
 Note: Time-based lag metrics only have `consumer_group` and `topic` tags (per-topic granularity)
 Note: DLP metrics only have `consumer_group` and `topic` tags (per-topic granularity)
 Note: Commit freshness metric only has `consumer_group` and `topic` tags (per-topic granularity)
+Note: when `CONSUMER_MEMBER_LABELS_ENABLED=true` (default), `klag.consumer.lag` (per-partition) and `klag.consumer.committed_offset` also carry `member_host`/`consumer_id`/`client_id` for the owning consumer instance (empty strings when unowned). Partition-level `klag.partition.log_*_offset` metrics stay member-agnostic. Members rotate on rebalance, so these series churn; the two-phase stale-gauge cleanup retires old owners within 1–2 intervals.
 Note: `klag.consumer.group.state` carries the state as a *tag*; on a state change the old-state series survives 1–2 collection intervals (two-phase stale-gauge cleanup), so both states export during that window. Key alerts on the most recent sample rather than series existence.
 
 ## Grafana Dashboard

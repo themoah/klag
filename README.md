@@ -7,6 +7,8 @@
 
 Inspired by [kafka-lag-exporter](https://github.com/seglo/kafka-lag-exporter) (archived 2024). Built with Vert.x and Micrometer.
 
+Migrating from kafka-lag-exporter? See the **[migration guide](https://klag.dev/migration)** (metric/label/config mapping + drop-in dashboard tips).
+
 > ### 📖 Documentation lives at **[klag.dev](https://klag.dev)**
 >
 > Full guides — configuration, Kafka ACLs, Helm/Strimzi deployment, integrations,

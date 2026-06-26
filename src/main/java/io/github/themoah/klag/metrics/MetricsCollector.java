@@ -25,6 +25,7 @@ import io.github.themoah.klag.model.HotPartitionLag;
 import io.github.themoah.klag.model.HotPartitionThroughput;
 import io.github.themoah.klag.model.LagMs;
 import io.github.themoah.klag.model.LagVelocity;
+import io.github.themoah.klag.model.MemberAssignment;
 import io.github.themoah.klag.model.MetricsSnapshot;
 import io.github.themoah.klag.model.MetricsSnapshot.GroupSnapshot;
 import io.github.themoah.klag.model.PartitionOffsets;
@@ -578,9 +579,12 @@ public class MetricsCollector {
       reporter.reportRetentionPercent(retentionRisks, activeKeys);
     }
 
-    // Report lag and state metrics
+    // Report lag and state metrics. Member ownership rides along on stateData (same
+    // describeConsumerGroups call) so consumer-owned lag series can carry member labels.
+    Map<String, Map<TopicPartitionKey, MemberAssignment>> partitionOwners = new HashMap<>();
+    stateData.forEach((group, s) -> partitionOwners.put(group, s.partitionOwners()));
     reporter.reportTopicPartitions(topicPartitions, activeKeys);
-    reporter.reportLag(lagData, activeKeys);
+    reporter.reportLag(lagData, partitionOwners, activeKeys);
     reporter.reportConsumerGroupStates(stateData, activeKeys);
 
     // Hot partition detection and reporting
