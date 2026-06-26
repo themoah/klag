@@ -5,6 +5,54 @@ entries:
       artifacthub.io/category: monitoring-logging
       artifacthub.io/changes: |
         - kind: added
+          description: Per-consumer-instance member labels (member_host, consumer_id, client_id) on consumer-owned lag metrics for kafka-lag-exporter parity; opt out with CONSUMER_MEMBER_LABELS_ENABLED=false
+        - kind: fixed
+          description: Stale gauges are now actually removed from the registry (key-format mismatch left old series lingering on /metrics)
+      artifacthub.io/images: |
+        - name: klag
+          image: themoah/klag:0.2.6
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: source
+          url: https://github.com/themoah/klag
+        - name: issues
+          url: https://github.com/themoah/klag/issues
+        - name: documentation
+          url: https://github.com/themoah/klag/blob/main/README.md
+      artifacthub.io/maintainers: |
+        - name: themoah
+          email: aviv@dozorets.com
+      artifacthub.io/prerelease: "false"
+    apiVersion: v2
+    appVersion: 0.2.6
+    created: "2026-06-26T18:13:14.35692026Z"
+    description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter
+      with pluggable metrics sinks.
+    digest: f2ae1673cafade88a25ef853d8491caf010ede2762c2df9832f39b2c01d963af
+    home: https://github.com/themoah/klag
+    icon: https://avatars.githubusercontent.com/themoah
+    keywords:
+    - kafka
+    - lag
+    - monitoring
+    - prometheus
+    - metrics
+    - consumer-groups
+    maintainers:
+    - email: aviv@dozorets.com
+      name: themoah
+      url: https://github.com/themoah
+    name: klag
+    sources:
+    - https://github.com/themoah/klag
+    type: application
+    urls:
+    - https://github.com/themoah/klag/releases/download/klag-0.3.4/klag-0.3.4.tgz
+    version: 0.3.4
+  - annotations:
+      artifacthub.io/category: monitoring-logging
+      artifacthub.io/changes: |
+        - kind: added
           description: Consumer commit freshness - klag.consumer.commit.staleness_seconds metric and MCP diagnose stuck-consumer flag (lag > 0 but committed offset frozen)
       artifacthub.io/images: |
         - name: klag
@@ -277,4 +325,4 @@ entries:
     urls:
     - https://github.com/themoah/klag/releases/download/klag-0.1.12/klag-0.1.12.tgz
     version: 0.1.12
-generated: "2026-06-23T16:15:48.714114875Z"
+generated: "2026-06-26T18:13:14.356946869Z"
