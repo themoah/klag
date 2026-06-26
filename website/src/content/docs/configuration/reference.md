@@ -42,6 +42,7 @@ For SASL/SSL, set `KAFKA_SECURITY_PROTOCOL`, `KAFKA_SASL_MECHANISM`, and
 | `METRICS_GROUP_FILTER` | `*` | Comma-separated glob include patterns. |
 | `METRICS_GROUP_EXCLUDE` | _(empty)_ | Comma-separated glob exclude patterns. |
 | `METRICS_JVM_ENABLED` | `false` | Export JVM metrics. |
+| `CONSUMER_MEMBER_LABELS_ENABLED` | `true` | Tag consumer-owned lag metrics with `member_host` / `consumer_id` / `client_id` (kafka-lag-exporter parity). Set `false` to drop them and reduce cardinality. |
 | `LAG_TREND_DEADBAND_MSG_PER_SEC` | `1.0` | STABLE band for the MCP lag-trend classifier. |
 
 A group is monitored **iff** it matches any include segment **and** no exclude segment.
