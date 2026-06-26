@@ -52,6 +52,8 @@ class MicrometerReporterMemberLabelsTest {
     // partition-level offsets are NOT member-tagged
     assertNull(registry.find("klag.partition.log_end_offset").tag("member_host", "10.0.0.1").gauge(),
       "log_end_offset must stay member-agnostic");
+    assertNull(registry.find("klag.partition.log_start_offset").tag("member_host", "10.0.0.1").gauge(),
+      "log_start_offset must stay member-agnostic");
   }
 
   @Test

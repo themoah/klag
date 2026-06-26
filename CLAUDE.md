@@ -179,7 +179,7 @@ Note: `klag.hot_partition` only has `topic` and `partition` tags (throughput is 
 Note: Time-based lag metrics only have `consumer_group` and `topic` tags (per-topic granularity)
 Note: DLP metrics only have `consumer_group` and `topic` tags (per-topic granularity)
 Note: Commit freshness metric only has `consumer_group` and `topic` tags (per-topic granularity)
-Note: when `CONSUMER_MEMBER_LABELS_ENABLED=true` (default), `klag.consumer.lag` (per-partition) and `klag.consumer.committed_offset` also carry `member_host`/`consumer_id`/`client_id` for the owning consumer instance (empty strings when unowned). Partition-level `klag.partition.log_*_offset` stay member-agnostic. Members rotate on rebalance, so these series churn; the two-phase stale-gauge cleanup retires old owners within 1–2 intervals.
+Note: when `CONSUMER_MEMBER_LABELS_ENABLED=true` (default), `klag.consumer.lag` (per-partition) and `klag.consumer.committed_offset` also carry `member_host`/`consumer_id`/`client_id` for the owning consumer instance (empty strings when unowned). Partition-level `klag.partition.log_*_offset` metrics stay member-agnostic. Members rotate on rebalance, so these series churn; the two-phase stale-gauge cleanup retires old owners within 1–2 intervals.
 Note: `klag.consumer.group.state` carries the state as a *tag*; on a state change the old-state series survives 1–2 collection intervals (two-phase stale-gauge cleanup), so both states export during that window. Key alerts on the most recent sample rather than series existence.
 
 ## Grafana Dashboard

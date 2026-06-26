@@ -17,6 +17,11 @@ public record ConsumerGroupState(
   Map<TopicPartitionKey, MemberAssignment> partitionOwners
 ) {
 
+  /** Defensively copies partitionOwners so the record stays immutable. */
+  public ConsumerGroupState {
+    partitionOwners = Map.copyOf(partitionOwners);
+  }
+
   /** Backwards-compatible constructor for callers that don't track member ownership. */
   public ConsumerGroupState(String groupId, State state) {
     this(groupId, state, Map.of());

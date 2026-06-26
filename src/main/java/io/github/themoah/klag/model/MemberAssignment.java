@@ -15,4 +15,12 @@ public record MemberAssignment(String memberHost, String consumerId, String clie
 
   /** Used for partitions with no current owner (Empty/Dead group): emits empty-string labels. */
   public static final MemberAssignment UNASSIGNED = new MemberAssignment("", "", "");
+
+  // Kafka may return null host/consumerId/clientId for some brokers/states; normalize to empty
+  // string so these flow straight into Micrometer Tags (which reject null values) without NPEing.
+  public MemberAssignment {
+    memberHost = memberHost == null ? "" : memberHost;
+    consumerId = consumerId == null ? "" : consumerId;
+    clientId = clientId == null ? "" : clientId;
+  }
 }
