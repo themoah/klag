@@ -4,6 +4,64 @@ entries:
   - annotations:
       artifacthub.io/category: monitoring-logging
       artifacthub.io/changes: |
+        - kind: changed
+          description: Enable Java 21 virtual threads by default (app.useVirtualThreads=true); set false for event-loop deployment
+        - kind: fixed
+          description: Keep JVM alive when virtual threads are enabled (KlagLauncher blocks until shutdown)
+        - kind: added
+          description: Per-partition breakdown of klag.consumer.lag.ms and klag.consumer.lag.retention_percent (topic-level aggregate kept as the partition-less series; select it with {partition=""}, drill down with {partition!=""})
+        - kind: changed
+          description: klag.consumer.lag.sum/.max/.min now carry a topic label (per consumer_group+topic); the group total is recoverable via sum by(consumer_group)(klag_consumer_lag_sum)
+        - kind: added
+          description: ISR (in-sync replica) monitoring - klag.partition.under_replicated flags partitions with fewer in-sync replicas than configured; surfaced in the diagnose MCP tool; opt out with ISR_ENABLED=false
+        - kind: added
+          description: Per-consumer-instance member labels (member_host, consumer_id, client_id) on consumer-owned lag metrics for kafka-lag-exporter parity; opt out with CONSUMER_MEMBER_LABELS_ENABLED=false
+        - kind: fixed
+          description: Stale gauges are now actually removed from the registry (key-format mismatch left old series lingering on /metrics)
+      artifacthub.io/images: |
+        - name: klag
+          image: themoah/klag:0.2.9
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: source
+          url: https://github.com/themoah/klag
+        - name: issues
+          url: https://github.com/themoah/klag/issues
+        - name: documentation
+          url: https://github.com/themoah/klag/blob/main/README.md
+      artifacthub.io/maintainers: |
+        - name: themoah
+          email: aviv@dozorets.com
+      artifacthub.io/prerelease: "false"
+    apiVersion: v2
+    appVersion: 0.2.9
+    created: "2026-07-10T12:02:23.469099632Z"
+    description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter
+      with pluggable metrics sinks.
+    digest: 86622f6ac26ee7240fc33e09db0d8eb57a9c6cf36930cb5f02aeaecd0d150ea0
+    home: https://github.com/themoah/klag
+    icon: https://avatars.githubusercontent.com/themoah
+    keywords:
+    - kafka
+    - lag
+    - monitoring
+    - prometheus
+    - metrics
+    - consumer-groups
+    maintainers:
+    - email: aviv@dozorets.com
+      name: themoah
+      url: https://github.com/themoah
+    name: klag
+    sources:
+    - https://github.com/themoah/klag
+    type: application
+    urls:
+    - https://github.com/themoah/klag/releases/download/klag-0.3.5/klag-0.3.5.tgz
+    version: 0.3.5
+  - annotations:
+      artifacthub.io/category: monitoring-logging
+      artifacthub.io/changes: |
         - kind: added
           description: Per-consumer-instance member labels (member_host, consumer_id, client_id) on consumer-owned lag metrics for kafka-lag-exporter parity; opt out with CONSUMER_MEMBER_LABELS_ENABLED=false
         - kind: fixed
@@ -325,4 +383,4 @@ entries:
     urls:
     - https://github.com/themoah/klag/releases/download/klag-0.1.12/klag-0.1.12.tgz
     version: 0.1.12
-generated: "2026-06-26T18:13:14.356946869Z"
+generated: "2026-07-10T12:02:23.46913071Z"
