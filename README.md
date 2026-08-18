@@ -125,10 +125,13 @@ most common:
 |----------|---------|-------------|
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka broker addresses |
 | `HTTP_PORT` | `8888` | HTTP server port (health, metrics, MCP) |
-| `METRICS_REPORTER` | `none` | `prometheus`, `datadog`, or `otlp` |
+| `METRICS_REPORTER` | `none` | `prometheus`, `datadog`, `otlp`, `statsd`, `dogstatsd` |
 | `METRICS_INTERVAL_MS` | `60000` | How often to collect metrics |
 | `METRICS_GROUP_FILTER` | `*` | Comma-separated glob patterns. A group is included if it matches any segment (e.g. `ingest*,categorize*`). |
 | `METRICS_GROUP_EXCLUDE` | _(empty)_ | Comma-separated glob patterns to exclude even if included by the filter (e.g. `debug-*,canary-*,*-shadow`). |
+| `STATSD_HOST` | `localhost` | StatsD/DogStatsD server host |
+| `STATSD_PORT` | `8125` | StatsD/DogStatsD server port |
+| `STATSD_FLAVOR` | `TELEGRAF` | `ETSY`, `TELEGRAF`, `SYSDIG`, `DATADOG` |
 
 Any variable can also be set as a JVM system property — `-DNAME` or its dotted-lowercase
 form `-Dname.dotted` (e.g. `HTTP_PORT` → `-Dhttp.port=8881`) — useful when running the jar

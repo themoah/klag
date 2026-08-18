@@ -54,6 +54,7 @@ dependencies {
   implementation("io.micrometer:micrometer-registry-datadog:$micrometerVersion")
   implementation("io.micrometer:micrometer-registry-prometheus:$micrometerVersion")
   implementation("io.micrometer:micrometer-registry-otlp:$micrometerVersion")
+  implementation("io.micrometer:micrometer-registry-statsd:$micrometerVersion")
 
   // Force patched transitive versions.
   constraints {

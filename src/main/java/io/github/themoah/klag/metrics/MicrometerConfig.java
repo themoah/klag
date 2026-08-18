@@ -13,6 +13,9 @@ import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import io.micrometer.registry.otlp.AggregationTemporality;
 import io.micrometer.registry.otlp.OtlpConfig;
 import io.micrometer.registry.otlp.OtlpMeterRegistry;
+import io.micrometer.statsd.StatsdConfig;
+import io.micrometer.statsd.StatsdFlavor;
+import io.micrometer.statsd.StatsdMeterRegistry;
 import java.time.Duration;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -208,6 +211,49 @@ public final class MicrometerConfig {
   }
 
   /**
+   * 
+   * Creates a StatsD/DogStatsD meter registry configured from environment variables.
+   * 
+   * 
+   */
+  public static MeterRegistry createStatsdRegistry(){
+    log.info("Creating StatsD");
+
+    io.micrometer.statsd.StatsdConfig config = new io.micrometer.statsd.StatsdConfig() {
+      @Override
+      public String host() {
+        return System.getenv().getOrDefault("STATSD_HOST", "localhost");
+      }
+
+      @Override
+      public int port() {
+        String port = System.getenv("STATSD_PORT");
+        return (port != null && !port.isBlank()) ? Integer.parseInt(port) : 8125;
+      }
+
+      @Override
+      public io.micrometer.statsd.StatsdFlavor flavor() {
+        String flavor = System.getenv("STATSD_FLAVOR");
+        if (flavor != null && !flavor.isBlank()) {
+          try {
+            return io.micrometer.statsd.StatsdFlavor.valueOf(flavor.toUpperCase());
+          } catch (IllegalArgumentException e) {
+            log.warn("Invalid STATSD_FLAVOR '{}', defaulting to TELEGRAF", flavor);
+          }
+        }
+        return io.micrometer.statsd.StatsdFlavor.TELEGRAF;
+      }
+
+      @Override
+      public String get(String key) {
+        return null;
+      }
+    };
+
+    return new io.micrometer.statsd.StatsdMeterRegistry(config, Clock.SYSTEM);
+  }
+
+  /**
    * Creates a meter registry based on the reporter type.
    *
    * @param reporterType the type of reporter ("datadog", "prometheus", etc.)
@@ -222,6 +268,7 @@ public final class MicrometerConfig {
       case "datadog" -> createDatadogRegistry();
       case "prometheus" -> createPrometheusRegistry();
       case "otlp" -> createOtlpRegistry();
+      case "statsd", "dogstatsd" -> createStatsdRegistry();
       default -> {
         log.warn("Unknown reporter type: {}", reporterType);
         yield null;

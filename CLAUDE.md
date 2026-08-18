@@ -102,7 +102,7 @@ Any `Env`-backed variable resolves in order (first non-blank wins): env var `NAM
 
 **Kafka:** `KAFKA_BOOTSTRAP_SERVERS` (localhost:9092), `KAFKA_REQUEST_TIMEOUT_MS` (30000), `KAFKA_CHUNK_COUNT` (1 — chunking is *off*; only values >1 enable it), `KAFKA_CHUNK_DELAY_MS` (0), `KAFKA_MAX_CONCURRENT_GROUPS` (50 — caps how many consumer-group offset requests are in flight at once; a concurrency bound, not a throttle, so it applies regardless of chunking). Any other `KAFKA_X_Y_Z` env var maps to `kafka.x.y.z` and is forwarded to the AdminClient. Config precedence: classpath `application.properties` < external file at `KLAG_CONFIG_FILE` < `KAFKA_*` env vars.
 
-**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false), `CONSUMER_MEMBER_LABELS_ENABLED` (true — tag per-partition `klag.consumer.lag`, `klag.consumer.lag.ms`, and `klag.consumer.committed_offset` with `member_host`/`consumer_id`/`client_id` for the owning consumer instance; kafka-lag-exporter parity. Empty-string values for unowned partitions; set `false` to drop the labels and cut cardinality), `LAG_TREND_DEADBAND_MSG_PER_SEC` (1.0 — STABLE band for the MCP basic lag-trend classifier; |velocity| within the band is STABLE). A group is monitored iff it matches any include segment AND no exclude segment.
+**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp/**statsd/dogstatsd**), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false), `CONSUMER_MEMBER_LABELS_ENABLED` (true — tag per-partition `klag.consumer.lag`, `klag.consumer.lag.ms`, and `klag.consumer.committed_offset` with `member_host`/`consumer_id`/`client_id` for the owning consumer instance; kafka-lag-exporter parity. Empty-string values for unowned partitions; set `false` to drop the labels and cut cardinality), `LAG_TREND_DEADBAND_MSG_PER_SEC` (1.0 — STABLE band for the MCP basic lag-trend classifier; |velocity| within the band is STABLE). A group is monitored iff it matches any include segment AND no exclude segment.
 
 **Hot Partition Detection:**
 - `HOT_PARTITION_ENABLED` (true) - Enable/disable hot partition detection
@@ -179,6 +179,28 @@ METRICS_REPORTER=otlp
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 OTEL_SERVICE_NAME=klag-dev
 OTEL_RESOURCE_ATTRIBUTES=environment=development,cluster=local
+```
+
+**StatsD/DogStatsD Configuration (when METRICS_REPORTER=statsd or dogstatsd):**
+
+- `STATSD_HOST` (default: `localhost`) - StatsD/DogStatsD server host
+- `STATSD_PORT` (default: `8125`) - StatsD/DogStatsD server port
+- `STATSD_FLAVOR` (default: `TELEGRAF`) - Protocol dialect: `ETSY`, `TELEGRAF`, `SYSDIG`, `DATADOG`
+
+*Example for Telegraf StatsD:*
+```bash
+METRICS_REPORTER=statsd
+STATSD_HOST=localhost
+STATSD_PORT=8125
+STATSD_FLAVOR=TELEGRAF
+```
+
+*Example for Datadog DogStatsD:*
+```bash
+METRICS_REPORTER=dogstatsd
+STATSD_HOST=localhost
+STATSD_PORT=8125
+STATSD_FLAVOR=DATADOG
 ```
 
 ## Metrics Exposed
