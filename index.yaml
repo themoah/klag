@@ -4,6 +4,85 @@ entries:
   - annotations:
       artifacthub.io/category: monitoring-logging
       artifacthub.io/changes: |
+        - kind: added
+          description: Expose serviceMonitor.metricRelabelings and serviceMonitor.relabelings so Prometheus Operator can rewrite labels without a second ServiceMonitor or a chart fork
+        - kind: security
+          description: Upgrade Micrometer to 1.16.6 (CVE-2026-40984 in micrometer-core; the 1.12 line is EOL and unpatched), which moves the Prometheus registry onto the Prometheus Java client 1.x and drops the EOL io.prometheus:simpleclient jars; scraped metric names, labels and values are unchanged
+        - kind: changed
+          description: Drop the unused vertx-micrometer-metrics dependency
+        - kind: fixed
+          description: A topic deleted while a group still has committed offsets for it no longer keeps every cycle partial (which froze stale-series cleanup for up to offsets.retention.minutes); such topics are filtered out and their series retired
+        - kind: fixed
+          description: The MCP snapshot now refreshes on a partial cycle instead of freezing at the last complete one, so one failing consumer group no longer leaves AI agents reading stale data while /metrics stays current
+        - kind: added
+          description: KIP-848 consumer-protocol group states (assigning, reconciling) are reported as their own state tag values instead of collapsing to unknown; rebalance alerts should match all four rebalance states
+        - kind: changed
+          description: Batch topic offset lookups into one describeTopics + three listOffsets per cycle (per chunk when KAFKA_CHUNK_COUNT > 1) instead of four admin requests per topic, cutting broker load and cycle time on clusters with many topics
+        - kind: added
+          description: KAFKA_MAX_CONCURRENT_GROUPS (default 50) bounds how many consumer-group offset requests are in flight at once
+        - kind: fixed
+          description: Leaderless (offline) partitions no longer throw while reading topic metadata, which previously dropped the whole topic from a collection cycle
+        - kind: changed
+          description: Enable Java 21 virtual threads by default (app.useVirtualThreads=true); set false for event-loop deployment
+        - kind: fixed
+          description: Keep JVM alive when virtual threads are enabled (KlagLauncher blocks until shutdown)
+        - kind: added
+          description: Per-partition breakdown of klag.consumer.lag.ms and klag.consumer.lag.retention_percent (topic-level aggregate kept as the partition-less series; select it with {partition=""}, drill down with {partition!=""})
+        - kind: changed
+          description: klag.consumer.lag.sum/.max/.min now carry a topic label (per consumer_group+topic); the group total is recoverable via sum by(consumer_group)(klag_consumer_lag_sum)
+        - kind: added
+          description: ISR (in-sync replica) monitoring - klag.partition.under_replicated flags partitions with fewer in-sync replicas than configured; surfaced in the diagnose MCP tool; opt out with ISR_ENABLED=false
+        - kind: added
+          description: Per-consumer-instance member labels (member_host, consumer_id, client_id) on consumer-owned lag metrics for kafka-lag-exporter parity; opt out with CONSUMER_MEMBER_LABELS_ENABLED=false
+        - kind: fixed
+          description: Stale gauges are now actually removed from the registry (key-format mismatch left old series lingering on /metrics)
+        - kind: fixed
+          description: Klag no longer exits (and crash-loops) when Kafka is unreachable during the first metrics collection; the first cycle now degrades like the health monitor
+        - kind: fixed
+          description: Topic names containing ':' no longer break every collection cycle (hot-partition throughput detection parsed the topic out of its internal key)
+        - kind: fixed
+          description: A cycle that observes no consumer groups now runs the full cycle-end cleanup and refreshes the MCP snapshot instead of leaving stale tracker history and a frozen snapshot
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: source
+          url: https://github.com/themoah/klag
+        - name: issues
+          url: https://github.com/themoah/klag/issues
+        - name: documentation
+          url: https://github.com/themoah/klag/blob/main/README.md
+      artifacthub.io/maintainers: |
+        - name: themoah
+          email: aviv@dozorets.com
+      artifacthub.io/prerelease: "false"
+    apiVersion: v2
+    appVersion: 0.2.14
+    created: "2026-08-30T11:44:19.036851975Z"
+    description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter
+      with pluggable metrics sinks.
+    digest: c0c00562880b4e798904d76cefb27e1aa93f38054407b35467db0f15cfab67fa
+    home: https://github.com/themoah/klag
+    icon: https://avatars.githubusercontent.com/themoah
+    keywords:
+    - kafka
+    - lag
+    - monitoring
+    - prometheus
+    - metrics
+    - consumer-groups
+    maintainers:
+    - email: aviv@dozorets.com
+      name: themoah
+      url: https://github.com/themoah
+    name: klag
+    sources:
+    - https://github.com/themoah/klag
+    type: application
+    urls:
+    - https://github.com/themoah/klag/releases/download/klag-0.3.10/klag-0.3.10.tgz
+    version: 0.3.10
+  - annotations:
+      artifacthub.io/category: monitoring-logging
+      artifacthub.io/changes: |
         - kind: security
           description: Upgrade Micrometer to 1.16.6 (CVE-2026-40984 in micrometer-core; the 1.12 line is EOL and unpatched), which moves the Prometheus registry onto the Prometheus Java client 1.x and drops the EOL io.prometheus:simpleclient jars; scraped metric names, labels and values are unchanged
         - kind: changed
@@ -551,4 +630,4 @@ entries:
     urls:
     - https://github.com/themoah/klag/releases/download/klag-0.1.12/klag-0.1.12.tgz
     version: 0.1.12
-generated: "2026-08-12T12:05:31.957495299Z"
+generated: "2026-08-30T11:44:19.036896801Z"
