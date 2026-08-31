@@ -5,6 +5,61 @@ entries:
       artifacthub.io/category: monitoring-logging
       artifacthub.io/changes: |
         - kind: added
+          description: Opt-in topic data-skew metric (klag.topic.size_skew = max/mean retained size × 100); enable with DATA_SKEW_ENABLED=true
+        - kind: added
+          description: OTLP exporter can trust extra CA certificates for an HTTPS collector served with an internally-signed cert; set metrics.otlp.caCertPath (env OTLP_CA_CERT_PATH / OTEL_EXPORTER_OTLP_CERTIFICATE) to a PEM bundle mounted with matching extraVolumes and extraVolumeMounts. Trust is additive over the JVM defaults and scoped to the OTLP exporter
+        - kind: added
+          description: Expose serviceMonitor.metricRelabelings and serviceMonitor.relabelings so Prometheus Operator can rewrite labels without a second ServiceMonitor or a chart fork
+        - kind: security
+          description: Upgrade Micrometer to 1.16.6 (CVE-2026-40984 in micrometer-core; the 1.12 line is EOL and unpatched), which moves the Prometheus registry onto the Prometheus Java client 1.x and drops the EOL io.prometheus:simpleclient jars; scraped metric names, labels and values are unchanged
+        - kind: changed
+          description: Drop the unused vertx-micrometer-metrics dependency
+        - kind: fixed
+          description: A topic deleted while a group still has committed offsets for it no longer keeps every cycle partial (which froze stale-series cleanup for up to offsets.retention.minutes); such topics are filtered out and their series retired
+        - kind: fixed
+          description: The MCP snapshot now refreshes on a partial cycle instead of freezing at the last complete one, so one failing consumer group no longer leaves AI agents reading stale data while /metrics stays current
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: source
+          url: https://github.com/themoah/klag
+        - name: issues
+          url: https://github.com/themoah/klag/issues
+        - name: documentation
+          url: https://github.com/themoah/klag/blob/main/README.md
+      artifacthub.io/maintainers: |
+        - name: themoah
+          email: aviv@dozorets.com
+      artifacthub.io/prerelease: "false"
+    apiVersion: v2
+    appVersion: 0.2.15
+    created: "2026-08-31T19:11:46.505124333Z"
+    description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter
+      with pluggable metrics sinks.
+    digest: 7598d8a56f0f79e6a7e8887f9e0f185d26da600c863ff656d9a3568ccaa268b7
+    home: https://github.com/themoah/klag
+    icon: https://avatars.githubusercontent.com/themoah
+    keywords:
+    - kafka
+    - lag
+    - monitoring
+    - prometheus
+    - metrics
+    - consumer-groups
+    maintainers:
+    - email: aviv@dozorets.com
+      name: themoah
+      url: https://github.com/themoah
+    name: klag
+    sources:
+    - https://github.com/themoah/klag
+    type: application
+    urls:
+    - https://github.com/themoah/klag/releases/download/klag-0.3.12/klag-0.3.12.tgz
+    version: 0.3.12
+  - annotations:
+      artifacthub.io/category: monitoring-logging
+      artifacthub.io/changes: |
+        - kind: added
           description: OTLP exporter can trust extra CA certificates for an HTTPS collector served with an internally-signed cert; set metrics.otlp.caCertPath (env OTLP_CA_CERT_PATH / OTEL_EXPORTER_OTLP_CERTIFICATE) to a PEM bundle mounted with matching extraVolumes and extraVolumeMounts. Trust is additive over the JVM defaults and scoped to the OTLP exporter
         - kind: added
           description: Expose serviceMonitor.metricRelabelings and serviceMonitor.relabelings so Prometheus Operator can rewrite labels without a second ServiceMonitor or a chart fork
@@ -683,4 +738,4 @@ entries:
     urls:
     - https://github.com/themoah/klag/releases/download/klag-0.1.12/klag-0.1.12.tgz
     version: 0.1.12
-generated: "2026-08-30T15:28:21.222647475Z"
+generated: "2026-08-31T19:11:46.505212824Z"
