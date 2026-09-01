@@ -37,6 +37,7 @@ public class MainVerticle extends AbstractVerticle {
   private static final Logger log = LoggerFactory.getLogger(MainVerticle.class);
 
   private KafkaClientService kafkaClientService;
+  private KafkaClientService healthKafkaClientService;
   private KafkaHealthMonitor healthMonitor;
   private MetricsCollector metricsCollector;
   private HttpServer httpServer;
@@ -51,7 +52,9 @@ public class MainVerticle extends AbstractVerticle {
     KafkaClientConfig kafkaConfig = KafkaClientConfig.load();
 
     kafkaClientService = new KafkaClientServiceImpl(vertx, kafkaConfig);
-    healthMonitor = new KafkaHealthMonitor(vertx, kafkaClientService, appConfig.healthCheckIntervalMs());
+    // Separate AdminClient so collection traffic cannot block describeCluster for /readyz.
+    healthKafkaClientService = new KafkaClientServiceImpl(vertx, kafkaConfig);
+    healthMonitor = new KafkaHealthMonitor(vertx, healthKafkaClientService, appConfig.healthCheckIntervalMs());
 
     Router router = Router.router(vertx);
     HealthCheckHandler healthHandler = new HealthCheckHandler(healthMonitor);
@@ -73,11 +76,15 @@ public class MainVerticle extends AbstractVerticle {
         .end("{\"error\": \"Not Found\"}");
     });
 
-    healthMonitor.start()
-      .compose(v -> startMetricsCollector())
-      .compose(v -> startHttpServer(router, appConfig.httpPort()))
-      .onSuccess(server -> {
+    // Bind HTTP first so /healthz is reachable during slow first collection (#75).
+    // /readyz stays DOWN until KafkaHealthMonitor reports UP.
+    startHttpServer(router, appConfig.httpPort())
+      .compose(server -> {
         httpServer = server;
+        return healthMonitor.start();
+      })
+      .compose(v -> startMetricsCollector())
+      .onSuccess(v -> {
         log.info("Klag started successfully on port {}", appConfig.httpPort());
         startPromise.complete();
       })
@@ -107,10 +114,15 @@ public class MainVerticle extends AbstractVerticle {
       ? kafkaClientService.close()
       : Future.succeededFuture();
 
+    Future<Void> closeHealthKafkaClient = (healthKafkaClientService != null)
+      ? healthKafkaClientService.close()
+      : Future.succeededFuture();
+
     stopHealthMonitor
       .compose(v -> stopMetricsCollector)
       .compose(v -> stopHttpServer)
       .compose(v -> closeKafkaClient)
+      .compose(v -> closeHealthKafkaClient)
       .onSuccess(v -> {
         log.info("Klag stopped successfully");
         stopPromise.complete();

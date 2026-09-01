@@ -222,12 +222,11 @@ public class MetricsCollector {
     log.info("Starting metrics collector with interval: {}ms, filter: {}, exclude: {}",
       intervalMs, groupFilter.includeDescription(), groupFilter.excludeDescription());
 
-    // The first cycle is recovered: a broker that is down at boot must degrade (like
-    // KafkaHealthMonitor) instead of failing verticle startup, which exits the process
-    // and crash-loops under Kubernetes. collectAndReport already logs the cause.
+    // Start the periodic timer immediately and run the first cycle in the background so
+    // HTTP (/healthz) can come up without waiting on a slow first scrape (#75).
+    // A broker that is down at boot still degrades: collectAndReport logs and recovers.
     return reporter.start()
-      .compose(v -> collectAndReport().recover(err -> Future.succeededFuture()))
-      .onComplete(ar -> {
+      .onSuccess(v -> {
         timerId = vertx.setPeriodic(intervalMs, id -> {
           if (collectionInFlight) {
             log.warn("Skipping collection tick: previous cycle still running "
@@ -237,6 +236,9 @@ public class MetricsCollector {
           collectAndReport();
         });
         log.info("Metrics collector started, timer ID: {}", timerId);
+        collectAndReport().onFailure(err ->
+          log.warn("Initial metrics collection failed (will retry on timer): {}", err.getMessage())
+        );
       })
       .mapEmpty();
   }

@@ -24,6 +24,9 @@ public class KafkaHealthMonitor {
 
   private Long timerId;
 
+  // Skip overlapping describeCluster calls during slow collection/network.
+  private boolean healthCheckInFlight;
+
   public KafkaHealthMonitor(Vertx vertx, KafkaClientService kafkaClient) {
     this(vertx, kafkaClient, DEFAULT_HEARTBEAT_INTERVAL_MS);
   }
@@ -88,6 +91,11 @@ public class KafkaHealthMonitor {
    * Performs a health check by describing cluster (lightweight metadata operation).
    */
   private Future<Void> performHealthCheck() {
+    if (healthCheckInFlight) {
+      log.debug("Skipping Kafka health check: previous check still running");
+      return Future.succeededFuture();
+    }
+    healthCheckInFlight = true;
     log.debug("Performing Kafka health check");
 
     return kafkaClient.describeCluster()
@@ -107,6 +115,7 @@ public class KafkaHealthMonitor {
           log.debug("Kafka health check failed: {}", err.getMessage());
         }
       })
+      .onComplete(ar -> healthCheckInFlight = false)
       .mapEmpty();
   }
 }
