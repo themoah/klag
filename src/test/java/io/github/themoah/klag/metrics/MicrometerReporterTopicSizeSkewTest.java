@@ -16,8 +16,10 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies the topic size-skew gauge: value is max/mean × 100, tags are topic only
- * (no consumer_group or partition), and two-phase stale-gauge cleanup retires deleted topics.
+ * Verifies the topic size-skew gauge: value is max/mean × 100, tags are topic
+ * (no consumer_group or partition; unnamed reporters omit cluster_name), and
+ * two-phase stale-gauge cleanup retires deleted topics. Named clusters add
+ * cluster_name via {@link MicrometerReporterClusterNameTest}.
  */
 class MicrometerReporterTopicSizeSkewTest {
 

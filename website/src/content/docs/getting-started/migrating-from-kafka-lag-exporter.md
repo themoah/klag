@@ -39,7 +39,7 @@ The biggest change is the group label name:
 
 | kafka-lag-exporter | Klag |
 |---|---|
-| `cluster_name` | No built-in equivalent; add a Prometheus target or external label if needed. |
+| `cluster_name` | `cluster_name` when `KAFKA_CLUSTER_NAME` or `KAFKA_CLUSTERS[].name` is set; otherwise omit (or add a Prometheus external label). |
 | `group` | `consumer_group` |
 | `topic` | `topic` |
 | `partition` | `partition` |
@@ -99,7 +99,9 @@ at `KLAG_CONFIG_FILE`, then environment variables. See the
 
 | kafka-lag-exporter (`application.conf`) | Klag |
 |---|---|
-| `kafka-lag-exporter.clusters[].bootstrap-brokers` | `KAFKA_BOOTSTRAP_SERVERS` |
+| `kafka-lag-exporter.clusters[]` | `KAFKA_CLUSTERS` JSON array (`name`, `bootstrapServers`, optional `groupFilter` / `properties`) |
+| `kafka-lag-exporter.clusters[].bootstrap-brokers` (single cluster) | `KAFKA_BOOTSTRAP_SERVERS` |
+| `kafka-lag-exporter.clusters[].name` (single cluster) | `KAFKA_CLUSTER_NAME` |
 | `kafka-lag-exporter.poll-interval` | `METRICS_INTERVAL_MS` |
 | `kafka-lag-exporter.client-group-id` / consumer props | `KAFKA_*` (mapped to `kafka.*` AdminClient props) |
 | group whitelist (`group-whitelist`) | `METRICS_GROUP_FILTER` (comma-separated globs) |

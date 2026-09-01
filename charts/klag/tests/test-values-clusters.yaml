@@ -1,0 +1,10 @@
+# Two Kafka clusters in one Klag process.
+# clusterName must be ignored when clusters is set (no KAFKA_CLUSTER_NAME env).
+kafka:
+  clusterName: should-be-ignored
+  clusters:
+    - name: msk-a
+      bootstrapServers: "a.example.com:9092"
+    - name: msk-b
+      bootstrapServers: "b.example.com:9092"
+      groupFilter: "app-*"

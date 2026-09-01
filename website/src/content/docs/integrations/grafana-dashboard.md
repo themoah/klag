@@ -41,7 +41,10 @@ Pick either path:
   advance its committed offset.
 - **Data Loss Prevention**: retention-risk and at-risk topics panels.
 - **JVM panels**: memory, GC pause, threads, CPU, allocation rate, loaded classes.
-- **Template variables**: filter by consumer group and topic; auto-refresh every minute.
+- **Template variables**: filter by Kafka `cluster_name`, consumer group, and topic;
+  auto-refresh every minute. The Cluster variable is populated from series that
+  carry `cluster_name` (`KAFKA_CLUSTER_NAME` or `kafka.clusters[].name`). JVM
+  panels are process-wide and are not filtered by cluster.
 
 ## Requirements
 

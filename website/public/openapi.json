@@ -55,23 +55,36 @@
         "tags": ["health"],
         "operationId": "getReadiness",
         "summary": "Readiness probe",
-        "description": "Returns 200 when the Kafka AdminClient connection is healthy, 503 when it is not. The check runs every `KAFKA_HEALTH_CHECK_INTERVAL_MS` (default 30000).",
+        "description": "Returns 200 when any configured Kafka cluster is up, 503 when every cluster is down. One unreachable cluster does not fail readiness. The JSON body keeps a top-level `kafka` field (`connected` when any cluster is up) and a `clusters` array with per-cluster `kafka` status and `name` when the cluster is named. Each cluster's check runs every `KAFKA_HEALTH_CHECK_INTERVAL_MS` (default 30000).",
         "responses": {
           "200": {
-            "description": "Kafka is reachable.",
+            "description": "At least one configured Kafka cluster is reachable.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/HealthResponse" },
-                "example": { "status": "UP", "kafka": "connected" }
+                "example": {
+                  "status": "UP",
+                  "kafka": "connected",
+                  "clusters": [
+                    { "name": "msk-a", "kafka": "connected" },
+                    { "name": "msk-b", "kafka": "disconnected" }
+                  ]
+                }
               }
             }
           },
           "503": {
-            "description": "Kafka is unreachable; the instance is not ready to serve metrics.",
+            "description": "Every configured Kafka cluster is unreachable; the instance is not ready to serve metrics.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/HealthResponse" },
-                "example": { "status": "DOWN", "kafka": "disconnected" }
+                "example": {
+                  "status": "DOWN",
+                  "kafka": "disconnected",
+                  "clusters": [
+                    { "name": "msk-a", "kafka": "disconnected" }
+                  ]
+                }
               }
             }
           }
@@ -221,12 +234,26 @@
     "schemas": {
       "HealthResponse": {
         "type": "object",
-        "description": "Health check result. `kafka` is present on readiness responses only.",
+        "description": "Health check result. `kafka` and `clusters` are present on readiness responses only. Top-level `kafka` is connected when any cluster is connected.",
         "properties": {
           "status": { "type": "string", "enum": ["UP", "DOWN"], "description": "Overall status." },
-          "kafka": { "type": "string", "enum": ["connected", "disconnected"], "description": "Kafka AdminClient connection state." }
+          "kafka": { "type": "string", "enum": ["connected", "disconnected"], "description": "Connected when any configured cluster is up." },
+          "clusters": {
+            "type": "array",
+            "description": "Per-cluster Kafka status. `name` is omitted when the cluster is unnamed.",
+            "items": { "$ref": "#/components/schemas/ClusterHealth" }
+          }
         },
         "required": ["status"],
+        "additionalProperties": false
+      },
+      "ClusterHealth": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Configured cluster name (`cluster_name`); omitted when unnamed." },
+          "kafka": { "type": "string", "enum": ["connected", "disconnected"] }
+        },
+        "required": ["kafka"],
         "additionalProperties": false
       },
       "VersionResponse": {

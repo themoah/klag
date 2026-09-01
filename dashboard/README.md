@@ -15,7 +15,7 @@ Consumer lag counts how far a consumer group trails the latest produced offset. 
 - **Time-based lag** in milliseconds plus estimated time to catch up
 - **Data Loss Prevention** shows % of retention consumed and at-risk topics
 - **JVM metrics**: heap, GC pause, threads, CPU
-- Template variables filter by consumer group and topic
+- Template variables filter by Kafka cluster (`cluster_name`), consumer group, and topic
 
 ## Requirements
 

@@ -49,7 +49,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_consumer_lag_sum{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
+                      "expr": "klag_consumer_lag_sum{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
                       "legendFormat": "{{consumer_group}}",
                       "range": true
                     },
@@ -168,7 +168,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "max(klag_consumer_lag_sum{consumer_group=~\"$consumer_group\", topic=~\"$topic\"})",
+                      "expr": "max(klag_consumer_lag_sum{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"})",
                       "legendFormat": "Max Lag",
                       "range": true
                     },
@@ -255,7 +255,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "count(count by (consumer_group) (klag_consumer_lag_sum{consumer_group=~\"$consumer_group\"}))",
+                      "expr": "count(count by (cluster_name, consumer_group) (klag_consumer_lag_sum{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\"}))",
                       "legendFormat": "Groups",
                       "range": true
                     },
@@ -334,7 +334,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "count(count by (topic) (klag_consumer_lag{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}))",
+                      "expr": "count(count by (cluster_name, topic) (klag_consumer_lag{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"}))",
                       "legendFormat": "Topics",
                       "range": true
                     },
@@ -417,7 +417,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "sum(klag_topic_partitions{topic=~\"$topic\"})",
+                      "expr": "sum(klag_topic_partitions{cluster_name=~\"$cluster_name\", topic=~\"$topic\"})",
                       "legendFormat": "Partitions",
                       "range": true
                     },
@@ -496,7 +496,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_consumer_lag_velocity{consumer_group=~\"$consumer_group\"}",
+                      "expr": "klag_consumer_lag_velocity{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\"}",
                       "legendFormat": "{{consumer_group}}",
                       "range": true
                     },
@@ -610,7 +610,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_consumer_group_state{consumer_group=~\"$consumer_group\"}",
+                      "expr": "klag_consumer_group_state{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\"}",
                       "legendFormat": "__auto",
                       "instant": true,
                       "format": "table"
@@ -820,7 +820,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_consumer_group_state{consumer_group=~\"$consumer_group\"} > 0",
+                      "expr": "klag_consumer_group_state{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\"} > 0",
                       "legendFormat": "{{consumer_group}} ({{state}})",
                       "range": true
                     },
@@ -938,7 +938,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_consumer_lag_sum{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
+                      "expr": "klag_consumer_lag_sum{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
                       "legendFormat": "{{consumer_group}}",
                       "range": true
                     },
@@ -1026,7 +1026,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "topk(10, klag_consumer_lag{consumer_group=~\"$consumer_group\", topic=~\"$topic\"})",
+                      "expr": "topk(10, klag_consumer_lag{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"})",
                       "legendFormat": "{{consumer_group}} - {{topic}} [{{partition}}]",
                       "range": true
                     },
@@ -1135,7 +1135,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "max(klag_consumer_lag_ms{consumer_group=~\"$consumer_group\", topic=~\"$topic\", partition=\"\"})",
+                      "expr": "max(klag_consumer_lag_ms{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\", partition=\"\"})",
                       "legendFormat": "Max Time Lag",
                       "range": true
                     },
@@ -1222,7 +1222,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "count(klag_consumer_lag_time_to_close_seconds{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}) or vector(0)",
+                      "expr": "count(klag_consumer_lag_time_to_close_seconds{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"}) or vector(0)",
                       "legendFormat": "Catching Up",
                       "range": true
                     },
@@ -1301,7 +1301,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_consumer_lag_ms{consumer_group=~\"$consumer_group\", topic=~\"$topic\", partition=\"\"}",
+                      "expr": "klag_consumer_lag_ms{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\", partition=\"\"}",
                       "legendFormat": "{{consumer_group}} - {{topic}}",
                       "range": true
                     },
@@ -1419,7 +1419,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_consumer_lag_time_to_close_seconds{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
+                      "expr": "klag_consumer_lag_time_to_close_seconds{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
                       "legendFormat": "{{consumer_group}} - {{topic}}",
                       "range": true
                     },
@@ -1528,7 +1528,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "max(klag_consumer_lag_retention_percent{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}) / 100",
+                      "expr": "max(klag_consumer_lag_retention_percent{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"}) / 100",
                       "legendFormat": "Max Retention Risk",
                       "range": true
                     },
@@ -1619,7 +1619,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "count(klag_consumer_lag_retention_percent{consumer_group=~\"$consumer_group\", topic=~\"$topic\", partition=\"\"} > 5000) or vector(0)",
+                      "expr": "count(klag_consumer_lag_retention_percent{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\", partition=\"\"} > 5000) or vector(0)",
                       "legendFormat": "At Risk",
                       "range": true
                     },
@@ -1706,7 +1706,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_consumer_lag_retention_percent{consumer_group=~\"$consumer_group\", topic=~\"$topic\", partition=\"\"} / 100",
+                      "expr": "klag_consumer_lag_retention_percent{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\", partition=\"\"} / 100",
                       "legendFormat": "{{consumer_group}} - {{topic}}",
                       "range": true
                     },
@@ -1824,7 +1824,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_consumer_lag_retention_percent{consumer_group=~\"$consumer_group\", topic=~\"$topic\", partition=\"\"} / 100 > 50",
+                      "expr": "klag_consumer_lag_retention_percent{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\", partition=\"\"} / 100 > 50",
                       "legendFormat": "__auto",
                       "instant": true,
                       "format": "table"
@@ -1970,7 +1970,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "count(klag_hot_partition_lag{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}) or vector(0)",
+                      "expr": "count(klag_hot_partition_lag{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"}) or vector(0)",
                       "legendFormat": "Hot Partitions",
                       "range": true
                     },
@@ -2057,7 +2057,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "count(klag_hot_partition{topic=~\"$topic\"}) or vector(0)",
+                      "expr": "count(klag_hot_partition{cluster_name=~\"$cluster_name\", topic=~\"$topic\"}) or vector(0)",
                       "legendFormat": "Hot Partitions",
                       "range": true
                     },
@@ -2144,7 +2144,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_hot_partition_lag{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
+                      "expr": "klag_hot_partition_lag{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
                       "legendFormat": "__auto",
                       "instant": true,
                       "format": "table"
@@ -2284,7 +2284,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_hot_partition_lag{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
+                      "expr": "klag_hot_partition_lag{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
                       "legendFormat": "{{consumer_group}} - {{topic}} [{{partition}}]",
                       "range": true
                     },
@@ -2402,7 +2402,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_hot_partition{topic=~\"$topic\"} / 100",
+                      "expr": "klag_hot_partition{cluster_name=~\"$cluster_name\", topic=~\"$topic\"} / 100",
                       "legendFormat": "{{topic}} [{{partition}}]",
                       "range": true
                     },
@@ -2512,7 +2512,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_topic_partitions{topic=~\"$topic\"}",
+                      "expr": "klag_topic_partitions{cluster_name=~\"$cluster_name\", topic=~\"$topic\"}",
                       "legendFormat": "{{topic}}",
                       "range": true
                     },
@@ -2618,7 +2618,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "sum by (topic) (rate(klag_partition_log_end_offset{topic=~\"$topic\"}[5m]))",
+                      "expr": "sum by (cluster_name, topic) (rate(klag_partition_log_end_offset{cluster_name=~\"$cluster_name\", topic=~\"$topic\"}[5m]))",
                       "legendFormat": "{{topic}}",
                       "range": true
                     },
@@ -2728,7 +2728,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "topk(10, klag_partition_log_end_offset{topic=~\"$topic\"} - on(consumer_group, topic, partition) klag_consumer_committed_offset{consumer_group=~\"$consumer_group\"})",
+                      "expr": "topk(10, klag_partition_log_end_offset{cluster_name=~\"$cluster_name\", topic=~\"$topic\"} - on(cluster_name, consumer_group, topic, partition) klag_consumer_committed_offset{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\"})",
                       "legendFormat": "{{consumer_group}} - {{topic}} [{{partition}}]",
                       "range": true
                     },
@@ -3672,7 +3672,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_consumer_commit_staleness_seconds{consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
+                      "expr": "klag_consumer_commit_staleness_seconds{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\", topic=~\"$topic\"}",
                       "legendFormat": "{{consumer_group}} - {{topic}}",
                       "range": true
                     },
@@ -3787,7 +3787,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "count(klag_partition_under_replicated{topic=~\"$topic\"}) or vector(0)",
+                      "expr": "count(klag_partition_under_replicated{cluster_name=~\"$cluster_name\", topic=~\"$topic\"}) or vector(0)",
                       "legendFormat": "Under-Replicated Partitions",
                       "range": true
                     },
@@ -3874,7 +3874,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_partition_under_replicated{topic=~\"$topic\"}",
+                      "expr": "klag_partition_under_replicated{cluster_name=~\"$cluster_name\", topic=~\"$topic\"}",
                       "legendFormat": "__auto",
                       "instant": true,
                       "format": "table"
@@ -4012,7 +4012,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_partition_under_replicated{topic=~\"$topic\"}",
+                      "expr": "klag_partition_under_replicated{cluster_name=~\"$cluster_name\", topic=~\"$topic\"}",
                       "legendFormat": "{{topic}} [{{partition}}]",
                       "range": true
                     },
@@ -4130,7 +4130,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "max(klag_topic_size_skew{topic=~\"$topic\"}) / 100 or vector(0)",
+                      "expr": "max(klag_topic_size_skew{cluster_name=~\"$cluster_name\", topic=~\"$topic\"}) / 100 or vector(0)",
                       "legendFormat": "Max size skew",
                       "range": true
                     },
@@ -4217,7 +4217,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_topic_size_skew{topic=~\"$topic\"} / 100",
+                      "expr": "klag_topic_size_skew{cluster_name=~\"$cluster_name\", topic=~\"$topic\"} / 100",
                       "legendFormat": "__auto",
                       "instant": true,
                       "format": "table"
@@ -4354,7 +4354,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "klag_topic_size_skew{topic=~\"$topic\"} / 100",
+                      "expr": "klag_topic_size_skew{cluster_name=~\"$cluster_name\", topic=~\"$topic\"} / 100",
                       "legendFormat": "{{topic}}",
                       "range": true
                     },
@@ -4472,7 +4472,7 @@
                     "kind": "DataQuery",
                     "spec": {
                       "editorMode": "code",
-                      "expr": "max by (topic, partition) (klag_partition_log_end_offset{topic=~\"$topic\"} - klag_partition_log_start_offset{topic=~\"$topic\"})",
+                      "expr": "max by (cluster_name, topic, partition) (klag_partition_log_end_offset{cluster_name=~\"$cluster_name\", topic=~\"$topic\"} - klag_partition_log_start_offset{cluster_name=~\"$cluster_name\", topic=~\"$topic\"})",
                       "legendFormat": "{{topic}} [{{partition}}]",
                       "range": true
                     },
@@ -5288,12 +5288,12 @@
           "text": "All",
           "value": "$__all"
         },
-        "definition": "label_values(klag_consumer_lag_sum, consumer_group)",
+        "definition": "label_values(klag_consumer_lag_sum, cluster_name)",
         "hide": "dontHide",
         "includeAll": true,
-        "label": "Consumer Group",
+        "label": "Cluster",
         "multi": true,
-        "name": "consumer_group",
+        "name": "cluster_name",
         "options": [],
         "query": {
           "datasource": {
@@ -5302,7 +5302,7 @@
           "group": "prometheus",
           "kind": "DataQuery",
           "spec": {
-            "query": "label_values(klag_consumer_lag_sum, consumer_group)",
+            "query": "label_values(klag_consumer_lag_sum, cluster_name)",
             "refId": "PrometheusVariableQueryEditor-VariableQuery"
           },
           "version": "v0"
@@ -5323,7 +5323,42 @@
           "text": "All",
           "value": "$__all"
         },
-        "definition": "label_values(klag_consumer_lag, topic)",
+        "definition": "label_values(klag_consumer_lag_sum{cluster_name=~\"$cluster_name\"}, consumer_group)",
+        "hide": "dontHide",
+        "includeAll": true,
+        "label": "Consumer Group",
+        "multi": true,
+        "name": "consumer_group",
+        "options": [],
+        "query": {
+          "datasource": {
+            "name": "${datasource}"
+          },
+          "group": "prometheus",
+          "kind": "DataQuery",
+          "spec": {
+            "query": "label_values(klag_consumer_lag_sum{cluster_name=~\"$cluster_name\"}, consumer_group)",
+            "refId": "PrometheusVariableQueryEditor-VariableQuery"
+          },
+          "version": "v0"
+        },
+        "refresh": "onTimeRangeChanged",
+        "regex": "",
+        "regexApplyTo": "value",
+        "skipUrlSync": false,
+        "sort": "alphabeticalAsc"
+      }
+    },
+    {
+      "kind": "QueryVariable",
+      "spec": {
+        "allValue": ".*",
+        "allowCustomValue": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "definition": "label_values(klag_consumer_lag{cluster_name=~\"$cluster_name\"}, topic)",
         "hide": "dontHide",
         "includeAll": true,
         "label": "Topic",
@@ -5337,7 +5372,7 @@
           "group": "prometheus",
           "kind": "DataQuery",
           "spec": {
-            "query": "label_values(klag_consumer_lag, topic)",
+            "query": "label_values(klag_consumer_lag{cluster_name=~\"$cluster_name\"}, topic)",
             "refId": "PrometheusVariableQueryEditor-VariableQuery"
           },
           "version": "v0"

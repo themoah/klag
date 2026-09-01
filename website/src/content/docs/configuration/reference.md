@@ -19,6 +19,7 @@ resolve in this order: environment variable `NAME` → `-DNAME` → dotted
 `-Dname.dotted` (for example, `HTTP_PORT` → `-Dhttp.port=8881`). They are:
 
 - `HTTP_PORT`, `KAFKA_HEALTH_CHECK_INTERVAL_MS`
+- `KAFKA_CLUSTER_NAME`, `KAFKA_CLUSTERS`
 - `KAFKA_CHUNK_COUNT`, `KAFKA_CHUNK_DELAY_MS`
 - `METRICS_REPORTER`, `METRICS_INTERVAL_MS`, `METRICS_GROUP_FILTER`,
   `METRICS_GROUP_EXCLUDE`, `METRICS_JVM_ENABLED`,
@@ -46,7 +47,9 @@ resolve exact-name JVM properties such as
 
 | Variable | Default | Description |
 |---|---|---|
-| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Broker addresses. |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Broker addresses for the default (single) cluster. |
+| `KAFKA_CLUSTER_NAME` | _(unset)_ | Optional `cluster_name` tag on Kafka series. Ignored when `KAFKA_CLUSTERS` is set. |
+| `KAFKA_CLUSTERS` | _(unset)_ | JSON array of clusters scraped in one process. Each object: `name`, `bootstrapServers`, optional `requestTimeoutMs`, `groupFilter`, `groupExclude`, `properties`. SASL/SSL from `KAFKA_*` still apply as defaults. Helm: do not put credentials in `properties` (plaintext Deployment env); use `kafka.existingSecret` for shared creds. Distinct per-cluster credentials are not supported. Not forwarded to the AdminClient. |
 | `KAFKA_REQUEST_TIMEOUT_MS` | `30000` | Request timeout. |
 | `KAFKA_CHUNK_COUNT` | `1` | Split offset requests into N batches. |
 | `KAFKA_CHUNK_DELAY_MS` | `0` | Delay (ms) between batches. |
@@ -54,7 +57,8 @@ resolve exact-name JVM properties such as
 Any `KAFKA_X_Y_Z` environment variable is mapped to `kafka.x.y.z` and forwarded to the
 Kafka AdminClient. For example, `KAFKA_SECURITY_PROTOCOL` becomes
 `kafka.security.protocol`. This generic forwarding is environment-only; in a properties
-file, use the `kafka.*` key directly.
+file, use the `kafka.*` key directly. `KAFKA_CLUSTERS` and `KAFKA_CLUSTER_NAME` are Klag
+process settings and are not forwarded as AdminClient properties.
 
 For SASL/SSL, common settings include `KAFKA_SECURITY_PROTOCOL`,
 `KAFKA_SASL_MECHANISM`, and `KAFKA_SASL_JAAS_CONFIG`. See

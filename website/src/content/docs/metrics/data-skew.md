@@ -19,7 +19,8 @@ Opt-in. Nothing is emitted until `DATA_SKEW_ENABLED=true`.
 |---|---|
 | `klag.topic.size_skew` | `max(retained) / mean(retained)` × 100, where `retained = max(0, logEndOffset − logStartOffset)`. |
 
-`klag.topic.size_skew` has only a `topic` tag. **100** means even; **200** means the
+`klag.topic.size_skew` is tagged with `topic`, plus `cluster_name` when the cluster is
+named. **100** means even; **200** means the
 fullest partition holds twice the average. Grafana panels divide by 100 so you read
 the ratio directly.
 

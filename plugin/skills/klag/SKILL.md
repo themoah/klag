@@ -36,7 +36,18 @@ Every setting is an env var. Resolution order, first non-blank wins:
 
 Any `KAFKA_X_Y_Z` env var is lowercased and mapped to the AdminClient property
 `kafka.x.y.z`, so the whole Kafka client surface is reachable without first-class support
-(`KAFKA_SASL_JAAS_CONFIG` → `sasl.jaas.config`). File config layers under env vars:
+(`KAFKA_SASL_JAAS_CONFIG` → `sasl.jaas.config`). Exceptions: `KAFKA_CLUSTERS` and
+`KAFKA_CLUSTER_NAME` are process settings, not AdminClient keys.
+
+`KAFKA_CLUSTERS` is a JSON array of clusters scraped in **one process** (`name` +
+`bootstrapServers` required; unique names). Helm: `kafka.clusters`. Do not run N
+Deployments for that. Kafka series carry `cluster_name`. `KAFKA_CLUSTER_NAME` tags a
+singleton and is ignored when `KAFKA_CLUSTERS` is set. Process `KAFKA_*` SASL/SSL are
+shared defaults (Helm: `kafka.existingSecret`). Do not put secrets in per-cluster
+`properties`. MCP still sees the first cluster only.
+`/readyz` is 200 if **any** cluster is up.
+
+File config layers under env vars:
 classpath `application.properties` < `KLAG_CONFIG_FILE` < `KAFKA_*` env vars.
 
 Full list: `https://klag.dev/configuration/reference/`.
@@ -46,7 +57,7 @@ Full list: `https://klag.dev/configuration/reference/`.
 | Path | Use |
 |---|---|
 | `/healthz` | liveness, always 200 |
-| `/readyz` | 200 when Kafka is reachable, 503 when not |
+| `/readyz` | 200 when any configured Kafka cluster is up, 503 when all are down |
 | `/metrics` | Prometheus scrape (when `METRICS_REPORTER=prometheus`) |
 | `/version` | build info |
 | `/mcp` | MCP for AI agents, when `MCP_ENABLED=true` |

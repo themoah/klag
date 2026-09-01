@@ -24,7 +24,7 @@ no group remains after filtering. The collector starts one cycle immediately; ve
 and some derived metrics still need more samples.
 
 If Kafka is unreachable at startup, Klag **stays running (degraded)** instead of
-exiting — `/readyz` returns `503` until connectivity is restored and a cycle succeeds.
+exiting — `/readyz` returns `503` until at least one cluster is connected.
 This is intentional: the process tolerates a broker outage at boot like the health
 monitor, so a transient Kafka blip does not crash-loop the pod.
 
@@ -35,9 +35,11 @@ cluster is large, allow longer than `METRICS_INTERVAL_MS`.
 
 ## `/readyz` returns 503
 
-**Likely cause:** Klag's Kafka health check cannot complete `describeCluster`. Common
-causes are an unreachable broker, bad TLS/SASL settings, or missing cluster
-`DESCRIBE`.
+**Likely cause:** Every configured Kafka health check cannot complete
+`describeCluster`. Common causes are an unreachable broker, bad TLS/SASL settings,
+or missing cluster `DESCRIBE`. With several clusters, HTTP 200 means at least one
+is up; inspect `clusters[]` in the `/readyz` JSON to see which names are
+`disconnected`.
 
 **Fix:** Test network and DNS access from the Klag container, then compare your Kafka
 security variables with [Installation](/getting-started/installation/). Grant the

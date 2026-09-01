@@ -55,6 +55,21 @@ service:
 
 # Kafka connection configuration
 kafka:
+  # Optional cluster_name tag on every Kafka series. Empty omits the label.
+  # Ignored when kafka.clusters is set (use each entry's name instead).
+  clusterName: ""
+  # Multiple clusters in one process. When non-empty, the chart
+  # sets KAFKA_CLUSTERS to this list as JSON. Each entry needs a unique name.
+  # Shared SASL/SSL below apply to every cluster (kafka.existingSecret /
+  # saslJaasConfig). Distinct per-cluster credentials are not supported.
+  # Do not put sasl.jaas.config, ssl.*.password, or other secrets in
+  # clusters[].properties — Helm renders that list as plaintext KAFKA_CLUSTERS.
+  # clusters:
+  #   - name: msk-a
+  #     bootstrapServers: "b-1.a.amazonaws.com:9092"
+  #   - name: msk-b
+  #     bootstrapServers: "b-1.b.amazonaws.com:9092"
+  clusters: []
   # Kafka bootstrap servers (comma-separated list)
   bootstrapServers: "localhost:9092"
   # Admin client request timeout in milliseconds

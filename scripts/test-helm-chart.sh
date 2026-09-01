@@ -90,6 +90,7 @@ run_test "SASL authentication" "${TESTS_DIR}/test-values-sasl.yaml"
 run_test "OTLP reporter" "${TESTS_DIR}/test-values-otlp.yaml"
 run_test "Datadog reporter" "${TESTS_DIR}/test-values-datadog.yaml"
 run_test "Existing secrets" "${TESTS_DIR}/test-values-existing-secret.yaml"
+run_test "Multi-cluster Kafka" "${TESTS_DIR}/test-values-clusters.yaml"
 
 # Test with various --set overrides
 run_test "Custom replica count" "" "--set replicaCount=3"
@@ -109,6 +110,12 @@ validate_output "Service uses port 8888" "" "port: 8888"
 validate_output "Liveness probe on /healthz" "" "path: /healthz"
 validate_output "Readiness probe on /readyz" "" "path: /readyz"
 validate_output "KAFKA_BOOTSTRAP_SERVERS env var" "${TESTS_DIR}/test-values.yaml" "KAFKA_BOOTSTRAP_SERVERS"
+
+# Multi-cluster Kafka
+validate_output "KAFKA_CLUSTERS env var" "${TESTS_DIR}/test-values-clusters.yaml" "KAFKA_CLUSTERS"
+validate_output "cluster names in KAFKA_CLUSTERS" "${TESTS_DIR}/test-values-clusters.yaml" "msk-a"
+validate_not_present "No KAFKA_CLUSTER_NAME when clusters is set" "${TESTS_DIR}/test-values-clusters.yaml" "KAFKA_CLUSTER_NAME"
+validate_not_present "No KAFKA_CLUSTERS by default" "" "KAFKA_CLUSTERS"
 validate_output "METRICS_REPORTER env var" "${TESTS_DIR}/test-values.yaml" "METRICS_REPORTER"
 
 # SASL config validation

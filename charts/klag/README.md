@@ -124,6 +124,8 @@ cheaper — Klag never builds the series.
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `kafka.bootstrapServers` | Kafka bootstrap servers (comma-separated) | `localhost:9092` |
+| `kafka.clusterName` | Optional `cluster_name` metric tag for a single cluster | `""` |
+| `kafka.clusters` | List of `{name, bootstrapServers, ...}` scraped in one process; sets `KAFKA_CLUSTERS`. Shared creds via `existingSecret`; do not put secrets in `clusters[].properties`. Distinct per-cluster credentials are not supported | `[]` |
 | `kafka.requestTimeoutMs` | Admin client request timeout | `30000` |
 | `kafka.securityProtocol` | Security protocol (PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL) | `""` |
 | `kafka.saslMechanism` | SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512) | `""` |
@@ -134,7 +136,9 @@ cheaper — Klag never builds the series.
 | `kafka.secretKeys.jaasConfig` | Key in secret for JAAS config | `jaas-config` |
 | `kafka.secretKeys.truststorePassword` | Key in secret for the truststore password | `truststore-password` |
 
-Any other `KAFKA_*` env var set on the pod is automatically picked up by klag and mapped to the equivalent Kafka client property (e.g. `KAFKA_SSL_TRUSTSTORE_PASSWORD` → `ssl.truststore.password`).
+Any other `KAFKA_*` env var set on the pod is automatically picked up by klag and mapped to the equivalent Kafka client property (e.g. `KAFKA_SSL_TRUSTSTORE_PASSWORD` → `ssl.truststore.password`). `KAFKA_CLUSTERS` and `KAFKA_CLUSTER_NAME` are process settings and are not forwarded to the AdminClient.
+
+ServiceMonitor `relabelings` (Prometheus target labels) apply to the whole scrape. They cannot distinguish two Kafka clusters scraped by one pod; use `kafka.clusters[].name` so series carry `cluster_name`.
 
 Set `KLAG_CONFIG_FILE` to the path of an external `application.properties` (typically mounted from a ConfigMap or Secret via `extraVolumes` / `extraVolumeMounts`) to layer file-based config between the classpath defaults and `KAFKA_*` env vars. Precedence: classpath `application.properties` < `KLAG_CONFIG_FILE` < `KAFKA_*` env vars.
 
@@ -261,7 +265,7 @@ annotation, so credential changes roll the Deployment automatically.
 | Endpoint | Description |
 |----------|-------------|
 | `/healthz` | Liveness probe - always returns 200 if running |
-| `/readyz` | Readiness probe - returns 200 if Kafka connected, 503 otherwise |
+| `/readyz` | Readiness probe - 200 if any Kafka cluster is connected, 503 if all are down. JSON: top-level `kafka` plus `clusters[]` |
 | `/metrics` | Prometheus metrics endpoint (when `metrics.reporter=prometheus`) |
 
 ## Metrics Exposed

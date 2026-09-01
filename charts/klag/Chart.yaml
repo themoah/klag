@@ -2,7 +2,7 @@ apiVersion: v2
 name: klag
 description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter with pluggable metrics sinks.
 type: application
-version: 0.3.12
+version: 0.3.13
 appVersion: "0.2.15"
 home: https://github.com/themoah/klag
 icon: https://avatars.githubusercontent.com/themoah
@@ -34,6 +34,8 @@ annotations:
     - name: themoah
       email: aviv@dozorets.com
   artifacthub.io/changes: |
+    - kind: added
+      description: One process can scrape several Kafka clusters via kafka.clusters (KAFKA_CLUSTERS); Kafka series carry cluster_name so PromQL can split them when instance/pod labels are dropped
     - kind: added
       description: Opt-in topic data-skew metric (klag.topic.size_skew = max/mean retained size × 100); enable with DATA_SKEW_ENABLED=true
     - kind: added

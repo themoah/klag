@@ -51,7 +51,7 @@ src/main/java/io/github/themoah/klag/
 ├── MainVerticle.java          # Entry point, HTTP router, lifecycle
 ├── config/AppConfig.java      # HTTP_PORT, KAFKA_HEALTH_CHECK_INTERVAL_MS
 ├── health/                    # KafkaHealthMonitor, HealthCheckHandler, HealthStatus, VersionHandler
-├── kafka/                     # KafkaClientService[Impl], KafkaClientConfig
+├── kafka/                     # KafkaClientService[Impl], KafkaClientConfig, KafkaClusters, KafkaClusterSpec
 ├── metrics/                   # MetricsCollector, MicrometerReporter, PrometheusHandler
 │   ├── velocity/              # LagVelocityTracker, TopicLagHistory
 │   ├── hotpartition/          # HotPartitionDetector, HotPartitionConfig, StatisticalUtils
@@ -127,7 +127,7 @@ of all of it.
 | Endpoint | Purpose |
 |----------|---------|
 | `/healthz` | Liveness probe (always 200) |
-| `/readyz` | Readiness probe (200 if Kafka UP, 503 if DOWN) |
+| `/readyz` | Readiness probe (200 if any configured Kafka cluster is UP, 503 if all are DOWN) |
 | `/metrics` | Prometheus scrape endpoint (if enabled) |
 | `/version` | Build information |
 | `/mcp` | MCP endpoint for AI agents (JSON-RPC over POST; if `MCP_ENABLED=true`) |
@@ -138,7 +138,7 @@ of all of it.
 
 Any `Env`-backed variable resolves in order (first non-blank wins): env var `NAME` → JVM property `-DNAME` → dotted `-Dname.dotted` (e.g. `HTTP_PORT` → `-Dhttp.port`). This lets jar/native users configure via `-D`; env keeps precedence. See `config/Env.java#resolve`.
 
-**Kafka:** `KAFKA_BOOTSTRAP_SERVERS` (localhost:9092), `KAFKA_REQUEST_TIMEOUT_MS` (30000), `KAFKA_CHUNK_COUNT` (1 — chunking is *off*; only values >1 enable it), `KAFKA_CHUNK_DELAY_MS` (0), `KAFKA_MAX_CONCURRENT_GROUPS` (50 — caps how many consumer-group offset requests are in flight at once; a concurrency bound, not a throttle, so it applies regardless of chunking). Any other `KAFKA_X_Y_Z` env var maps to `kafka.x.y.z` and is forwarded to the AdminClient. Config precedence: classpath `application.properties` < external file at `KLAG_CONFIG_FILE` < `KAFKA_*` env vars.
+**Kafka:** `KAFKA_BOOTSTRAP_SERVERS` (localhost:9092), `KAFKA_REQUEST_TIMEOUT_MS` (30000), `KAFKA_CHUNK_COUNT` (1 — chunking is *off*; only values >1 enable it), `KAFKA_CHUNK_DELAY_MS` (0), `KAFKA_MAX_CONCURRENT_GROUPS` (50 — caps how many consumer-group offset requests are in flight at once; a concurrency bound, not a throttle, so it applies regardless of chunking). `KAFKA_CLUSTER_NAME` optionally tags Kafka series with `cluster_name` for a single cluster. `KAFKA_CLUSTERS` is a JSON array of `{name, bootstrapServers, ...}` scraped in one process (unique non-blank `name` per entry); when set, `KAFKA_CLUSTER_NAME` is ignored. `KAFKA_CLUSTERS` and `KAFKA_CLUSTER_NAME` are process settings and are **not** forwarded to the AdminClient. Any other `KAFKA_X_Y_Z` env var maps to `kafka.x.y.z` and is forwarded to the AdminClient. Config precedence: classpath `application.properties` < external file at `KLAG_CONFIG_FILE` < `KAFKA_*` env vars. Shared SASL/SSL from process `KAFKA_*` apply as defaults, then each cluster overlay. One Micrometer registry; Kafka series get `cluster_name` on the reporter, not as registry `commonTags`. MCP snapshot is the first cluster only.
 
 **Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false), `CONSUMER_MEMBER_LABELS_ENABLED` (true — tag per-partition `klag.consumer.lag`, `klag.consumer.lag.ms`, and `klag.consumer.committed_offset` with `member_host`/`consumer_id`/`client_id` for the owning consumer instance; kafka-lag-exporter parity. Empty-string values for unowned partitions; set `false` to drop the labels and cut cardinality), `LAG_TREND_DEADBAND_MSG_PER_SEC` (1.0 — STABLE band for the MCP basic lag-trend classifier; |velocity| within the band is STABLE). Every setting in this list is `Env`-backed and accepts both exact-name and dotted JVM properties, including `-DMETRICS_REPORTER=prometheus` and `-Dmetrics.reporter=prometheus`. A group is monitored iff it matches any include segment AND no exclude segment.
 
@@ -252,11 +252,11 @@ OTEL_RESOURCE_ATTRIBUTES=environment=development,cluster=local
 - `klag.partition.under_replicated` - Count of missing in-sync replicas (`replicaCount - inSyncReplicaCount`) for a partition currently under-replicated. Detects fault-tolerance loss (isr.size() < replicas.size()); does not compare against `min.insync.replicas`.
 
 **Topic data skew (opt-in — only when `DATA_SKEW_ENABLED=true`):**
-- `klag.topic.size_skew` - `max(retained) / mean(retained)` × 100 per topic, where `retained = max(0, logEndOffset − logStartOffset)`. 100 = even; 200 = fullest partition holds 2× the average. Tags: `topic` only. Topics with fewer than `DATA_SKEW_MIN_PARTITIONS` partitions are skipped; all-empty topics score 100. Complementary to hot partitions (produce-rate outliers vs stored-size imbalance). MCP `diagnose` warns at ratio ≥ 2.0.
+- `klag.topic.size_skew` - `max(retained) / mean(retained)` × 100 per topic, where `retained = max(0, logEndOffset − logStartOffset)`. 100 = even; 200 = fullest partition holds 2× the average. Tags: `topic`, plus `cluster_name` when the cluster is named. Topics with fewer than `DATA_SKEW_MIN_PARTITIONS` partitions are skipped; all-empty topics score 100. Complementary to hot partitions (produce-rate outliers vs stored-size imbalance). MCP `diagnose` warns at ratio ≥ 2.0.
 
 Note: `klag.hot_partition` only has `topic` and `partition` tags (throughput is partition-level, independent of consumers)
 Note: `klag.partition.under_replicated` only has `topic` and `partition` tags (ISR status is partition-level, independent of consumers)
-Note: `klag.topic.size_skew` only has a `topic` tag (retained-size skew is topic-level, independent of consumers). Gauge is stored ×100; Grafana divides by 100.
+Note: `klag.topic.size_skew` has a `topic` tag (retained-size skew is topic-level, independent of consumers) and `cluster_name` when the cluster is named. Gauge is stored ×100; Grafana divides by 100.
 Note: `klag.consumer.lag.time_to_close_seconds` has only `consumer_group` and `topic` tags (per-topic granularity, trend metric)
 Note: `klag.consumer.lag.ms` and `klag.consumer.lag.retention_percent` have `consumer_group`+`topic` for the aggregate series and additionally `partition` for the per-partition series (aggregate = topic-level max, no `partition` tag; select rollups with `{partition=""}`, per-partition with `{partition!=""}`). Per-partition `klag.consumer.lag.ms` also has member labels when enabled.
 Note: Commit freshness metric only has `consumer_group` and `topic` tags (per-topic granularity)

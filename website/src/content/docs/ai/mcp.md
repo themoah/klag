@@ -26,7 +26,8 @@ touches the collection flow.
 | `MCP_PATH` | `/mcp` | HTTP path of the endpoint. |
 
 MCP requires `METRICS_REPORTER` to be set. The snapshot is only populated when metrics
-collection runs.
+collection runs. When more than one Kafka cluster is configured, the snapshot is the
+**first** cluster only.
 
 ## Transport
 

@@ -3,6 +3,7 @@ package io.github.themoah.klag.health;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,10 +15,14 @@ public class HealthCheckHandler {
   private static final Logger log = LoggerFactory.getLogger(HealthCheckHandler.class);
   private static final String CONTENT_TYPE_JSON = "application/json";
 
-  private final KafkaHealthMonitor healthMonitor;
+  private final List<KafkaHealthMonitor> healthMonitors;
 
   public HealthCheckHandler(KafkaHealthMonitor healthMonitor) {
-    this.healthMonitor = healthMonitor;
+    this(List.of(healthMonitor));
+  }
+
+  public HealthCheckHandler(List<KafkaHealthMonitor> healthMonitors) {
+    this.healthMonitors = List.copyOf(healthMonitors);
   }
 
   /**
@@ -44,12 +49,18 @@ public class HealthCheckHandler {
   }
 
   /**
-   * Readiness probe - checks Kafka connection status.
-   * Returns 200 if connected, 503 if disconnected.
+   * Readiness probe — Kafka connection status.
+   * Returns 200 if any configured cluster is up, 503 if every cluster is down,
+   * so one unreachable cluster does not take the Prometheus scrape target down.
    */
   private void handleReadiness(RoutingContext ctx) {
-    boolean connected = healthMonitor.isKafkaConnected();
-    HealthCheckResponse response = HealthCheckResponse.readiness(connected);
+    boolean connected = healthMonitors.stream().anyMatch(KafkaHealthMonitor::isKafkaConnected);
+    List<HealthCheckResponse.ClusterHealth> clusters = healthMonitors.stream()
+      .map(monitor -> new HealthCheckResponse.ClusterHealth(
+        monitor.clusterName(),
+        monitor.isKafkaConnected() ? "connected" : "disconnected"))
+      .toList();
+    HealthCheckResponse response = HealthCheckResponse.readiness(clusters);
     int statusCode = connected ? 200 : 503;
 
     ctx.response()

@@ -49,7 +49,7 @@ Once running, Klag exposes:
 | Endpoint | Purpose |
 |---|---|
 | `/healthz` | Liveness probe (always 200). |
-| `/readyz` | Readiness probe (200 if Kafka UP, 503 if DOWN). |
+| `/readyz` | Readiness probe (200 if any Kafka cluster is UP, 503 if every cluster is DOWN). JSON includes top-level `kafka` plus a `clusters` array. |
 | `/metrics` | Prometheus scrape endpoint (when enabled). |
 | `/version` | Build information. |
 | `/mcp` | [MCP endpoint](/ai/mcp/) for AI agents (when `MCP_ENABLED=true`). |

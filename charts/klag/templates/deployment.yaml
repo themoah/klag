@@ -50,6 +50,14 @@ spec:
             # Kafka configuration
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: {{ .Values.kafka.bootstrapServers | quote }}
+            {{- if and .Values.kafka.clusterName (not .Values.kafka.clusters) }}
+            - name: KAFKA_CLUSTER_NAME
+              value: {{ .Values.kafka.clusterName | quote }}
+            {{- end }}
+            {{- if .Values.kafka.clusters }}
+            - name: KAFKA_CLUSTERS
+              value: {{ .Values.kafka.clusters | toJson | quote }}
+            {{- end }}
             - name: KAFKA_REQUEST_TIMEOUT_MS
               value: {{ .Values.kafka.requestTimeoutMs | quote }}
             {{- if .Values.kafka.securityProtocol }}

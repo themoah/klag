@@ -93,10 +93,14 @@ documents the expected Secret keys and a truststore mount example.
 ### Probes and resources
 
 The chart sends liveness checks to `/healthz` and readiness checks to `/readyz`.
-`/healthz` only confirms that the process runs. `/readyz` returns the Kafka health
-monitor's cached state, so increasing the probe `timeoutSeconds` does not give an
-in-flight Kafka check more time. Keep the probe roles separate. For slow startup,
-increase `readinessProbe.initialDelaySeconds` or `readinessProbe.failureThreshold`.
+`/healthz` only confirms that the process runs. `/readyz` uses the Kafka health
+monitors' cached state: it is ready when **any** configured cluster is up, so one
+unreachable cluster does not take the Prometheus scrape target down. The JSON body
+keeps a top-level `kafka` field (`connected` when any cluster is up) and a
+`clusters` array with per-cluster `kafka` status and `name` when the cluster is
+named. Increasing the probe `timeoutSeconds` does not give an in-flight Kafka check
+more time. Keep the probe roles separate. For slow startup, increase
+`readinessProbe.initialDelaySeconds` or `readinessProbe.failureThreshold`.
 Tune `kafka.requestTimeoutMs` and `app.healthCheckIntervalMs` when Kafka requests or
 health-state refreshes need different timing.
 
@@ -104,6 +108,31 @@ The defaults request `100m` CPU and `256Mi` memory and limit the container to `5
 and `512Mi` memory. Treat them as a starting point. Measure collection duration and
 memory for your group and partition count, then raise requests or limits before reducing
 `metrics.intervalMs`; overlapping demand can otherwise cause skipped collection ticks.
+
+### Multiple Kafka clusters
+
+One process can scrape several Kafka clusters. Set `kafka.clusters` with a unique
+`name` and `bootstrapServers` per entry. Shared SASL/SSL still come from
+`kafka.existingSecret` (or `kafka.saslJaasConfig`) and apply to every cluster.
+Distinct per-cluster credentials are not supported. Do not put JAAS, SSL passwords,
+or other secrets in `clusters[].properties`: Helm renders `kafka.clusters` as the
+plaintext `KAFKA_CLUSTERS` env value.
+
+```yaml
+kafka:
+  clusters:
+    - name: msk-a
+      bootstrapServers: "b-1.a.example:9092"
+    - name: msk-b
+      bootstrapServers: "b-1.b.example:9092"
+```
+
+Each series is tagged with `cluster_name`. Prometheus Operator target `relabelings`
+(for example a scrape-level `cluster` label) apply to the **whole** pod scrape and
+cannot split those series; use `cluster_name` in PromQL (the bundled Grafana
+dashboard has a Cluster variable). A single cluster can set `kafka.clusterName`
+instead of `kafka.clusters`. Without a name, Kafka series omit `cluster_name` and
+that dashboard filter matches nothing — set `kafka.clusterName` if you use it.
 
 ## Permissions
 

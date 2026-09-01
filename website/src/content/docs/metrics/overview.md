@@ -9,6 +9,8 @@ reporter (Prometheus, Datadog, or OTLP). The logical metrics are the same everyw
 Tags depend on the metric's scope. Consumer metrics commonly use `consumer_group`,
 topic-level metrics add `topic`, and only partition-level series add `partition`.
 Broker/topic signals such as throughput and ISR do not have a `consumer_group` tag.
+When `KAFKA_CLUSTER_NAME` or a `KAFKA_CLUSTERS` entry `name` is set, Kafka series
+also carry `cluster_name`. JVM and process metrics do not.
 
 ## Core lag and offsets
 
@@ -74,7 +76,7 @@ Opt-in via `DATA_SKEW_ENABLED` (default `false`). See [Topic Data Skew](/metrics
 
 | Metric | Description |
 |---|---|
-| `klag.topic.size_skew` | `max/mean` retained-size ratio × 100 (`retained = max(0, logEndOffset − logStartOffset)`). Tags: `topic` only. 100 = even; 200 = fullest partition holds 2× the average. |
+| `klag.topic.size_skew` | `max/mean` retained-size ratio × 100 (`retained = max(0, logEndOffset − logStartOffset)`). Tags: `topic`, plus `cluster_name` when the cluster is named. 100 = even; 200 = fullest partition holds 2× the average. |
 
 ## Time-based lag
 

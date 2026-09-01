@@ -9,6 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -42,6 +43,16 @@ public class KafkaClientConfig {
   private static final String ENV_PREFIX = "KAFKA_";
   private static final String EXTERNAL_CONFIG_ENV = "KLAG_CONFIG_FILE";
 
+  /**
+   * {@code KAFKA_*} names that are Klag process config, not AdminClient properties.
+   * Mapping them through would set bogus {@code kafka.clusters} / {@code kafka.cluster.name}
+   * keys on the client.
+   */
+  static final Set<String> RESERVED_ENV_NAMES = Set.of(
+    KafkaClusters.ENV_CLUSTERS,
+    KafkaClusters.ENV_CLUSTER_NAME
+  );
+
   private static final String DEFAULT_BOOTSTRAP_SERVERS = "localhost:9092";
   private static final int DEFAULT_REQUEST_TIMEOUT_MS = 30000;
 
@@ -74,6 +85,28 @@ public class KafkaClientConfig {
     props.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, String.valueOf(requestTimeoutMs));
     props.putAll(additionalProperties);
     return props;
+  }
+
+  /**
+   * Returns a copy with optional bootstrap / timeout / extra AdminClient property overlays.
+   * Used when {@code KAFKA_CLUSTERS} entries inherit SASL/SSL from the process env.
+   */
+  KafkaClientConfig overlay(
+      String bootstrapServersOverride,
+      Integer requestTimeoutMsOverride,
+      Map<String, String> extraProperties) {
+    Builder builder = builder()
+      .bootstrapServers(
+        bootstrapServersOverride != null && !bootstrapServersOverride.isBlank()
+          ? bootstrapServersOverride
+          : this.bootstrapServers)
+      .requestTimeoutMs(
+        requestTimeoutMsOverride != null ? requestTimeoutMsOverride : this.requestTimeoutMs);
+    additionalProperties.forEach(builder::property);
+    if (extraProperties != null) {
+      extraProperties.forEach(builder::property);
+    }
+    return builder.build();
   }
 
   public static Builder builder() {
@@ -230,6 +263,9 @@ public class KafkaClientConfig {
     for (Map.Entry<String, String> entry : env.entrySet()) {
       String name = entry.getKey();
       if (name == null || !name.startsWith(ENV_PREFIX) || name.length() == ENV_PREFIX.length()) {
+        continue;
+      }
+      if (RESERVED_ENV_NAMES.contains(name)) {
         continue;
       }
       String value = entry.getValue();

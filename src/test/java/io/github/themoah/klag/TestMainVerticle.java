@@ -9,6 +9,7 @@ import io.github.themoah.klag.health.HealthCheckResponse;
 import io.github.themoah.klag.health.HealthStatus;
 import io.github.themoah.klag.health.VersionInfoResponse;
 import io.vertx.core.json.JsonObject;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -32,6 +33,7 @@ public class TestMainVerticle {
     JsonObject json = response.toJson();
     assertEquals("UP", json.getString("status"));
     assertFalse(json.containsKey("kafka"));
+    assertFalse(json.containsKey("clusters"));
   }
 
   @Test
@@ -44,6 +46,9 @@ public class TestMainVerticle {
     JsonObject json = response.toJson();
     assertEquals("UP", json.getString("status"));
     assertEquals("connected", json.getString("kafka"));
+    assertEquals(1, json.getJsonArray("clusters").size());
+    assertEquals("connected", json.getJsonArray("clusters").getJsonObject(0).getString("kafka"));
+    assertFalse(json.getJsonArray("clusters").getJsonObject(0).containsKey("name"));
   }
 
   @Test
@@ -56,6 +61,24 @@ public class TestMainVerticle {
     JsonObject json = response.toJson();
     assertEquals("DOWN", json.getString("status"));
     assertEquals("disconnected", json.getString("kafka"));
+    assertEquals("disconnected", json.getJsonArray("clusters").getJsonObject(0).getString("kafka"));
+  }
+
+  @Test
+  void healthCheckResponse_readiness_per_cluster() {
+    HealthCheckResponse response = HealthCheckResponse.readiness(List.of(
+      new HealthCheckResponse.ClusterHealth("msk-a", "connected"),
+      new HealthCheckResponse.ClusterHealth("msk-b", "disconnected")));
+
+    assertEquals(HealthStatus.UP, response.status());
+    assertEquals("connected", response.kafka());
+
+    JsonObject json = response.toJson();
+    assertEquals(2, json.getJsonArray("clusters").size());
+    assertEquals("msk-a", json.getJsonArray("clusters").getJsonObject(0).getString("name"));
+    assertEquals("connected", json.getJsonArray("clusters").getJsonObject(0).getString("kafka"));
+    assertEquals("msk-b", json.getJsonArray("clusters").getJsonObject(1).getString("name"));
+    assertEquals("disconnected", json.getJsonArray("clusters").getJsonObject(1).getString("kafka"));
   }
 
   @Test
@@ -66,6 +89,7 @@ public class TestMainVerticle {
     HealthCheckResponse readinessUp = HealthCheckResponse.readiness(true);
     assertTrue(readinessUp.toJson().encode().contains("\"status\":\"UP\""));
     assertTrue(readinessUp.toJson().encode().contains("\"kafka\":\"connected\""));
+    assertTrue(readinessUp.toJson().encode().contains("\"clusters\""));
 
     HealthCheckResponse readinessDown = HealthCheckResponse.readiness(false);
     assertTrue(readinessDown.toJson().encode().contains("\"status\":\"DOWN\""));
