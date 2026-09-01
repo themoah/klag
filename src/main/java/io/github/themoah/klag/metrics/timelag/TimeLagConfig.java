@@ -43,6 +43,21 @@ public record TimeLagConfig(
     int interpolationBufferSize = Env.getInt("TIME_LAG_INTERPOLATION_BUFFER_SIZE", DEFAULT_INTERPOLATION_BUFFER_SIZE);
     long staleProducerThresholdMs = Env.getLong("TIME_LAG_STALE_PRODUCER_THRESHOLD_MS", DEFAULT_STALE_PRODUCER_THRESHOLD_MS);
 
+    if (minLagMessages < 0) {
+      log.warn("TIME_LAG_MIN_MESSAGES must be >= 0, using default: {}", DEFAULT_MIN_LAG_MESSAGES);
+      minLagMessages = DEFAULT_MIN_LAG_MESSAGES;
+    }
+    if (interpolationBufferSize < 2) {
+      log.warn("TIME_LAG_INTERPOLATION_BUFFER_SIZE must be >= 2, using default: {}",
+        DEFAULT_INTERPOLATION_BUFFER_SIZE);
+      interpolationBufferSize = DEFAULT_INTERPOLATION_BUFFER_SIZE;
+    }
+    if (staleProducerThresholdMs <= 0) {
+      log.warn("TIME_LAG_STALE_PRODUCER_THRESHOLD_MS must be > 0, using default: {}",
+        DEFAULT_STALE_PRODUCER_THRESHOLD_MS);
+      staleProducerThresholdMs = DEFAULT_STALE_PRODUCER_THRESHOLD_MS;
+    }
+
     TimeLagConfig config = new TimeLagConfig(enabled, minLagMessages, interpolationBufferSize, staleProducerThresholdMs);
     log.info("Time lag config: enabled={}, minLagMessages={}, interpolationBufferSize={}, staleProducerThresholdMs={}",
       enabled, minLagMessages, interpolationBufferSize, staleProducerThresholdMs);

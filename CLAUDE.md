@@ -140,6 +140,9 @@ Any `Env`-backed variable resolves in order (first non-blank wins): env var `NAM
 
 **Kafka:** `KAFKA_BOOTSTRAP_SERVERS` (localhost:9092), `KAFKA_REQUEST_TIMEOUT_MS` (30000), `KAFKA_CHUNK_COUNT` (1 — chunking is *off*; only values >1 enable it), `KAFKA_CHUNK_DELAY_MS` (0), `KAFKA_MAX_CONCURRENT_GROUPS` (50 — caps how many consumer-group offset requests are in flight at once; a concurrency bound, not a throttle, so it applies regardless of chunking). Any other `KAFKA_X_Y_Z` env var maps to `kafka.x.y.z` and is forwarded to the AdminClient. Config precedence: classpath `application.properties` < external file at `KLAG_CONFIG_FILE` < `KAFKA_*` env vars.
 
+`KAFKA_CHUNK_COUNT` must be at least 1 and `KAFKA_CHUNK_DELAY_MS` must be non-negative.
+Invalid values loaded through `Env` log a warning and fall back to the defaults above.
+
 **Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false), `CONSUMER_MEMBER_LABELS_ENABLED` (true — tag per-partition `klag.consumer.lag`, `klag.consumer.lag.ms`, and `klag.consumer.committed_offset` with `member_host`/`consumer_id`/`client_id` for the owning consumer instance; kafka-lag-exporter parity. Empty-string values for unowned partitions; set `false` to drop the labels and cut cardinality), `LAG_TREND_DEADBAND_MSG_PER_SEC` (1.0 — STABLE band for the MCP basic lag-trend classifier; |velocity| within the band is STABLE). Every setting in this list is `Env`-backed and accepts both exact-name and dotted JVM properties, including `-DMETRICS_REPORTER=prometheus` and `-Dmetrics.reporter=prometheus`. A group is monitored iff it matches any include segment AND no exclude segment.
 
 **Hot Partition Detection:**
@@ -149,11 +152,19 @@ Any `Env`-backed variable resolves in order (first non-blank wins): env var `NAM
 - `HOT_PARTITION_MIN_SAMPLES` (3) - Minimum samples for throughput calculation
 - `HOT_PARTITION_BUFFER_SIZE` (20) - Samples to retain per partition
 
+The sigma multiplier must be finite and positive, minimum partitions and samples must be at
+least 2, and the buffer size must be at least the minimum sample count. Invalid or incompatible
+values log a warning and fall back to the documented defaults.
+
 **Time-Based Lag Estimation:**
 - `TIME_LAG_ENABLED` (true) - Enable/disable time-based lag estimation
 - `TIME_LAG_MIN_MESSAGES` (100) - Minimum lag messages required for time-to-close estimates
 - `TIME_LAG_INTERPOLATION_BUFFER_SIZE` (60) - Number of offset/timestamp points per partition for interpolation
 - `TIME_LAG_STALE_PRODUCER_THRESHOLD_MS` (180000) - Time in ms before a producer with no offset progress is considered stale
+
+Minimum lag messages must be non-negative, the interpolation buffer must contain at least 2
+points, and the stale-producer threshold must be positive. Invalid values log a warning and
+fall back to the documented defaults.
 
 **Commit Freshness:**
 - `COMMIT_FRESHNESS_ENABLED` (true) - Track time since each group+topic last advanced its committed offset. Kafka exposes no commit timestamp, so freshness is *inferred*: klag timestamps when the observed committed offset changes. The clock starts at klag startup and resets on restart (it measures time since klag last *observed* a commit, not the absolute commit time). Staleness is only reported while lag > 0. The MCP `diagnose` stuck-consumer flag fires at 300s (constant; alert on the raw gauge at any threshold).

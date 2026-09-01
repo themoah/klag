@@ -48,8 +48,8 @@ resolve exact-name JVM properties such as
 |---|---|---|
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Broker addresses. |
 | `KAFKA_REQUEST_TIMEOUT_MS` | `30000` | Request timeout. |
-| `KAFKA_CHUNK_COUNT` | `1` | Split offset requests into N batches. |
-| `KAFKA_CHUNK_DELAY_MS` | `0` | Delay (ms) between batches. |
+| `KAFKA_CHUNK_COUNT` | `1` | Split offset requests into N batches. Must be at least `1`; invalid values fall back to the default. |
+| `KAFKA_CHUNK_DELAY_MS` | `0` | Delay (ms) between batches. Must be non-negative; invalid values fall back to the default. |
 
 Any `KAFKA_X_Y_Z` environment variable is mapped to `kafka.x.y.z` and forwarded to the
 Kafka AdminClient. For example, `KAFKA_SECURITY_PROTOCOL` becomes
@@ -99,19 +99,24 @@ See [Metrics Overview](/metrics/overview/) for commit-staleness semantics,
 | Variable | Default | Description |
 |---|---|---|
 | `HOT_PARTITION_ENABLED` | `true` | Enable hot-partition detection. |
-| `HOT_PARTITION_SIGMA_MULTIPLIER` | `2.0` | Std-devs for the outlier threshold. |
-| `HOT_PARTITION_MIN_PARTITIONS` | `3` | Min partitions per topic for detection. |
-| `HOT_PARTITION_MIN_SAMPLES` | `3` | Min samples for throughput calc. |
-| `HOT_PARTITION_BUFFER_SIZE` | `20` | Samples retained per partition. |
+| `HOT_PARTITION_SIGMA_MULTIPLIER` | `2.0` | Std-devs for the outlier threshold. Must be finite and positive. |
+| `HOT_PARTITION_MIN_PARTITIONS` | `3` | Min partitions per topic for detection. Must be at least `2`. |
+| `HOT_PARTITION_MIN_SAMPLES` | `3` | Min samples for throughput calc. Must be at least `2`. |
+| `HOT_PARTITION_BUFFER_SIZE` | `20` | Samples retained per partition. Must be at least `HOT_PARTITION_MIN_SAMPLES`. |
+
+Invalid hot-partition values log a warning and fall back to the documented defaults. If the
+minimum sample count exceeds the buffer size, both settings fall back to their defaults.
 
 ## Time-based lag estimation
 
 | Variable | Default | Description |
 |---|---|---|
 | `TIME_LAG_ENABLED` | `true` | Enable time-based lag estimation. |
-| `TIME_LAG_MIN_MESSAGES` | `100` | Min lag messages for time-to-close estimates. |
-| `TIME_LAG_INTERPOLATION_BUFFER_SIZE` | `60` | Offset/timestamp points per partition. |
-| `TIME_LAG_STALE_PRODUCER_THRESHOLD_MS` | `180000` | Time before a producer is considered stale. |
+| `TIME_LAG_MIN_MESSAGES` | `100` | Min lag messages for time-to-close estimates. Must be non-negative. |
+| `TIME_LAG_INTERPOLATION_BUFFER_SIZE` | `60` | Offset/timestamp points per partition. Must be at least `2`. |
+| `TIME_LAG_STALE_PRODUCER_THRESHOLD_MS` | `180000` | Time before a producer is considered stale. Must be positive. |
+
+Invalid time-lag values log a warning and fall back to the documented defaults.
 
 ## MCP (AI agent access)
 
