@@ -2,8 +2,8 @@ apiVersion: v2
 name: klag
 description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter with pluggable metrics sinks.
 type: application
-version: 0.3.12
-appVersion: "0.2.15"
+version: 0.3.13
+appVersion: "0.2.16"
 home: https://github.com/themoah/klag
 icon: https://avatars.githubusercontent.com/themoah
 sources:
@@ -34,6 +34,8 @@ annotations:
     - name: themoah
       email: aviv@dozorets.com
   artifacthub.io/changes: |
+    - kind: fixed
+      description: Preserve HOT_PARTITION_MIN_SAMPLES when HOT_PARTITION_BUFFER_SIZE is too small by raising the buffer size to the configured minimum
     - kind: added
       description: Opt-in topic data-skew metric (klag.topic.size_skew = max/mean retained size × 100); enable with DATA_SKEW_ENABLED=true
     - kind: added

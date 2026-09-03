@@ -48,6 +48,30 @@ public record HotPartitionConfig(
     int minSamples = Env.getInt("HOT_PARTITION_MIN_SAMPLES", DEFAULT_MIN_SAMPLES);
     int bufferSize = Env.getInt("HOT_PARTITION_BUFFER_SIZE", DEFAULT_BUFFER_SIZE);
 
+    if (!Double.isFinite(sigma) || sigma <= 0) {
+      log.warn("HOT_PARTITION_SIGMA_MULTIPLIER must be finite and > 0, using default: {}",
+        DEFAULT_SIGMA_MULTIPLIER);
+      sigma = DEFAULT_SIGMA_MULTIPLIER;
+    }
+    if (minPartitions < 2) {
+      log.warn("HOT_PARTITION_MIN_PARTITIONS must be >= 2, using default: {}", DEFAULT_MIN_PARTITIONS);
+      minPartitions = DEFAULT_MIN_PARTITIONS;
+    }
+    if (minSamples < 2) {
+      log.warn("HOT_PARTITION_MIN_SAMPLES must be >= 2, using default: {}", DEFAULT_MIN_SAMPLES);
+      minSamples = DEFAULT_MIN_SAMPLES;
+    }
+    if (bufferSize < 2) {
+      log.warn("HOT_PARTITION_BUFFER_SIZE must be >= 2, using default: {}", DEFAULT_BUFFER_SIZE);
+      bufferSize = DEFAULT_BUFFER_SIZE;
+    }
+    if (bufferSize < minSamples) {
+      log.warn("HOT_PARTITION_BUFFER_SIZE must be >= HOT_PARTITION_MIN_SAMPLES ({}), "
+          + "using HOT_PARTITION_MIN_SAMPLES as buffer size: {}",
+        minSamples, minSamples);
+      bufferSize = minSamples;
+    }
+
     HotPartitionConfig config = new HotPartitionConfig(enabled, sigma, minPartitions, minSamples, bufferSize);
     log.info("Hot partition config: enabled={}, sigma={}, minPartitions={}, minSamples={}, bufferSize={}",
       enabled, sigma, minPartitions, minSamples, bufferSize);

@@ -44,6 +44,10 @@ public record ChunkConfig(
       log.warn("KAFKA_CHUNK_COUNT must be >= 1, using default: {}", DEFAULT_CHUNK_COUNT);
       chunkCount = DEFAULT_CHUNK_COUNT;
     }
+    if (chunkDelayMs < 0) {
+      log.warn("KAFKA_CHUNK_DELAY_MS must be >= 0, using default: {}", DEFAULT_CHUNK_DELAY_MS);
+      chunkDelayMs = DEFAULT_CHUNK_DELAY_MS;
+    }
 
     ChunkConfig config = new ChunkConfig(chunkCount, chunkDelayMs);
     log.info("Chunk config: chunkCount={}, chunkDelayMs={}, enabled={}",
