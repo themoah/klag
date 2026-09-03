@@ -61,6 +61,10 @@ public record HotPartitionConfig(
       log.warn("HOT_PARTITION_MIN_SAMPLES must be >= 2, using default: {}", DEFAULT_MIN_SAMPLES);
       minSamples = DEFAULT_MIN_SAMPLES;
     }
+    if (bufferSize < 2) {
+      log.warn("HOT_PARTITION_BUFFER_SIZE must be >= 2, using default: {}", DEFAULT_BUFFER_SIZE);
+      bufferSize = DEFAULT_BUFFER_SIZE;
+    }
     if (bufferSize < minSamples) {
       log.warn("HOT_PARTITION_BUFFER_SIZE must be >= HOT_PARTITION_MIN_SAMPLES ({}), "
           + "using HOT_PARTITION_MIN_SAMPLES as buffer size: {}",
