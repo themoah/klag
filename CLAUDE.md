@@ -153,8 +153,9 @@ Invalid values loaded through `Env` log a warning and fall back to the defaults 
 - `HOT_PARTITION_BUFFER_SIZE` (20) - Samples to retain per partition
 
 The sigma multiplier must be finite and positive, minimum partitions and samples must be at
-least 2, and the buffer size must be at least the minimum sample count. Invalid or incompatible
-values log a warning and fall back to the documented defaults.
+least 2, and the buffer size must be at least the minimum sample count. Invalid values log a
+warning and fall back to the documented defaults. If the buffer size is smaller than a valid
+minimum sample count, it is raised to the minimum sample count.
 
 **Time-Based Lag Estimation:**
 - `TIME_LAG_ENABLED` (true) - Enable/disable time-based lag estimation

@@ -70,14 +70,14 @@ class HotPartitionConfigTest {
   }
 
   @Test
-  void bufferSmallerThanMinSamplesFallsBackToCompatibleDefaults() {
+  void bufferSmallerThanMinSamplesIsRaisedToMinSamples() {
     System.setProperty(MIN_SAMPLES, "30");
     System.setProperty(BUFFER_SIZE, "20");
 
     HotPartitionConfig config = HotPartitionConfig.fromEnvironment();
 
-    assertEquals(3, config.minSamples());
-    assertEquals(20, config.bufferSize());
+    assertEquals(30, config.minSamples());
+    assertEquals(30, config.bufferSize());
   }
 
   @Test

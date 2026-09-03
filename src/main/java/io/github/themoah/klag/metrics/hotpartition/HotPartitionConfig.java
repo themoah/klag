@@ -63,10 +63,9 @@ public record HotPartitionConfig(
     }
     if (bufferSize < minSamples) {
       log.warn("HOT_PARTITION_BUFFER_SIZE must be >= HOT_PARTITION_MIN_SAMPLES ({}), "
-          + "using defaults: HOT_PARTITION_MIN_SAMPLES={}, HOT_PARTITION_BUFFER_SIZE={}",
-        minSamples, DEFAULT_MIN_SAMPLES, DEFAULT_BUFFER_SIZE);
-      minSamples = DEFAULT_MIN_SAMPLES;
-      bufferSize = DEFAULT_BUFFER_SIZE;
+          + "using HOT_PARTITION_MIN_SAMPLES as buffer size: {}",
+        minSamples, minSamples);
+      bufferSize = minSamples;
     }
 
     HotPartitionConfig config = new HotPartitionConfig(enabled, sigma, minPartitions, minSamples, bufferSize);

@@ -105,7 +105,8 @@ See [Metrics Overview](/metrics/overview/) for commit-staleness semantics,
 | `HOT_PARTITION_BUFFER_SIZE` | `20` | Samples retained per partition. Must be at least `HOT_PARTITION_MIN_SAMPLES`. |
 
 Invalid hot-partition values log a warning and fall back to the documented defaults. If the
-minimum sample count exceeds the buffer size, both settings fall back to their defaults.
+minimum sample count exceeds the buffer size, the buffer size is raised to the minimum sample
+count.
 
 ## Time-based lag estimation
 
