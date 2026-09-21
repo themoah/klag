@@ -470,7 +470,7 @@
           "custom": {
             "axisCenteredZero": true,
             "axisColorMode": "text",
-            "axisLabel": "Velocity (msgs/s \u00d7 100)",
+            "axisLabel": "Velocity (msgs/s)",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
@@ -540,6 +540,7 @@
       "pluginVersion": "11.3.0",
       "title": "Lag Velocity by Group (Positive = Growing)",
       "type": "timeseries",
+      "description": "Lag velocity is exported as messages per second multiplied by 100 for precision. The query divides by 100 so the plotted values and axis are in messages per second; positive values mean lag is growing.",
       "targets": [
         {
           "refId": "A",
@@ -548,7 +549,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "klag_consumer_lag_velocity{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\"}",
+          "expr": "klag_consumer_lag_velocity{cluster_name=~\"$cluster_name\", consumer_group=~\"$consumer_group\"} / 100",
           "legendFormat": "{{consumer_group}}",
           "range": true
         }
@@ -707,6 +708,7 @@
       "pluginVersion": "11.3.0",
       "title": "Consumer Group State",
       "type": "table",
+      "description": "The state tag carries the consumer group state. Values include classic states (preparing_rebalance, completing_rebalance) and KIP-848 states (assigning, reconciling), as well as stable, empty, dead, and unknown. Select states by the state tag; the numeric gauge value is not an encoded state. A previous state series can remain for one or two scrapes.",
       "targets": [
         {
           "refId": "A",
@@ -830,9 +832,9 @@
         }
       },
       "pluginVersion": "11.3.0",
-      "title": "Consumer Group State Changes",
+      "title": "Consecutive State Changes",
       "type": "timeseries",
-      "description": "Shows cumulative state changes over time. Spikes indicate state transitions (rebalances, failures).",
+      "description": "The gauge counts consecutive observed state changes and resets to 0 when a collection observes no change. The state tag identifies the state; the value is not a lifetime total. Classic and KIP-848 states can both appear. Previous state-tagged series may remain for one or two collection intervals after a transition.",
       "targets": [
         {
           "refId": "A",
@@ -1079,6 +1081,7 @@
       "pluginVersion": "11.3.0",
       "title": "Max Time Lag",
       "type": "stat",
+      "description": "Lag duration in milliseconds. partition=\"\" selects the topic-level aggregate, which is the maximum across partitions; use partition!=\"\" for per-partition series.",
       "targets": [
         {
           "refId": "A",
@@ -1242,7 +1245,7 @@
       "pluginVersion": "11.3.0",
       "title": "Time Lag by Consumer Group",
       "type": "timeseries",
-      "description": "Lag in milliseconds based on Kafka message timestamps",
+      "description": "Lag duration in milliseconds. partition=\"\" selects the topic-level maximum across partitions. Use partition!=\"\" to inspect per-partition lag; per-partition series can also include member labels when enabled.",
       "targets": [
         {
           "refId": "A",
@@ -2125,7 +2128,7 @@
           "custom": {
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "Messages/sec \u00d7 100",
+            "axisLabel": "Messages/sec × 100",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
@@ -2191,7 +2194,7 @@
       "pluginVersion": "11.3.0",
       "title": "Hot Partition Throughput Over Time",
       "type": "timeseries",
-      "description": "Partitions with disproportionately high throughput (messages/second). Value is throughput \u00d7 100 for precision.",
+      "description": "Partitions with disproportionately high throughput (messages/second). Value is throughput × 100 for precision.",
       "targets": [
         {
           "refId": "A",
@@ -2274,7 +2277,7 @@
       },
       "pluginVersion": "11.3.0",
       "title": "Max Topic Size Skew",
-      "description": "max/mean retained-size ratio. 1.0 = even; 2.0 = hottest partition holds 2\u00d7 the average. Requires DATA_SKEW_ENABLED=true.",
+      "description": "max/mean retained-size ratio. 1.0 = even; 2.0 = hottest partition holds 2× the average. Requires DATA_SKEW_ENABLED=true.",
       "type": "stat",
       "targets": [
         {
@@ -2495,7 +2498,7 @@
       },
       "pluginVersion": "11.3.0",
       "title": "Topic Size Skew Over Time",
-      "description": "max/mean retained-size ratio per topic. Gauge is stored \u00d7100; this panel divides by 100. Requires DATA_SKEW_ENABLED=true.",
+      "description": "max/mean retained-size ratio per topic. Gauge is stored ×100; this panel divides by 100. Requires DATA_SKEW_ENABLED=true.",
       "type": "timeseries",
       "targets": [
         {
@@ -2589,7 +2592,7 @@
       },
       "pluginVersion": "11.3.0",
       "title": "Retained Messages by Partition",
-      "description": "logEndOffset \u2212 logStartOffset from existing partition gauges. Use this to see which partition is fat when size skew is high.",
+      "description": "logEndOffset − logStartOffset from existing partition gauges. Use this to see which partition is fat when size skew is high.",
       "type": "timeseries",
       "targets": [
         {

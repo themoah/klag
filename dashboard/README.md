@@ -8,7 +8,7 @@ Consumer lag counts how far a consumer group trails the latest produced offset. 
 
 - **Consumer lag** per group, color-coded by threshold
 - **Lag velocity** shows whether lag grows or shrinks (messages/sec)
-- **Consumer group state** tracking: Stable, Rebalancing, Dead
+- **Consumer group state** tracking: Stable, classic and KIP-848 rebalance states, Empty, Dead
 - **Partition & offset** detail: per-partition lag, log offsets, topic throughput
 - **Hot partition detection** flags skewed partitions via statistical outliers
 - **Topic data skew** scores uneven retained size across partitions (opt-in `DATA_SKEW_ENABLED`)
