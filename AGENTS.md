@@ -187,7 +187,7 @@ of all of it.
 | `/readyz` | Readiness probe (200 if any configured Kafka cluster is UP, 503 if all are DOWN) |
 | `/metrics` | Prometheus scrape endpoint (if enabled) |
 | `/version` | Build information |
-| `/mcp` | MCP endpoint for AI agents (JSON-RPC over POST; if `MCP_ENABLED=true`) |
+| `/mcp` | Default MCP endpoint for AI agents (JSON-RPC over POST; actual path is controlled by `MCP_PATH`; if `MCP_ENABLED=true`) |
 
 ## Environment Variables
 
