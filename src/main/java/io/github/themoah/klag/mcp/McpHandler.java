@@ -47,9 +47,11 @@ public class McpHandler {
     // Auth runs on its own route ahead of the body handler so klag rejects unauthorized
     // requests without buffering a single body byte (Vert.x forbids a USER handler before
     // a BODY handler on the same route); the body limit caps what authorized clients can send.
+    // false = do not handle multipart file uploads: MCP only needs a JSON body, and the default
+    // BodyHandler.create() streams uploaded parts to disk (./file-uploads/) without cleaning up.
     router.post(config.path()).handler(this::checkAuth);
     router.post(config.path())
-      .handler(BodyHandler.create().setBodyLimit(MAX_BODY_BYTES))
+      .handler(BodyHandler.create(false).setBodyLimit(MAX_BODY_BYTES))
       .handler(this::handlePost)
       .failureHandler(this::handleFailure);
     router.get(config.path()).handler(this::handleGet);

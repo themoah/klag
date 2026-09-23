@@ -1,6 +1,7 @@
 package io.github.themoah.klag.mcp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.themoah.klag.metrics.snapshot.SnapshotStore;
@@ -17,6 +18,9 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.junit5.VertxExtension;
 import io.vertx.junit5.VertxTestContext;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Function;
 import org.junit.jupiter.api.AfterEach;
@@ -171,6 +175,71 @@ class McpHttpIntegrationTest {
           assertTrue(text.contains("payments"));
           return null;
         }, ctx));
+  }
+
+  /**
+   * Regression test for issue #115: a multipart/form-data POST to /mcp must not write any
+   * files. The old BodyHandler.create() (handleFileUploads=true) would stream uploaded parts
+   * to ./file-uploads/ without deleting them; BodyHandler.create(false) must prevent this.
+   *
+   * <p>Vert.x BodyHandler resolves the upload directory via {@code new File("file-uploads")}
+   * and {@code vertx.fileSystem().mkdirsBlocking}, both of which use the native OS process
+   * working directory — not {@code System.getProperty("user.dir")} (which Java's {@code File}
+   * constructor ignores). The test therefore checks {@code file-uploads/} relative to the real
+   * absolute CWD, and performs cleanup in both async callbacks so no files leak between runs.
+   */
+  @Test
+  void multipartFormDataPostDoesNotCreateFileUploadsDirectory(VertxTestContext ctx) {
+    // Resolve against the real native CWD, which is what BodyHandler uses.
+    Path fileUploadsDir = Path.of("file-uploads").toAbsolutePath();
+
+    // Multipart body simulating the reproduction case from issue #115.
+    String boundary = "testboundary";
+    String crlf = "\r\n";
+    String multipartBody =
+        "--" + boundary + crlf
+        + "Content-Disposition: form-data; name=\"f\"; filename=\"blob.bin\"" + crlf
+        + "Content-Type: application/octet-stream" + crlf
+        + crlf
+        + "BINARYDATA"  // small stand-in for /dev/urandom output
+        + crlf
+        + "--" + boundary + "--" + crlf;
+
+    // Remove any pre-existing file-uploads/ directory so the before-state is clean.
+    deleteRecursively(fileUploadsDir);
+
+    deployThen(enabled(null), new SnapshotStore(), ctx, () ->
+      client.request(HttpMethod.POST, port, "localhost", "/mcp")
+        .compose(req -> {
+          req.putHeader("content-type", "multipart/form-data; boundary=" + boundary);
+          return req.send(Buffer.buffer(multipartBody.getBytes(StandardCharsets.UTF_8)));
+        })
+        .compose(resp -> resp.body().map(b -> new HttpResult(resp.statusCode(), b)))
+        .onSuccess(r -> {
+          // BodyHandler has finished; capture existence before cleanup.
+          boolean created = Files.exists(fileUploadsDir);
+          // Always clean up in case the old (buggy) handler wrote files.
+          deleteRecursively(fileUploadsDir);
+          ctx.verify(() -> {
+            assertFalse(created,
+              "file-uploads/ directory must not be created by a multipart POST to /mcp");
+            ctx.completeNow();
+          });
+        })
+        .onFailure(t -> {
+          deleteRecursively(fileUploadsDir);
+          ctx.failNow(t);
+        }));
+  }
+
+  private static void deleteRecursively(Path dir) {
+    if (!Files.exists(dir)) {
+      return;
+    }
+    try (var stream = Files.walk(dir)) {
+      stream.sorted(java.util.Comparator.reverseOrder())
+            .forEach(p -> { try { Files.delete(p); } catch (java.io.IOException ignored) {} });
+    } catch (java.io.IOException ignored) {}
   }
 
   /** Deploy, then run the test body once the server is listening. */
