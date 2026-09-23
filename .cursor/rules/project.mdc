@@ -56,4 +56,4 @@ src/main/java/io/github/themoah/klag/
 - Bump version in `build.gradle.kts` after minor/major changes
 - Minimize diff scope; match existing patterns; no drive-by refactors
 
-Full env var and metric reference: `CLAUDE.md`.
+Full env var and metric reference: https://klag.dev/llms.txt and `website/src/content/docs/`.
