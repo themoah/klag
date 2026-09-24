@@ -84,6 +84,7 @@ jobs:
     needs: [changes, test-helm-chart]
     if: always() && (needs.test-helm-chart.result == 'success' || needs.test-helm-chart.result == 'skipped')
     strategy:
+      fail-fast: false
       matrix:
         jdk-version: [21, 25]
 
