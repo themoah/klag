@@ -35,6 +35,8 @@ annotations:
       email: aviv@dozorets.com
   artifacthub.io/changes: |
     - kind: fixed
+      description: Disable multipart file uploads on the MCP endpoint so requests cannot leave uploaded files on disk
+    - kind: fixed
       description: Keep MCP trend values and consumer group state labels independent of the JVM default locale
     - kind: added
       description: Opt-in METRICS_ASSIGNED_TOPICS_ONLY drops lag for topics a Stable group has abandoned but whose committed offsets have not yet expired; Empty/rebalancing groups keep reporting so outages stay visible

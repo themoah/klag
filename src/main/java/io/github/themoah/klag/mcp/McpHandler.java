@@ -49,7 +49,7 @@ public class McpHandler {
     // a BODY handler on the same route); the body limit caps what authorized clients can send.
     router.post(config.path()).handler(this::checkAuth);
     router.post(config.path())
-      .handler(BodyHandler.create().setBodyLimit(MAX_BODY_BYTES))
+      .handler(BodyHandler.create(false).setBodyLimit(MAX_BODY_BYTES))
       .handler(this::handlePost)
       .failureHandler(this::handleFailure);
     router.get(config.path()).handler(this::handleGet);
