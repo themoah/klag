@@ -23,6 +23,8 @@ Inspired by [kafka-lag-exporter](https://github.com/seglo/kafka-lag-exporter) (a
 
 Migrating from kafka-lag-exporter? See the **[migration guide](https://klag.dev/migration)** (metric/label/config mapping + drop-in dashboard tips).
 
+New to metrics cardinality? See the **[label cardinality guide](https://klag.dev/configuration/cardinality/)** — when to keep or disable member labels, group/topic filtering, and multi-cluster tagging.
+
 > ### 📖 Documentation lives at **[klag.dev](https://klag.dev)**
 >
 > Full guides — configuration, Kafka ACLs, Helm/Strimzi deployment, integrations,
