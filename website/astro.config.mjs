@@ -154,6 +154,7 @@ export default defineConfig({
           items: [
             { label: 'Agent Setup', slug: 'ai/agent-setup' },
             { label: 'MCP Endpoint', slug: 'ai/mcp' },
+            { label: 'MCP Evaluation', slug: 'ai/evaluation-checklist' },
             { label: 'Developers', slug: 'developers' },
           ],
         },
