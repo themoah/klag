@@ -49,7 +49,7 @@ All docs live in `src/content/docs/**` as Markdown/MDX. The sidebar is configure
 `astro.config.mjs`. Add a page by dropping a `.md`/`.mdx` file with `title` +
 `description` frontmatter and adding it to the sidebar.
 
-Content is sourced from the repo's `README.md` and `CLAUDE.md` — keep them in sync when
+Content is sourced from the repo's `README.md` and `AGENTS.md` — keep them in sync when
 project facts change.
 
 ## Agent-facing surface

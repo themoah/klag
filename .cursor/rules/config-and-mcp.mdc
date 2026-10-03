@@ -34,4 +34,4 @@ Feature toggles: `HOT_PARTITION_*`, `TIME_LAG_*`, `COMMIT_FRESHNESS_*`, `ISR_ENA
 
 ## OTLP
 
-HTTP only (port 4318). `OTEL_*` vars or Klag overrides (`OTLP_ENDPOINT`, `OTLP_HEADERS`, etc.). See `CLAUDE.md` for full list.
+HTTP only (port 4318). `OTEL_*` vars or Klag overrides (`OTLP_ENDPOINT`, `OTLP_HEADERS`, etc.). See https://klag.dev/llms.txt and `website/src/content/docs/configuration/reference.md` for the full list.
