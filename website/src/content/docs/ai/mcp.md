@@ -19,6 +19,9 @@ touches the collection flow.
 
 ## Enable
 
+For a local, vendor-neutral check of tool answers against Prometheus, follow the
+[MCP evaluation checklist](/ai/evaluation-checklist/).
+
 | Variable | Default | Description |
 |---|---|---|
 | `MCP_ENABLED` | `false` | Expose the `/mcp` endpoint. |
