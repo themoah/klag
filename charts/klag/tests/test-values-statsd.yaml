@@ -1,0 +1,16 @@
+# Test values for StatsD/DogStatsD metrics configuration
+kafka:
+  bootstrapServers: "kafka-broker:9092"
+
+metrics:
+  reporter: "statsd"
+
+extraEnv:
+  - name: STATSD_HOST
+    valueFrom:
+      fieldRef:
+        fieldPath: status.hostIP
+  - name: STATSD_PORT
+    value: "8125"
+  - name: STATSD_FLAVOR
+    value: datadog

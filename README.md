@@ -55,7 +55,7 @@ Consumer lag is the gap between what Kafka has produced and what your consumers 
 | **Request batching**              | Safely monitor large clusters without overwhelming brokers                |
 | **AI-native**                     | Opt-in read-only [MCP endpoint](https://klag.dev/ai/mcp/) for SRE/dev agents |
 
-**Sinks:** Prometheus, Datadog, OTLP (Grafana Cloud, New Relic, etc.). See [integrations](https://klag.dev/integrations/prometheus/).
+**Sinks:** Prometheus, Datadog, OTLP (Grafana Cloud, New Relic, etc.), StatsD/DogStatsD. See [integrations](https://klag.dev/integrations/prometheus/).
 
 ## How Klag compares
 
@@ -133,7 +133,7 @@ most common:
 |----------|---------|-------------|
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka broker addresses |
 | `HTTP_PORT` | `8888` | HTTP server port (health, metrics, MCP) |
-| `METRICS_REPORTER` | `none` | `prometheus`, `datadog`, or `otlp` |
+| `METRICS_REPORTER` | `none` | `prometheus`, `datadog`, `otlp`, or `statsd` |
 | `METRICS_INTERVAL_MS` | `60000` | How often to collect metrics |
 | `METRICS_GROUP_FILTER` | `*` | Comma-separated glob patterns. A group is included if it matches any segment (e.g. `ingest*,categorize*`). |
 | `METRICS_GROUP_EXCLUDE` | _(empty)_ | Comma-separated glob patterns to exclude even if included by the filter (e.g. `debug-*,canary-*,*-shadow`). |

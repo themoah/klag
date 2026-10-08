@@ -26,10 +26,11 @@ resolve in this order: environment variable `NAME` → `-DNAME` → dotted
   `CONSUMER_MEMBER_LABELS_ENABLED`, `LAG_TREND_DEADBAND_MSG_PER_SEC`
 - all `HOT_PARTITION_*` and `TIME_LAG_*` settings listed below
 - `COMMIT_FRESHNESS_ENABLED`, `ISR_ENABLED`, `DATA_SKEW_ENABLED`, `DATA_SKEW_MIN_PARTITIONS`
+- `STATSD_HOST`, `STATSD_PORT`, `STATSD_FLAVOR`
 
-Kafka forwarding, `KLAG_CONFIG_FILE`, Vert.x, MCP, and reporter-specific integration
-settings such as `DD_*`, `OTLP_*`, and `OTEL_*` read environment variables directly and
-do not use that `-D` resolution chain. Logging is a separate exception: Logback can
+Kafka forwarding, `KLAG_CONFIG_FILE`, Vert.x, MCP, and the other reporter-specific
+integration settings (`DD_*`, `OTLP_*`, and `OTEL_*`) read environment variables directly
+and do not use that `-D` resolution chain. Logging is a separate exception: Logback can
 resolve exact-name JVM properties such as
 `-DLOG_LEVEL=DEBUG`, but it does not provide `Env`-style dotted aliases such as
 `-Dlog.level`.
@@ -69,7 +70,7 @@ For SASL/SSL, common settings include `KAFKA_SECURITY_PROTOCOL`,
 
 | Variable | Default | Description |
 |---|---|---|
-| `METRICS_REPORTER` | `none` | `none`, `prometheus`, `datadog`, or `otlp`. |
+| `METRICS_REPORTER` | `none` | `none`, `prometheus`, `datadog`, `otlp`, or `statsd`. |
 | `METRICS_INTERVAL_MS` | `60000` | How often to collect metrics. |
 | `METRICS_GROUP_FILTER` | `*` | Comma-separated glob include patterns. |
 | `METRICS_GROUP_EXCLUDE` | _(empty)_ | Comma-separated glob exclude patterns. |
@@ -178,6 +179,20 @@ Transport is HTTP/protobuf (port 4318); both `http://` and `https://` endpoints 
 supported — for an internally-signed HTTPS collector, point `OTLP_CA_CERT_PATH` (or
 `OTEL_EXPORTER_OTLP_CERTIFICATE`) at the CA bundle. Temporality is cumulative.
 See [OTLP & Grafana Cloud](/integrations/otlp-grafana/).
+
+## StatsD (when `METRICS_REPORTER=statsd`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `STATSD_HOST` | `localhost` | Host of the StatsD agent (Datadog Agent, Telegraf, etc.). |
+| `STATSD_PORT` | `8125` | UDP port of the StatsD agent. Must be 1–65535; an invalid value logs a warning and uses `8125`. |
+| `STATSD_FLAVOR` | `datadog` | Line protocol: `datadog` (DogStatsD), `telegraf`, `sysdig`, or `etsy`. `etsy` has no tag support, so tags are folded into metric names. An invalid value logs a warning and uses `datadog`. |
+
+Each setting also accepts an exact-name or dotted JVM property (for example
+`-DSTATSD_HOST=agent` or `-Dstatsd.host=agent`). Transport is UDP, so a missing agent
+never blocks Klag; lines are simply dropped. Gauges are sent every 10 seconds, even though
+their values change once per `METRICS_INTERVAL_MS`. With Datadog, every tag combination
+is a custom metric; set `CONSUMER_MEMBER_LABELS_ENABLED=false` to reduce the count.
 
 ## Logging
 

@@ -89,6 +89,7 @@ run_test "Basic Prometheus config" "${TESTS_DIR}/test-values.yaml"
 run_test "SASL authentication" "${TESTS_DIR}/test-values-sasl.yaml"
 run_test "OTLP reporter" "${TESTS_DIR}/test-values-otlp.yaml"
 run_test "Datadog reporter" "${TESTS_DIR}/test-values-datadog.yaml"
+run_test "StatsD reporter" "${TESTS_DIR}/test-values-statsd.yaml"
 run_test "Existing secrets" "${TESTS_DIR}/test-values-existing-secret.yaml"
 run_test "Multi-cluster Kafka" "${TESTS_DIR}/test-values-clusters.yaml"
 
@@ -137,6 +138,11 @@ validate_output "DD_API_KEY set" "${TESTS_DIR}/test-values-datadog.yaml" "DD_API
 validate_output "DD_APP_KEY set" "${TESTS_DIR}/test-values-datadog.yaml" "DD_APP_KEY"
 validate_output "DD_SITE set" "${TESTS_DIR}/test-values-datadog.yaml" "DD_SITE"
 validate_output "Datadog secret created" "${TESTS_DIR}/test-values-datadog.yaml" "name: test-release-klag-datadog"
+
+# StatsD config validation
+validate_output "METRICS_REPORTER is statsd" "${TESTS_DIR}/test-values-statsd.yaml" 'value: "statsd"'
+validate_output "STATSD_HOST from node IP via extraEnv" "${TESTS_DIR}/test-values-statsd.yaml" "fieldPath: status.hostIP"
+validate_not_present "No Datadog API secret for DogStatsD" "${TESTS_DIR}/test-values-statsd.yaml" "name: test-release-klag-datadog"
 
 # MCP config validation
 validate_output "MCP_ALLOWED_ORIGINS set when allowedOrigins given" "" "MCP_ALLOWED_ORIGINS" "--set mcp.enabled=true --set mcp.allowedOrigins=https://ops.example.com"

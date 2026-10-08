@@ -109,7 +109,7 @@ kafka:
 
 # Metrics configuration
 metrics:
-  # Metrics reporter: none, prometheus, datadog, otlp
+  # Metrics reporter: none, prometheus, datadog, otlp, statsd
   reporter: "prometheus"
   # Metrics collection interval in milliseconds
   intervalMs: 60000
@@ -158,6 +158,11 @@ metrics:
     secretKeys:
       apiKey: "api-key"
       appKey: "app-key"
+
+  # StatsD - used when reporter is "statsd". There are no first-class values: pass
+  # STATSD_HOST, STATSD_PORT and STATSD_FLAVOR through extraEnv. With a node-local agent
+  # (e.g. the Datadog Agent DaemonSet), set STATSD_HOST from the node IP via
+  # valueFrom.fieldRef.fieldPath: status.hostIP, since localhost is the klag pod itself.
 
 # Application configuration
 app:

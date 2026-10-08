@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Klag is a Kafka Lag Exporter built with Vert.x 4.5.34. Monitors consumer lag and group states with Prometheus/Datadog/OTLP metrics.
+Klag is a Kafka Lag Exporter built with Vert.x 4.5.34. Monitors consumer lag and group states with Prometheus/Datadog/OTLP/StatsD metrics.
 
 ## Build Commands
 
@@ -143,7 +143,7 @@ Any `Env`-backed variable resolves in order (first non-blank wins): env var `NAM
 `KAFKA_CHUNK_COUNT` must be at least 1 and `KAFKA_CHUNK_DELAY_MS` must be non-negative.
 Invalid values loaded through `Env` log a warning and fall back to the defaults above.
 
-**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false), `CONSUMER_MEMBER_LABELS_ENABLED` (true — tag per-partition `klag.consumer.lag`, `klag.consumer.lag.ms`, and `klag.consumer.committed_offset` with `member_host`/`consumer_id`/`client_id` for the owning consumer instance; kafka-lag-exporter parity. Empty-string values for unowned partitions; set `false` to drop the labels and cut cardinality), `LAG_TREND_DEADBAND_MSG_PER_SEC` (1.0 — STABLE band for the MCP basic lag-trend classifier; |velocity| within the band is STABLE), `METRICS_ASSIGNED_TOPICS_ONLY` (false — when true, Stable groups omit lag for topics with committed offsets but no member assignment; Empty/rebalancing groups are unchanged so outages stay visible). Every setting in this list is `Env`-backed and accepts both exact-name and dotted JVM properties, including `-DMETRICS_REPORTER=prometheus` and `-Dmetrics.reporter=prometheus`. A group is monitored iff it matches any include segment AND no exclude segment.
+**Metrics:** `METRICS_REPORTER` (none/prometheus/datadog/otlp/statsd), `METRICS_INTERVAL_MS` (60000), `METRICS_GROUP_FILTER` (comma-separated glob patterns, default `*`), `METRICS_GROUP_EXCLUDE` (comma-separated glob patterns, default empty), `METRICS_JVM_ENABLED` (false), `CONSUMER_MEMBER_LABELS_ENABLED` (true — tag per-partition `klag.consumer.lag`, `klag.consumer.lag.ms`, and `klag.consumer.committed_offset` with `member_host`/`consumer_id`/`client_id` for the owning consumer instance; kafka-lag-exporter parity. Empty-string values for unowned partitions; set `false` to drop the labels and cut cardinality), `LAG_TREND_DEADBAND_MSG_PER_SEC` (1.0 — STABLE band for the MCP basic lag-trend classifier; |velocity| within the band is STABLE), `METRICS_ASSIGNED_TOPICS_ONLY` (false — when true, Stable groups omit lag for topics with committed offsets but no member assignment; Empty/rebalancing groups are unchanged so outages stay visible). Every setting in this list is `Env`-backed and accepts both exact-name and dotted JVM properties, including `-DMETRICS_REPORTER=prometheus` and `-Dmetrics.reporter=prometheus`. A group is monitored iff it matches any include segment AND no exclude segment.
 
 **Hot Partition Detection:**
 - `HOT_PARTITION_ENABLED` (true) - Enable/disable hot partition detection
@@ -237,6 +237,13 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 OTEL_SERVICE_NAME=klag-dev
 OTEL_RESOURCE_ATTRIBUTES=environment=development,cluster=local
 ```
+
+**StatsD Configuration (when METRICS_REPORTER=statsd):**
+- `STATSD_HOST` (localhost) - StatsD agent host (Datadog Agent, Telegraf, etc.)
+- `STATSD_PORT` (8125) - StatsD agent UDP port; must be 1-65535
+- `STATSD_FLAVOR` (datadog) - Line protocol: `datadog` (DogStatsD), `telegraf`, `sysdig`, or `etsy`. `etsy` has no tags, so tags are folded into metric names (warning logged).
+
+All three are `Env`-backed (`-DSTATSD_HOST` / `-Dstatsd.host` work). Invalid port or flavor logs a warning and falls back to the default. Transport is UDP (fire-and-forget: a missing agent never blocks or fails Klag). Gauges are sent every 10s (Micrometer's polling frequency) though values change once per `METRICS_INTERVAL_MS`. Tag volume matters for Datadog custom-metric billing; `CONSUMER_MEMBER_LABELS_ENABLED=false` cuts it.
 
 ## Metrics Exposed
 

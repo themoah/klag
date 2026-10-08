@@ -1,5 +1,6 @@
 package io.github.themoah.klag.metrics;
 
+import io.github.themoah.klag.config.Env;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
@@ -14,7 +15,11 @@ import io.micrometer.registry.otlp.AggregationTemporality;
 import io.micrometer.registry.otlp.OtlpConfig;
 import io.micrometer.registry.otlp.OtlpHttpMetricsSender;
 import io.micrometer.registry.otlp.OtlpMeterRegistry;
+import io.micrometer.statsd.StatsdConfig;
+import io.micrometer.statsd.StatsdFlavor;
+import io.micrometer.statsd.StatsdMeterRegistry;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import javax.net.ssl.SSLContext;
@@ -33,6 +38,9 @@ public final class MicrometerConfig {
   // Micrometer 1.16; the sender owns its timeouts now instead of reading them off the registry config.
   private static final Duration OTLP_CONNECT_TIMEOUT = Duration.ofSeconds(1);
   private static final Duration OTLP_READ_TIMEOUT = Duration.ofSeconds(10);
+
+  private static final String DEFAULT_STATSD_HOST = "localhost";
+  private static final int DEFAULT_STATSD_PORT = 8125;
 
   private MicrometerConfig() {}
 
@@ -226,6 +234,66 @@ public final class MicrometerConfig {
   }
 
   /**
+   * Creates a StatsD meter registry that sends metric lines over UDP to the configured
+   * StatsD agent host (Datadog Agent, Telegraf, etc.). DogStatsD is the {@code datadog} flavor.
+   */
+  public static MeterRegistry createStatsdRegistry() {
+    StatsdConfig config = statsdConfigFromEnvironment();
+    if (config.flavor() == StatsdFlavor.ETSY) {
+      log.warn("STATSD_FLAVOR=etsy has no tag support; tags are folded into metric names");
+    }
+    log.info("StatsD registry created - endpoint: {}:{}, flavor: {}",
+             config.host(), config.port(), config.flavor());
+    return new StatsdMeterRegistry(config, Clock.SYSTEM);
+  }
+
+  /**
+   * Reads StatsD settings once via {@link Env}, so -D properties work and invalid values
+   * fall back to defaults with a warning instead of failing registry creation.
+   */
+  static StatsdConfig statsdConfigFromEnvironment() {
+    String host = Env.getString("STATSD_HOST", DEFAULT_STATSD_HOST);
+    int port = Env.getInt("STATSD_PORT", DEFAULT_STATSD_PORT);
+    if (port < 1 || port > 65535) {
+      log.warn("Invalid STATSD_PORT: {}, using default {}", port, DEFAULT_STATSD_PORT);
+      port = DEFAULT_STATSD_PORT;
+    }
+    StatsdFlavor flavor = parseStatsdFlavor(Env.getString("STATSD_FLAVOR", "datadog"));
+
+    int resolvedPort = port;
+    return new StatsdConfig() {
+      @Override
+      public String host() {
+        return host;
+      }
+
+      @Override
+      public int port() {
+        return resolvedPort;
+      }
+
+      @Override
+      public StatsdFlavor flavor() {
+        return flavor;
+      }
+
+      @Override
+      public String get(String key) {
+        return null; // Use defaults for other properties
+      }
+    };
+  }
+
+  static StatsdFlavor parseStatsdFlavor(String value) {
+    try {
+      return StatsdFlavor.valueOf(value.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      log.warn("Invalid STATSD_FLAVOR: '{}', using default datadog", value);
+      return StatsdFlavor.DATADOG;
+    }
+  }
+
+  /**
    * Creates a meter registry based on the reporter type.
    *
    * @param reporterType the type of reporter ("datadog", "prometheus", etc.)
@@ -240,6 +308,7 @@ public final class MicrometerConfig {
       case "datadog" -> createDatadogRegistry();
       case "prometheus" -> createPrometheusRegistry();
       case "otlp" -> createOtlpRegistry();
+      case "statsd" -> createStatsdRegistry();
       default -> {
         log.warn("Unknown reporter type: {}", reporterType);
         yield null;

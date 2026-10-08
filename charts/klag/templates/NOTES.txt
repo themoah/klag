@@ -39,6 +39,11 @@ Klag has been deployed successfully!
 {{- else if eq .Values.metrics.reporter "datadog" }}
 
    Metrics are being sent to Datadog ({{ .Values.metrics.datadog.site }}).
+{{- else if eq .Values.metrics.reporter "statsd" }}
+
+   Metrics are being pushed over UDP to the StatsD agent set by STATSD_HOST and
+   STATSD_PORT in extraEnv (default localhost:8125). UDP is fire-and-forget, so check
+   the agent to confirm metrics are arriving.
 {{- end }}
 
 4. Check the logs:

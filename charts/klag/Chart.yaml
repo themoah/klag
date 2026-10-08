@@ -2,8 +2,8 @@ apiVersion: v2
 name: klag
 description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter with pluggable metrics sinks.
 type: application
-version: 0.3.17
-appVersion: "0.2.18"
+version: 0.3.18
+appVersion: "0.2.19"
 home: https://github.com/themoah/klag
 icon: https://avatars.githubusercontent.com/themoah
 sources:
@@ -34,6 +34,8 @@ annotations:
     - name: themoah
       email: aviv@dozorets.com
   artifacthub.io/changes: |
+    - kind: added
+      description: StatsD/DogStatsD reporter; set metrics.reporter to statsd and pass STATSD_HOST, STATSD_PORT and STATSD_FLAVOR (datadog, telegraf, sysdig, etsy) via extraEnv to push metrics over UDP to a StatsD agent
     - kind: fixed
       description: A consumer group that fails every cycle (ACL gap, wedged coordinator) no longer freezes stale-series cleanup for the whole cluster; only that group's last good series are held
     - kind: fixed

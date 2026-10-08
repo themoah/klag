@@ -84,6 +84,26 @@ helm install klag ./charts/klag \
   --set metrics.datadog.appKey="<your-app-key>"
 ```
 
+### With StatsD / DogStatsD
+
+StatsD settings have no first-class values; pass them through `extraEnv`. With a
+node-local agent such as the Datadog Agent DaemonSet, point `STATSD_HOST` at the node,
+because `localhost` is the klag pod itself:
+
+```yaml
+metrics:
+  reporter: statsd
+extraEnv:
+  - name: STATSD_HOST
+    valueFrom:
+      fieldRef:
+        fieldPath: status.hostIP
+  - name: STATSD_PORT
+    value: "8125"
+  - name: STATSD_FLAVOR
+    value: datadog
+```
+
 ### With Prometheus ServiceMonitor
 
 ```bash
@@ -146,7 +166,7 @@ Set `KLAG_CONFIG_FILE` to the path of an external `application.properties` (typi
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `metrics.reporter` | Metrics backend (none, prometheus, datadog, otlp) | `prometheus` |
+| `metrics.reporter` | Metrics backend (none, prometheus, datadog, otlp, statsd) | `prometheus` |
 | `metrics.intervalMs` | Metrics collection interval (ms) | `60000` |
 | `metrics.groupFilter` | Comma-separated glob patterns for consumer groups to include | `*` |
 | `metrics.groupExclude` | Comma-separated glob patterns to exclude (evaluated after `groupFilter`) | `""` |
