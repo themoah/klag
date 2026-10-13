@@ -180,7 +180,6 @@ nbdist/
 .nb-gradle/
 
 ### VisualStudioCode ###
-.vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
@@ -190,7 +189,8 @@ nbdist/
 ARTIFACTHUB_PUBLISHING_MEMO.md
 
 ### Environment Variables ###
-.env
 
 .mcp.json
 src/main/resources/application.properties
+config.bat
+node_modules
