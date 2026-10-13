@@ -145,7 +145,7 @@ the GraalVM native binary too (runtime `-D` flags). See the
 [configuration reference](website/src/content/docs/configuration/reference.md) for the
 complete list of `Env`-backed settings.
 
-See [CLAUDE.md](CLAUDE.md) for the complete configuration reference.
+See [AGENTS.md](AGENTS.md) for the complete configuration reference.
 
 ---
 

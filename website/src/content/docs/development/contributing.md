@@ -52,7 +52,7 @@ For Hacktoberfest, use the [`hacktoberfest`](https://github.com/themoah/klag/iss
 ## When adding a metric
 
 Metric names and tags are part of the public API. When you add, rename, or retag a
-metric, also update the reporter/collector and its tests, the `README.md` and `CLAUDE.md`
+metric, also update the reporter/collector and its tests, the `README.md` and `AGENTS.md`
 metric docs, the [Grafana dashboard](/integrations/grafana-dashboard/)
 (`dashboard/demo-dashboard.json`), and, if Helm/ServiceMonitor behavior changes, the
 chart values, templates, README, and Helm tests.
