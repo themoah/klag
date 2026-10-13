@@ -29,7 +29,7 @@ Member labels (`member_host`, `consumer_id`, `client_id`) on per-partition consu
 Update **all** of:
 
 - Collector/reporter code + tests
-- `CLAUDE.md` and `README.md` metric sections
+- `AGENTS.md` and `README.md` metric sections
 - `dashboard/demo-dashboard.json` (and Grafana.com export if applicable)
 - Helm chart/README if scrape or ServiceMonitor behavior changes
 - Website docs under `website/src/content/docs/metrics/` when user-facing
