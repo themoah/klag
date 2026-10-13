@@ -110,6 +110,7 @@ export default defineConfig({
           items: [
             { label: 'Reference', slug: 'configuration/reference' },
             { label: 'Group Filtering', slug: 'configuration/group-filtering' },
+            { label: 'Label Cardinality', slug: 'configuration/cardinality' },
           ],
         },
         {
