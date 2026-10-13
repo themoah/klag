@@ -51,7 +51,9 @@ identifying the consumer **instance** that owns each partition — handy for pin
 specific pod. Unowned partitions (Empty/Dead groups) get empty-string values. Disable with
 `CONSUMER_MEMBER_LABELS_ENABLED=false` to cut cardinality (cheaper than Prometheus
 `labeldrop` of the same names, which still scrapes the series first). Topic-level `lag.ms` aggregates and
-partition-level `klag.partition.log_*_offset` metrics stay member-agnostic.
+partition-level `klag.partition.log_*_offset` metrics stay member-agnostic. For when to
+keep or drop these — and how group filters and cluster tags interact — see the
+[Label Cardinality guide](/configuration/cardinality/).
 
 ## Hot partitions
 

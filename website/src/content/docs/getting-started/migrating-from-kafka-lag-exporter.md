@@ -118,6 +118,9 @@ The partition-level `klag_partition_log_end_offset` / `log_start_offset` metrics
 labels (they describe the partition, not a consumer), matching kafka-lag-exporter's
 `kafka_partition_*`.
 
+The full worked decision — including how group/topic filters and multi-cluster tags
+interact with this — is in the [Label Cardinality guide](/configuration/cardinality/).
+
 ## Configuration mapping
 
 kafka-lag-exporter uses a HOCON `application.conf`; Klag primarily uses environment

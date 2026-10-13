@@ -41,3 +41,7 @@ Filtering reduces the number of `describe`/offset calls Klag makes. For very lar
 clusters, also tune `KAFKA_CHUNK_COUNT` and `KAFKA_CHUNK_DELAY_MS` (see the
 [Configuration Reference](/configuration/reference/)) to spread requests over time and
 avoid spiking broker CPU.
+
+Filtering is one of the levers that cuts series count. The other levers — consumer
+member labels, topic filtering, and multi-cluster tags — are covered in the
+[Label Cardinality guide](/configuration/cardinality/).
