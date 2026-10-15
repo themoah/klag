@@ -77,6 +77,11 @@ public class McpTools {
    * @return an MCP tool result ({@code content} + {@code isError})
    */
   public JsonObject call(String name, JsonObject args) {
+    // Group is required for these tools even when the snapshot is not ready, so a
+    // missing/invalid argument is not reported as a successful not-ready result.
+    if ((GET_GROUP_LAG.equals(name) || DIAGNOSE.equals(name)) && groupArg(args) == null) {
+      return error("Missing or invalid required argument: group");
+    }
     Optional<MetricsSnapshot> snapshot = store.latest();
     if (snapshot.isEmpty()) {
       return text("Snapshot not ready yet — the metrics collector has not completed its first "
@@ -111,9 +116,9 @@ public class McpTools {
   }
 
   private JsonObject getGroupLag(MetricsSnapshot snap, JsonObject args) {
-    String group = args.getString("group");
-    if (group == null || group.isBlank()) {
-      return error("Missing required argument: group");
+    String group = groupArg(args);
+    if (group == null) {
+      return error("Missing or invalid required argument: group");
     }
     Optional<GroupSnapshot> gs = snap.group(group);
     if (gs.isEmpty()) {
@@ -193,9 +198,9 @@ public class McpTools {
   }
 
   private JsonObject diagnose(MetricsSnapshot snap, JsonObject args) {
-    String group = args.getString("group");
-    if (group == null || group.isBlank()) {
-      return error("Missing required argument: group");
+    String group = groupArg(args);
+    if (group == null) {
+      return error("Missing or invalid required argument: group");
     }
     Optional<GroupSnapshot> gs = snap.group(group);
     if (gs.isEmpty()) {
@@ -321,6 +326,14 @@ public class McpTools {
 
   private static JsonObject text(String body) {
     return result(body, false);
+  }
+
+  /**
+   * Reads the {@code group} argument by JSON type. A number, array or object is an invalid
+   * argument rather than a group name to look up. Returns null unless it is a non-blank string.
+   */
+  private static String groupArg(JsonObject args) {
+    return args.getValue("group") instanceof String g && !g.isBlank() ? g : null;
   }
 
   private static JsonObject error(String body) {
