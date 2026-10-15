@@ -1,5 +1,6 @@
 package io.github.themoah.klag.mcp;
 
+import io.github.themoah.klag.config.Env;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
@@ -28,12 +29,13 @@ public record McpConfig(
   private static final String DEFAULT_PATH = "/mcp";
 
   /**
-   * Loads configuration from the process environment.
+   * Loads configuration from the process environment. Like every other setting, each key
+   * resolves from the env var {@code NAME}, then {@code -DNAME}, then {@code -Dname.dotted}.
    *
    * @return the MCP configuration
    */
   public static McpConfig fromEnvironment() {
-    return from(System::getenv);
+    return from(Env::resolve);
   }
 
   /**

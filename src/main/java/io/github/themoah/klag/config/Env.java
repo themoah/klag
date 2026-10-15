@@ -20,8 +20,11 @@ public final class Env {
 
   /**
    * Resolves a config value from env var, then -DNAME, then -Dname.dotted. Null if none set.
+   *
+   * @param name the environment variable name, e.g. {@code MCP_AUTH_TOKEN}
+   * @return the first non-blank value found, or the dotted property value (possibly null)
    */
-  static String resolve(String name) {
+  public static String resolve(String name) {
     String value = System.getenv(name);
     if (value != null && !value.isBlank()) {
       return value;

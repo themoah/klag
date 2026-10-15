@@ -27,8 +27,9 @@ resolve in this order: environment variable `NAME` → `-DNAME` → dotted
 - all `HOT_PARTITION_*` and `TIME_LAG_*` settings listed below
 - `COMMIT_FRESHNESS_ENABLED`, `ISR_ENABLED`, `DATA_SKEW_ENABLED`, `DATA_SKEW_MIN_PARTITIONS`
 - `STATSD_HOST`, `STATSD_PORT`, `STATSD_FLAVOR`
+- `MCP_ENABLED`, `MCP_AUTH_TOKEN`, `MCP_PATH`, `MCP_ALLOWED_ORIGINS`
 
-Kafka forwarding, `KLAG_CONFIG_FILE`, Vert.x, MCP, and the other reporter-specific
+Kafka forwarding, `KLAG_CONFIG_FILE`, Vert.x, and the other reporter-specific
 integration settings (`DD_*`, `OTLP_*`, and `OTEL_*`) read environment variables directly
 and do not use that `-D` resolution chain. Logging is a separate exception: Logback can
 resolve exact-name JVM properties such as

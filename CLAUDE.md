@@ -177,7 +177,7 @@ fall back to the documented defaults.
 - `DATA_SKEW_ENABLED` (false) - Score retained-size imbalance across a topic's partitions as `max/mean` of `logEndOffset − logStartOffset`. No extra Kafka calls. When off: no gauges, no MCP diagnose findings.
 - `DATA_SKEW_MIN_PARTITIONS` (2) - Minimum partitions per topic before a score is emitted.
 
-**MCP (AI agent access):**
+**MCP (AI agent access):** (all `Env`-backed, so `-DMCP_AUTH_TOKEN` / `-Dmcp.auth.token` work too)
 - `MCP_ENABLED` (false) - Expose the `/mcp` endpoint for AI agents (SRE/dev). Opt-in; zero impact when off.
 - `MCP_AUTH_TOKEN` (empty) - When set, requires `Authorization: Bearer <token>`. Empty = open (logged warning).
 - `MCP_PATH` (/mcp) - HTTP path of the MCP endpoint.

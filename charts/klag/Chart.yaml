@@ -2,8 +2,8 @@ apiVersion: v2
 name: klag
 description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter with pluggable metrics sinks.
 type: application
-version: 0.3.18
-appVersion: "0.2.19"
+version: 0.3.19
+appVersion: "0.2.20"
 home: https://github.com/themoah/klag
 icon: https://avatars.githubusercontent.com/themoah
 sources:
@@ -34,6 +34,8 @@ annotations:
     - name: themoah
       email: aviv@dozorets.com
   artifacthub.io/changes: |
+    - kind: security
+      description: MCP settings (MCP_ENABLED, MCP_AUTH_TOKEN, MCP_PATH, MCP_ALLOWED_ORIGINS) now also resolve from -DNAME and -Dname.dotted like every other setting, so a token passed as a JVM property is no longer silently ignored
     - kind: added
       description: StatsD/DogStatsD reporter; set metrics.reporter to statsd and pass STATSD_HOST, STATSD_PORT and STATSD_FLAVOR (datadog, telegraf, sysdig, etsy) via extraEnv to push metrics over UDP to a StatsD agent
     - kind: fixed
