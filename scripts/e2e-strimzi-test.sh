@@ -131,7 +131,14 @@ if [[ -n "${KLAG_IMAGE:-}" ]]; then
 else
   log "Building Klag image from local Dockerfile (can take a few minutes)"
   docker build -t "$LOCAL_IMAGE" . >/dev/null; ok "built ${LOCAL_IMAGE}"
-  log "Importing image into k3d"; k3d image import "$LOCAL_IMAGE" -c "$CLUSTER_NAME" >/dev/null; ok imported
+  log "Importing image into k3d"
+  # k3d import can race its tools node and still exit 0; verify the image landed.
+  for attempt in 1 2 3; do
+    k3d image import "$LOCAL_IMAGE" -c "$CLUSTER_NAME" >/dev/null || true
+    docker exec "k3d-${CLUSTER_NAME}-server-0" crictl inspecti "docker.io/library/${LOCAL_IMAGE}" >/dev/null 2>&1 && break
+    [[ $attempt == 3 ]] && die "${LOCAL_IMAGE} missing from k3d node after 3 imports"
+  done
+  ok imported
   IMAGE_REPO="klag"; IMAGE_TAG="e2e"; PULL_POLICY="Never"
 fi
 
