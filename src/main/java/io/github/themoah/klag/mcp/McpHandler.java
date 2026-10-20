@@ -165,19 +165,23 @@ public class McpHandler {
   public Optional<JsonObject> dispatch(JsonObject request) {
     // Must run before the notification check: a message missing both "jsonrpc" and "id"
     // would otherwise be silently accepted as a notification.
+    Object id = request.getValue("id");
     if (!"2.0".equals(request.getValue("jsonrpc"))) {
-      return Optional.of(McpProtocol.error(request.getValue("id"),
+      return Optional.of(McpProtocol.error(id,
         McpProtocol.INVALID_REQUEST, "Missing or invalid jsonrpc version (expected \"2.0\")"));
+    }
+    Object methodVal = request.getValue("method");
+    if (methodVal == null) {
+      return Optional.of(McpProtocol.error(id, McpProtocol.INVALID_REQUEST, "Missing method"));
+    }
+    // Check the JSON type before the notification check: a non-string method with no id
+    // is Invalid Request, not a silently accepted notification (HTTP 202).
+    if (!(methodVal instanceof String method)) {
+      return Optional.of(McpProtocol.error(id, McpProtocol.INVALID_REQUEST, "'method' must be a string"));
     }
     if (McpProtocol.isNotification(request)) {
       // The only notification we expect is notifications/initialized; nothing to return.
       return Optional.empty();
-    }
-
-    Object id = request.getValue("id");
-    String method = request.getString("method");
-    if (method == null) {
-      return Optional.of(McpProtocol.error(id, McpProtocol.INVALID_REQUEST, "Missing method"));
     }
 
     return Optional.of(switch (method) {
@@ -207,8 +211,11 @@ public class McpHandler {
     if (argsVal != null && !(argsVal instanceof JsonObject)) {
       return McpProtocol.error(id, McpProtocol.INVALID_PARAMS, "'arguments' must be an object");
     }
+    if (!(params.getValue("name") instanceof String toolName)) {
+      return McpProtocol.error(id, McpProtocol.INVALID_PARAMS, "'name' must be a string");
+    }
     JsonObject args = argsVal != null ? (JsonObject) argsVal : new JsonObject();
-    JsonObject result = tools.call(String.valueOf(params.getValue("name")), args);
+    JsonObject result = tools.call(toolName, args);
     return McpProtocol.success(id, result);
   }
 

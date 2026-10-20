@@ -105,6 +105,53 @@ class McpToolsTest {
   }
 
   @Test
+  void nonStringGroupArgIsToolErrorNotException() {
+    McpTools tools = new McpTools(storeWith(group("payments", State.STABLE, 50, 1, 5)));
+    for (String tool : new String[] {"get_consumer_group_lag", "diagnose"}) {
+      for (Object bad : new Object[] {123, new io.vertx.core.json.JsonArray().add("payments"), new JsonObject(), "  "}) {
+        JsonObject r = tools.call(tool, new JsonObject().put("group", bad));
+        assertTrue(r.getBoolean("isError"), tool + " group=" + bad);
+        assertTrue(textOf(r).contains("Missing or invalid required argument: group"), tool + " group=" + bad);
+      }
+    }
+  }
+
+  @Test
+  void validGroupReturnsNotReadyForGetConsumerGroupLagWhenSnapshotEmpty() {
+    McpTools tools = new McpTools(new SnapshotStore());
+    JsonObject r = tools.call("get_consumer_group_lag", new JsonObject().put("group", "payments"));
+    assertFalse(r.getBoolean("isError"));
+    assertTrue(textOf(r).toLowerCase(Locale.ROOT).contains("not ready"));
+  }
+
+  @Test
+  void validGroupReturnsNotReadyForDiagnoseWhenSnapshotEmpty() {
+    McpTools tools = new McpTools(new SnapshotStore());
+    JsonObject r = tools.call("diagnose", new JsonObject().put("group", "payments"));
+    assertFalse(r.getBoolean("isError"));
+    assertTrue(textOf(r).toLowerCase(Locale.ROOT).contains("not ready"));
+  }
+
+  @Test
+  void invalidGroupIsErrorEvenWhenSnapshotNotReady() {
+    McpTools tools = new McpTools(new SnapshotStore());
+    for (String tool : new String[] {"get_consumer_group_lag", "diagnose"}) {
+      JsonObject missing = tools.call(tool, new JsonObject());
+      assertTrue(missing.getBoolean("isError"), tool + " missing group");
+      assertTrue(textOf(missing).contains("Missing or invalid required argument: group"),
+        tool + " missing group");
+      for (Object bad : new Object[] {123, new JsonArray(), new JsonObject(), "  "}) {
+        JsonObject r = tools.call(tool, new JsonObject().put("group", bad));
+        assertTrue(r.getBoolean("isError"), tool + " group=" + bad);
+        assertTrue(textOf(r).contains("Missing or invalid required argument: group"),
+          tool + " group=" + bad);
+        assertFalse(textOf(r).toLowerCase(Locale.ROOT).contains("not ready"),
+          tool + " group=" + bad);
+      }
+    }
+  }
+
+  @Test
   void getConsumerGroupLagUnknownGroupIsError() {
     McpTools tools = new McpTools(storeWith(group("payments", State.STABLE, 50, 1, 5)));
     JsonObject r = tools.call("get_consumer_group_lag", new JsonObject().put("group", "ghost"));

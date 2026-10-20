@@ -76,6 +76,18 @@ class McpHandlerTest {
   }
 
   @Test
+  void toolsCallWithNonStringNameIsInvalidParams() {
+    for (Object bad : new Object[] {42, new io.vertx.core.json.JsonArray().add(1), new JsonObject(), true}) {
+      JsonObject params = new JsonObject().put("name", bad);
+      JsonObject req = request(42, McpProtocol.TOOLS_CALL).put("params", params);
+      JsonObject resp = openHandler().dispatch(req).orElseThrow();
+      JsonObject err = resp.getJsonObject("error");
+      assertEquals(McpProtocol.INVALID_PARAMS, err.getInteger("code"), "name=" + bad);
+      assertFalse(err.getString("message").contains("cannot be cast"), "leaked: " + err);
+    }
+  }
+
+  @Test
   void unknownMethodReturnsMethodNotFound() {
     JsonObject resp = openHandler().dispatch(request(5, "does/notExist")).orElseThrow();
     assertEquals(McpProtocol.METHOD_NOT_FOUND, resp.getJsonObject("error").getInteger("code"));
@@ -86,6 +98,47 @@ class McpHandlerTest {
     JsonObject req = new JsonObject().put("jsonrpc", "2.0").put("id", 6);
     JsonObject resp = openHandler().dispatch(req).orElseThrow();
     assertEquals(McpProtocol.INVALID_REQUEST, resp.getJsonObject("error").getInteger("code"));
+  }
+
+  @Test
+  void missingMethodWithoutIdIsInvalidRequestNotNotification() {
+    JsonObject req = new JsonObject().put("jsonrpc", "2.0");
+    Optional<JsonObject> resp = openHandler().dispatch(req);
+    assertTrue(resp.isPresent());
+    assertEquals(McpProtocol.INVALID_REQUEST, resp.get().getJsonObject("error").getInteger("code"));
+  }
+
+  @Test
+  void nullMethodWithoutIdIsInvalidRequestNotNotification() {
+    JsonObject req = new JsonObject().put("jsonrpc", "2.0").putNull("method");
+    Optional<JsonObject> resp = openHandler().dispatch(req);
+    assertTrue(resp.isPresent());
+    assertEquals(McpProtocol.INVALID_REQUEST, resp.get().getJsonObject("error").getInteger("code"));
+  }
+
+  @Test
+  void nonStringMethodIsInvalidRequest() {
+    for (Object bad : new Object[] {123, new JsonObject().put("a", 1), new io.vertx.core.json.JsonArray().add("ping"), true}) {
+      JsonObject req = new JsonObject().put("jsonrpc", "2.0").put("id", 7).put("method", bad);
+      JsonObject resp = openHandler().dispatch(req).orElseThrow();
+      JsonObject err = resp.getJsonObject("error");
+      assertEquals(McpProtocol.INVALID_REQUEST, err.getInteger("code"), "method=" + bad);
+      assertEquals(7, resp.getInteger("id"));
+      assertFalse(err.getString("message").contains("cannot be cast"), "leaked: " + err);
+    }
+  }
+
+  @Test
+  void nonStringMethodWithoutIdIsInvalidRequestNotNotification() {
+    for (Object bad : new Object[] {123, new JsonObject().put("a", 1), new io.vertx.core.json.JsonArray().add("ping"), true}) {
+      JsonObject req = new JsonObject().put("jsonrpc", "2.0").put("method", bad);
+      Optional<JsonObject> maybe = openHandler().dispatch(req);
+      assertTrue(maybe.isPresent(), "method=" + bad + " must not be treated as a notification");
+      JsonObject resp = maybe.get();
+      JsonObject err = resp.getJsonObject("error");
+      assertEquals(McpProtocol.INVALID_REQUEST, err.getInteger("code"), "method=" + bad);
+      assertEquals("'method' must be a string", err.getString("message"), "method=" + bad);
+    }
   }
 
   @Test

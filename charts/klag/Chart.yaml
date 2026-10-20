@@ -34,6 +34,8 @@ annotations:
     - name: themoah
       email: aviv@dozorets.com
   artifacthub.io/changes: |
+    - kind: fixed
+      description: The MCP endpoint answers a non-string method with -32600 Invalid Request and a non-string group argument with the tool's argument error, instead of treating the value's text as a method or group name
     - kind: security
       description: MCP settings (MCP_ENABLED, MCP_AUTH_TOKEN, MCP_PATH, MCP_ALLOWED_ORIGINS) now also resolve from -DNAME and -Dname.dotted like every other setting, so a token passed as a JVM property is no longer silently ignored
     - kind: added
