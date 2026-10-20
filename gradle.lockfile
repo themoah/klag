@@ -1,12 +1,11 @@
 # This is a Gradle generated file for dependency locking.
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
-# To regenerate this file, run: ./gradlew :dependencies --write-locks
-at.yawk.lz4:lz4-java:1.11.1=runtimeClasspath
+at.yawk.lz4:lz4-java:1.11.4=runtimeClasspath
 ch.qos.logback:logback-classic:1.5.38=compileClasspath,runtimeClasspath
 ch.qos.logback:logback-core:1.5.38=compileClasspath,runtimeClasspath
-com.fasterxml.jackson.core:jackson-core:2.21.6=compileClasspath,runtimeClasspath
-com.fasterxml.jackson:jackson-bom:2.21.6=compileClasspath,runtimeClasspath
+com.fasterxml.jackson.core:jackson-core:2.21.8=compileClasspath,runtimeClasspath
+com.fasterxml.jackson:jackson-bom:2.21.8=compileClasspath,runtimeClasspath
 com.github.luben:zstd-jni:1.5.6-10=runtimeClasspath
 com.google.protobuf:protobuf-java:4.32.0=runtimeClasspath
 io.micrometer:micrometer-commons:1.16.6=compileClasspath,runtimeClasspath

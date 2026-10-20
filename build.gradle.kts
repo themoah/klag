@@ -63,8 +63,12 @@ dependencies {
       because("CVE-2024-7254")
     }
     // kafka-clients — JNI XXHash JVM crash on invalid byte-array ranges.
-    implementation("at.yawk.lz4:lz4-java:1.11.1") {
-      because("CVE-2026-59949")
+    implementation("at.yawk.lz4:lz4-java:1.11.4") {
+      because("CVE-2026-59949, CVE-2026-106451, CVE-2026-106450, CVE-2026-106452, CVE-2026-106453, CVE-2026-106449")
+    }
+    // vertx-stack-depchain BOM pins jackson-core 2.21.6 — DoS in parsing /mcp request bodies.
+    implementation("com.fasterxml.jackson.core:jackson-core:2.21.8") {
+      because("CVE-2026-89425, CVE-2026-89407")
     }
     // vertx-stack-depchain BOM pins micrometer-core to the EOL 1.12.x line.
     implementation("io.micrometer:micrometer-core:$micrometerVersion") {
