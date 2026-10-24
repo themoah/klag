@@ -9,6 +9,8 @@ on:
       - 'website/**'
   schedule:
     - cron: '0 6 * * 1' # weekly Monday 06:00 UTC
+  # Manual re-scan of main after a deps fix, so stale alerts close without waiting a week.
+  workflow_dispatch:
 
 # New pushes cancel stale in-progress PR runs instead of stacking them.
 concurrency:
