@@ -4,6 +4,87 @@ entries:
   - annotations:
       artifacthub.io/category: monitoring-logging
       artifacthub.io/changes: |
+        - kind: security
+          description: snappy-java 1.1.10.7 -> 1.1.10.9 (CVE-2026-93451, CVE-2026-108106, CVE-2026-116590), transitive via kafka-clients
+        - kind: fixed
+          description: The MCP endpoint answers a non-string method with -32600 Invalid Request and a non-string group argument with the tool's argument error, instead of treating the value's text as a method or group name
+        - kind: security
+          description: MCP settings (MCP_ENABLED, MCP_AUTH_TOKEN, MCP_PATH, MCP_ALLOWED_ORIGINS) now also resolve from -DNAME and -Dname.dotted like every other setting, so a token passed as a JVM property is no longer silently ignored
+        - kind: added
+          description: StatsD/DogStatsD reporter; set metrics.reporter to statsd and pass STATSD_HOST, STATSD_PORT and STATSD_FLAVOR (datadog, telegraf, sysdig, etsy) via extraEnv to push metrics over UDP to a StatsD agent
+        - kind: fixed
+          description: A consumer group that fails every cycle (ACL gap, wedged coordinator) no longer freezes stale-series cleanup for the whole cluster; only that group's last good series are held
+        - kind: fixed
+          description: A partition read by several groups or chunks gets one throughput and one lag_ms poll sample per cycle, and throughput hot partitions are detected once per cycle instead of per chunk, which removes false and duplicate results when KAFKA_CHUNK_COUNT is above 1
+        - kind: security
+          description: The MCP endpoint rejects requests from browser origins with 403 unless listed in mcp.allowedOrigins (MCP_ALLOWED_ORIGINS), and bodies that are not application/json with 415, so a web page cannot read consumer group data through DNS rebinding
+        - kind: added
+          description: Optional PodDisruptionBudget and configurable pod termination grace period, preserving Kubernetes 1.19 support
+        - kind: fixed
+          description: Disable multipart file uploads on the MCP endpoint so requests cannot leave uploaded files on disk
+        - kind: fixed
+          description: Keep MCP trend values and consumer group state labels independent of the JVM default locale
+        - kind: added
+          description: Opt-in METRICS_ASSIGNED_TOPICS_ONLY drops lag for topics a Stable group has abandoned but whose committed offsets have not yet expired; Empty/rebalancing groups keep reporting so outages stay visible
+        - kind: fixed
+          description: Preserve HOT_PARTITION_MIN_SAMPLES when HOT_PARTITION_BUFFER_SIZE is too small by raising the buffer size to the configured minimum
+        - kind: added
+          description: One process can scrape several Kafka clusters via kafka.clusters (KAFKA_CLUSTERS); Kafka series carry cluster_name so PromQL can split them when instance/pod labels are dropped
+        - kind: added
+          description: Opt-in topic data-skew metric (klag.topic.size_skew = max/mean retained size × 100); enable with DATA_SKEW_ENABLED=true
+        - kind: added
+          description: OTLP exporter can trust extra CA certificates for an HTTPS collector served with an internally-signed cert; set metrics.otlp.caCertPath (env OTLP_CA_CERT_PATH / OTEL_EXPORTER_OTLP_CERTIFICATE) to a PEM bundle mounted with matching extraVolumes and extraVolumeMounts. Trust is additive over the JVM defaults and scoped to the OTLP exporter
+        - kind: added
+          description: Expose serviceMonitor.metricRelabelings and serviceMonitor.relabelings so Prometheus Operator can rewrite labels without a second ServiceMonitor or a chart fork
+        - kind: security
+          description: Upgrade Micrometer to 1.16.6 (CVE-2026-40984 in micrometer-core; the 1.12 line is EOL and unpatched), which moves the Prometheus registry onto the Prometheus Java client 1.x and drops the EOL io.prometheus:simpleclient jars; scraped metric names, labels and values are unchanged
+        - kind: changed
+          description: Drop the unused vertx-micrometer-metrics dependency
+        - kind: fixed
+          description: A topic deleted while a group still has committed offsets for it no longer keeps every cycle partial (which froze stale-series cleanup for up to offsets.retention.minutes); such topics are filtered out and their series retired
+        - kind: fixed
+          description: The MCP snapshot now refreshes on a partial cycle instead of freezing at the last complete one, so one failing consumer group no longer leaves AI agents reading stale data while /metrics stays current
+      artifacthub.io/license: Apache-2.0
+      artifacthub.io/links: |
+        - name: source
+          url: https://github.com/themoah/klag
+        - name: issues
+          url: https://github.com/themoah/klag/issues
+        - name: documentation
+          url: https://github.com/themoah/klag/blob/main/README.md
+      artifacthub.io/maintainers: |
+        - name: themoah
+          email: aviv@dozorets.com
+      artifacthub.io/prerelease: "false"
+    apiVersion: v2
+    appVersion: 0.2.20
+    created: "2026-11-01T20:58:27.456849073Z"
+    description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter
+      with pluggable metrics sinks.
+    digest: 4f5b534481c1ba96539dd5ce27589022e4c2b4394c2350fcf7bb5a5aae1ba1e0
+    home: https://github.com/themoah/klag
+    icon: https://avatars.githubusercontent.com/themoah
+    keywords:
+    - kafka
+    - lag
+    - monitoring
+    - prometheus
+    - metrics
+    - consumer-groups
+    maintainers:
+    - email: aviv@dozorets.com
+      name: themoah
+      url: https://github.com/themoah
+    name: klag
+    sources:
+    - https://github.com/themoah/klag
+    type: application
+    urls:
+    - https://github.com/themoah/klag/releases/download/klag-0.3.19/klag-0.3.19.tgz
+    version: 0.3.19
+  - annotations:
+      artifacthub.io/category: monitoring-logging
+      artifacthub.io/changes: |
         - kind: added
           description: StatsD/DogStatsD reporter; set metrics.reporter to statsd and pass STATSD_HOST, STATSD_PORT and STATSD_FLAVOR (datadog, telegraf, sysdig, etsy) via extraEnv to push metrics over UDP to a StatsD agent
         - kind: fixed
@@ -1128,4 +1209,4 @@ entries:
     urls:
     - https://github.com/themoah/klag/releases/download/klag-0.1.12/klag-0.1.12.tgz
     version: 0.1.12
-generated: "2026-10-12T18:38:13.896000501Z"
+generated: "2026-11-01T20:58:27.456975322Z"
