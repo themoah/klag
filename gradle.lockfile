@@ -48,5 +48,5 @@ org.hdrhistogram:HdrHistogram:2.2.2=runtimeClasspath
 org.jspecify:jspecify:1.0.0=compileClasspath,runtimeClasspath
 org.latencyutils:LatencyUtils:2.0.3=runtimeClasspath
 org.slf4j:slf4j-api:2.0.17=compileClasspath,runtimeClasspath
-org.xerial.snappy:snappy-java:1.1.10.7=runtimeClasspath
+org.xerial.snappy:snappy-java:1.1.10.9=runtimeClasspath
 empty=

@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "io.github.themoah"
-version = "0.2.19"
+version = "0.2.20"
 
 repositories {
   mavenCentral()
@@ -65,6 +65,10 @@ dependencies {
     // kafka-clients — JNI XXHash JVM crash on invalid byte-array ranges.
     implementation("at.yawk.lz4:lz4-java:1.11.4") {
       because("CVE-2026-59949, CVE-2026-106451, CVE-2026-106450, CVE-2026-106452, CVE-2026-106453, CVE-2026-106449")
+    }
+    // kafka-clients pulls snappy-java 1.1.10.7 (fixed in 1.1.10.9).
+    implementation("org.xerial.snappy:snappy-java:1.1.10.9") {
+      because("CVE-2026-93451, CVE-2026-108106, CVE-2026-116590")
     }
     // vertx-stack-depchain BOM pins jackson-core 2.21.6 — DoS in parsing /mcp request bodies.
     implementation("com.fasterxml.jackson.core:jackson-core:2.21.8") {
