@@ -2,8 +2,8 @@ apiVersion: v2
 name: klag
 description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter with pluggable metrics sinks.
 type: application
-version: 0.3.18
-appVersion: "0.2.19"
+version: 0.3.19
+appVersion: "0.2.20"
 home: https://github.com/themoah/klag
 icon: https://avatars.githubusercontent.com/themoah
 sources:
@@ -34,6 +34,8 @@ annotations:
     - name: themoah
       email: aviv@dozorets.com
   artifacthub.io/changes: |
+    - kind: security
+      description: snappy-java 1.1.10.7 -> 1.1.10.9 (CVE-2026-93451, CVE-2026-108106, CVE-2026-116590), transitive via kafka-clients
     - kind: fixed
       description: The MCP endpoint answers a non-string method with -32600 Invalid Request and a non-string group argument with the tool's argument error, instead of treating the value's text as a method or group name
     - kind: security
