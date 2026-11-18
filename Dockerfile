@@ -46,6 +46,7 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 USER 65532:65532
 
 # -XX:-UseBASE64Intrinsics: Java4Shell (CVE-2026-114938) workaround for x86-64 AVX-512 hosts.
-# In the entrypoint, not JAVA_OPTS, so overriding JAVA_OPTS can't drop it. Arch-neutral (arm64 OK).
+# In the entrypoint after $JAVA_OPTS (last flag wins), so JAVA_OPTS can't drop or re-enable it.
+# Arch-neutral (arm64 OK).
 # ponytail: remove once the base image ships Temurin >= 21.0.13.1.
-ENTRYPOINT ["sh", "-c", "java -XX:-UseBASE64Intrinsics $JAVA_OPTS -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -XX:-UseBASE64Intrinsics -jar app.jar"]

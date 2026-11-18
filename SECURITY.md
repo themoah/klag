@@ -33,8 +33,10 @@ without authentication on affected hosts.
 - **Fixed in 0.2.21:** h2c is disabled, and the JVM image starts with
   `-XX:-UseBASE64Intrinsics`.
 - **Native image:** not affected (no HotSpot JIT).
-- **Running the jar on your own JDK:** upgrade to JDK 21.0.13.1 or later, or add
-  `-XX:-UseBASE64Intrinsics` to the `java` command.
+- **Running the jar on your own JDK:** upgrade to the fixed release of your JDK
+  line (17.0.21.1, 21.0.13.1, 25.0.5.1 or 27.0.1.1 and later in that line; check
+  your vendor's advisory), or add `-XX:-UseBASE64Intrinsics` to the `java`
+  command after any other options.
 
 ## Image hardening
 
