@@ -30,8 +30,8 @@ upgrades, whose handler Base64-decodes the client-supplied `HTTP2-Settings`
 header before routing or MCP auth, so the JVM image up to 0.2.20 was reachable
 without authentication on affected hosts.
 
-- **Fixed in 0.2.21:** h2c is disabled, and the JVM image starts with
-  `-XX:-UseBASE64Intrinsics`.
+- **Fixed in 0.2.21:** h2c is disabled, the JVM image runs on the patched
+  SapMachine 21.0.13.1 runtime, and it also starts with `-XX:-UseBASE64Intrinsics`.
 - **Native image:** not affected (no HotSpot JIT).
 - **Running the jar on your own JDK:** upgrade to the fixed release of your JDK
   line (17.0.21.1, 21.0.13.1, 25.0.5.1 or 27.0.1.1 and later in that line; check

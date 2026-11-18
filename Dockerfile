@@ -27,8 +27,10 @@ COPY src src
 # Build fat JAR
 RUN gradle assemble --no-daemon
 
-# Runtime stage (Ubuntu 24.04 Noble to avoid pebble + reduce CVEs)
-FROM eclipse-temurin:21-jre-noble
+# Runtime stage (Ubuntu 24.04 Noble to avoid pebble + reduce CVEs).
+# SapMachine (SAP's OpenJDK build, Docker Official Image) instead of Temurin: it shipped the
+# Java4Shell fix (21.0.13.1) first. Same OpenJDK 21 code; switch back once Temurin has 21.0.13.1.
+FROM sapmachine:21-jre-ubuntu-noble
 
 WORKDIR /app
 
@@ -48,5 +50,5 @@ USER 65532:65532
 # -XX:-UseBASE64Intrinsics: Java4Shell (CVE-2026-114938) workaround for x86-64 AVX-512 hosts.
 # In the entrypoint after $JAVA_OPTS (last flag wins), so JAVA_OPTS can't drop or re-enable it.
 # Arch-neutral (arm64 OK).
-# ponytail: remove once the base image ships Temurin >= 21.0.13.1.
+# Redundant on a fixed base (>= 21.0.13.1); kept as a guard if the base is switched back early.
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -XX:-UseBASE64Intrinsics -jar app.jar"]
