@@ -18,7 +18,7 @@ npm run dev        # http://localhost:4321 — Astro only, no Worker
 npm run preview    # build + `wrangler dev` — the real thing, Worker included
 ```
 
-Node >= 22.12 (see `.node-version`).
+Node >= 22.23.4 (see `.node-version`).
 
 ## Build
 
