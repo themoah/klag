@@ -25,6 +25,7 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.http.HttpServerOptions;
 import io.vertx.ext.web.Router;
 import java.util.ArrayList;
 import java.util.List;
@@ -131,8 +132,14 @@ public class MainVerticle extends AbstractVerticle {
       });
   }
 
+  // h2c off: its upgrade handler Base64-decodes the client's HTTP2-Settings header before
+  // routing/auth (Java4Shell, CVE-2026-114938). Prometheus, probes and MCP use HTTP/1.1.
+  static HttpServerOptions httpServerOptions() {
+    return new HttpServerOptions().setHttp2ClearTextEnabled(false);
+  }
+
   private Future<HttpServer> startHttpServer(Router router, int port) {
-    return vertx.createHttpServer()
+    return vertx.createHttpServer(httpServerOptions())
       .requestHandler(router)
       .listen(port)
       .onSuccess(server -> log.info("HTTP server started on port {}", port))

@@ -20,6 +20,22 @@ in `charts/klag/Chart.yaml`. We will acknowledge within 72 hours.
 - CI runs Trivy scans on PRs and `main`. Release pipelines fail on image drift
   between chart and application versions to avoid stale, unscanned tags.
 
+## Advisories
+
+### Java4Shell (CVE-2026-114938)
+
+HotSpot's AVX-512 Base64 decode intrinsic can write out of bounds on x86-64 CPUs
+with AVX-512 VBMI (ARM64 is not affected). Klag's HTTP server accepted h2c
+upgrades, whose handler Base64-decodes the client-supplied `HTTP2-Settings`
+header before routing or MCP auth, so the JVM image up to 0.2.20 was reachable
+without authentication on affected hosts.
+
+- **Fixed in 0.2.21:** h2c is disabled, and the JVM image starts with
+  `-XX:-UseBASE64Intrinsics`.
+- **Native image:** not affected (no HotSpot JIT).
+- **Running the jar on your own JDK:** upgrade to JDK 21.0.13.1 or later, or add
+  `-XX:-UseBASE64Intrinsics` to the `java` command.
+
 ## Image hardening
 
 - JVM image runtime is built on a minimal, non-root base with read-only FS.
