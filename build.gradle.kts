@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "io.github.themoah"
-version = "0.2.20"
+version = "0.2.21"
 
 repositories {
   mavenCentral()

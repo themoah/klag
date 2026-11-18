@@ -2,8 +2,8 @@ apiVersion: v2
 name: klag
 description: A Helm chart for Klag - A simple, lightweight Kafka Lag Exporter with pluggable metrics sinks.
 type: application
-version: 0.3.19
-appVersion: "0.2.20"
+version: 0.3.20
+appVersion: "0.2.21"
 home: https://github.com/themoah/klag
 icon: https://avatars.githubusercontent.com/themoah
 sources:
@@ -34,6 +34,8 @@ annotations:
     - name: themoah
       email: aviv@dozorets.com
   artifacthub.io/changes: |
+    - kind: security
+      description: Java4Shell (CVE-2026-114938) mitigation. The HTTP server no longer accepts h2c upgrades, whose handler Base64-decoded the client's HTTP2-Settings header before routing or auth, and the JVM image now runs on SapMachine 21.0.13.1 (patched) and also starts with -XX:-UseBASE64Intrinsics. The native image was not affected
     - kind: security
       description: snappy-java 1.1.10.7 -> 1.1.10.9 (CVE-2026-93451, CVE-2026-108106, CVE-2026-116590), transitive via kafka-clients
     - kind: fixed
