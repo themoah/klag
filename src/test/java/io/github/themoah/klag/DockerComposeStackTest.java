@@ -1,47 +1,98 @@
 package io.github.themoah.klag;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
  * Guards the wiring of the local docker-compose stack (Prometheus + Grafana around Klag).
- * Checks the files reference each other correctly; it does not start containers.
+ * Checks the parsed configuration; it does not start containers.
  */
 class DockerComposeStackTest {
 
-  private static String read(String relative) throws Exception {
-    return Files.readString(Path.of(relative));
+  private static Map<String, Object> readYaml(String relative) throws Exception {
+    String contents = Files.readString(Path.of(relative));
+    Object document = new Yaml(new SafeConstructor(new LoaderOptions())).load(contents);
+    return asMap(document);
+  }
+
+  private static Map<String, Object> asMap(Object value) {
+    assertInstanceOf(Map.class, value);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> result = (Map<String, Object>) value;
+    return result;
+  }
+
+  private static List<Object> asList(Object value) {
+    assertInstanceOf(List.class, value);
+    @SuppressWarnings("unchecked")
+    List<Object> result = (List<Object>) value;
+    return result;
   }
 
   @Test
-  void composeDefinesPrometheusAndGrafana() throws Exception {
-    String compose = read("docker-compose.yaml");
-    assertTrue(compose.contains("\n  prometheus:\n"), "prometheus service missing");
-    assertTrue(compose.contains("\n  grafana:\n"), "grafana service missing");
-    assertTrue(compose.contains("./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml"),
-        "prometheus config not mounted");
-    assertTrue(compose.contains("./docker/grafana/provisioning:/etc/grafana/provisioning"),
-        "grafana provisioning not mounted");
-    assertTrue(compose.contains("./dashboard/klag-grafana-com.json:"),
-        "dashboard not mounted into grafana");
+  void composeWiresZookeeperKafkaAndMonitoringServices() throws Exception {
+    Map<String, Object> services = asMap(readYaml("docker-compose.yaml").get("services"));
+    Map<String, Object> zookeeper = asMap(services.get("zookeeper"));
+    Map<String, Object> kafka = asMap(services.get("kafka"));
+    Map<String, Object> klag = asMap(services.get("klag"));
+    Map<String, Object> prometheus = asMap(services.get("prometheus"));
+    Map<String, Object> grafana = asMap(services.get("grafana"));
+
+    assertEquals("confluentinc/cp-zookeeper:7.7.8", zookeeper.get("image"));
+    assertEquals("zookeeper:2181", asMap(kafka.get("environment")).get("KAFKA_ZOOKEEPER_CONNECT"));
+    assertTrue(asList(kafka.get("depends_on")).contains("zookeeper"),
+        "Kafka must wait for Zookeeper");
+    assertEquals("true", asMap(klag.get("environment")).get("METRICS_JVM_ENABLED"));
+    assertTrue(asList(prometheus.get("volumes")).stream()
+        .anyMatch(volume -> volume.toString().startsWith("./docker/prometheus/prometheus.yml:")),
+        "Prometheus config not mounted into its service");
+    assertTrue(asList(grafana.get("volumes")).stream()
+        .anyMatch(volume -> volume.toString().startsWith("./docker/grafana/provisioning:")),
+        "Grafana provisioning not mounted into its service");
+    assertTrue(asList(grafana.get("volumes")).stream()
+        .anyMatch(volume -> volume.toString().startsWith("./dashboard/klag-grafana-com.json:")),
+        "Dashboard not mounted into Grafana");
+    assertTrue(asList(prometheus.get("ports")).contains("127.0.0.1:9090:9090"),
+        "Prometheus must only be published on host loopback");
+    assertTrue(asList(grafana.get("ports")).contains("127.0.0.1:3000:3000"),
+        "Grafana must only be published on host loopback");
   }
 
   @Test
   void prometheusScrapesKlagMetricsEndpoint() throws Exception {
-    String prom = read("docker/prometheus/prometheus.yml");
-    assertTrue(prom.contains("targets: [\"klag:8888\"]"), "klag scrape target missing");
-    assertTrue(prom.contains("metrics_path: /metrics"), "metrics_path not /metrics");
+    Map<String, Object> config = readYaml("docker/prometheus/prometheus.yml");
+    Map<String, Object> job = asMap(asList(config.get("scrape_configs")).getFirst());
+    Map<String, Object> staticConfig = asMap(asList(job.get("static_configs")).getFirst());
+
+    assertEquals("klag", job.get("job_name"));
+    assertEquals("/metrics", job.getOrDefault("metrics_path", "/metrics"));
+    assertTrue(asList(staticConfig.get("targets")).contains("klag:8888"),
+        "Klag scrape target missing from the klag job");
   }
 
   @Test
   void grafanaProvisionsPrometheusDatasourceAndDashboardPath() throws Exception {
-    String ds = read("docker/grafana/provisioning/datasources/prometheus.yml");
-    assertTrue(ds.contains("url: http://prometheus:9090"), "datasource URL does not match service");
-    String dash = read("docker/grafana/provisioning/dashboards/klag.yml");
-    assertTrue(dash.contains("path: /var/lib/grafana/dashboards/klag"),
-        "dashboard provider path does not match the compose mount");
+    Map<String, Object> datasourceFile =
+        readYaml("docker/grafana/provisioning/datasources/prometheus.yml");
+    Map<String, Object> datasource = asMap(asList(datasourceFile.get("datasources")).getFirst());
+    assertEquals("Prometheus", datasource.get("name"));
+    assertEquals("http://prometheus:9090", datasource.get("url"));
+
+    Map<String, Object> dashboardFile =
+        readYaml("docker/grafana/provisioning/dashboards/klag.yml");
+    Map<String, Object> provider = asMap(asList(dashboardFile.get("providers")).getFirst());
+    Map<String, Object> options = asMap(provider.get("options"));
+    assertEquals("klag", provider.get("name"));
+    assertEquals("/var/lib/grafana/dashboards/klag", options.get("path"));
   }
 }
