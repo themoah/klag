@@ -40,18 +40,24 @@ class DockerComposeStackTest {
   }
 
   @Test
-  void composeWiresZookeeperKafkaAndMonitoringServices() throws Exception {
+  void composeWiresKraftKafkaAndMonitoringServices() throws Exception {
     Map<String, Object> services = asMap(readYaml("docker-compose.yaml").get("services"));
-    Map<String, Object> zookeeper = asMap(services.get("zookeeper"));
     Map<String, Object> kafka = asMap(services.get("kafka"));
     Map<String, Object> klag = asMap(services.get("klag"));
     Map<String, Object> prometheus = asMap(services.get("prometheus"));
     Map<String, Object> grafana = asMap(services.get("grafana"));
+    Map<String, Object> kafkaEnvironment = asMap(kafka.get("environment"));
 
-    assertEquals("confluentinc/cp-zookeeper:7.7.8", zookeeper.get("image"));
-    assertEquals("zookeeper:2181", asMap(kafka.get("environment")).get("KAFKA_ZOOKEEPER_CONNECT"));
-    assertTrue(asList(kafka.get("depends_on")).contains("zookeeper"),
-        "Kafka must wait for Zookeeper");
+    assertEquals("confluentinc/cp-kafka:8.1.1", kafka.get("image"));
+    assertEquals(1, kafkaEnvironment.get("KAFKA_NODE_ID"));
+    assertEquals("broker,controller", kafkaEnvironment.get("KAFKA_PROCESS_ROLES"));
+    assertEquals("1@kafka:29093", kafkaEnvironment.get("KAFKA_CONTROLLER_QUORUM_VOTERS"));
+    assertEquals("CONTROLLER", kafkaEnvironment.get("KAFKA_CONTROLLER_LISTENER_NAMES"));
+    assertTrue(kafkaEnvironment.get("KAFKA_LISTENERS").toString().contains("CONTROLLER://"),
+        "KRaft controller listener missing");
+    assertTrue(!services.containsKey("zookeeper"), "KRaft stack must not define Zookeeper");
+    assertTrue(!kafkaEnvironment.containsKey("KAFKA_ZOOKEEPER_CONNECT"),
+        "KRaft broker must not connect to Zookeeper");
     assertEquals("true", asMap(klag.get("environment")).get("METRICS_JVM_ENABLED"));
     assertTrue(asList(prometheus.get("volumes")).stream()
         .anyMatch(volume -> volume.toString().startsWith("./docker/prometheus/prometheus.yml:")),

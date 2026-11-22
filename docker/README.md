@@ -4,8 +4,7 @@
 
 | Service | What it does | URL |
 |---------|--------------|-----|
-| `zookeeper` | Kafka coordination service (internal to Compose) | |
-| `kafka` | Single-broker Kafka coordinated by Zookeeper | `localhost:9092` |
+| `kafka` | Single-broker KRaft Kafka (no Zookeeper) | `localhost:9092` |
 | `klag` | Built from the local `Dockerfile` | http://localhost:8888/metrics |
 | `prometheus` | Scrapes Klag every 10s (`docker/prometheus/prometheus.yml`) | http://localhost:9090 |
 | `grafana` | Prometheus datasource + Klag dashboard pre-provisioned | http://localhost:3000 (admin / admin) |
