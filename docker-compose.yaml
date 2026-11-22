@@ -28,6 +28,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       METRICS_REPORTER: prometheus
       METRICS_INTERVAL_MS: 10000
+      METRICS_JVM_ENABLED: "true"
       LOG_LEVEL: DEBUG
       LOG_LEVEL_KLAG: DEBUG
       LOG_LEVEL_KAFKA: DEBUG
@@ -35,6 +36,31 @@ services:
       LOG_LEVEL_METRICS: DEBUG
     depends_on:
       - kafka
+
+  # Prometheus scrapes Klag's /metrics every 10s (config: docker/prometheus/prometheus.yml)
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - klag
+
+  # Grafana with Prometheus datasource and the Klag dashboard pre-provisioned.
+  # Login: admin / admin (local demo only)
+  grafana:
+    image: grafana/grafana:11.3.0
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./dashboard/klag-grafana-com.json:/var/lib/grafana/dashboards/klag/klag.json:ro
+    depends_on:
+      - prometheus
 
   # Produces messages to test-topic at 5/sec, creating visible lag
   producer:

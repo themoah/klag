@@ -82,6 +82,7 @@ dependencies {
 
   testImplementation("io.vertx:vertx-junit5")
   testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
+  testImplementation("org.yaml:snakeyaml:2.7")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

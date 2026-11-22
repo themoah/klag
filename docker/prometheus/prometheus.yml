@@ -1,0 +1,11 @@
+# Prometheus scrape config for the local docker-compose stack.
+# Klag serves Prometheus metrics on its HTTP port (8888) at /metrics.
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: klag
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["klag:8888"]

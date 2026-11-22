@@ -1,0 +1,12 @@
+# Loads the Klag demo dashboard from the file mounted in docker-compose.yaml.
+apiVersion: 1
+
+providers:
+  - name: klag
+    orgId: 1
+    folder: Klag
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/klag
