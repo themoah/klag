@@ -112,6 +112,10 @@ validate_output "Liveness probe on /healthz" "" "path: /healthz"
 validate_output "Readiness probe on /readyz" "" "path: /readyz"
 validate_output "KAFKA_BOOTSTRAP_SERVERS env var" "${TESTS_DIR}/test-values.yaml" "KAFKA_BOOTSTRAP_SERVERS"
 
+# SASL callback handler is opt-in
+validate_output "MSK IAM SASL callback class" "" "KAFKA_SASL_CLIENT_CALLBACK_HANDLER_CLASS" "--set kafka.saslClientCallbackHandlerClass=software.amazon.msk.auth.iam.IAMClientCallbackHandler"
+validate_not_present "No SASL callback class by default" "" "KAFKA_SASL_CLIENT_CALLBACK_HANDLER_CLASS"
+
 # Multi-cluster Kafka
 validate_output "KAFKA_CLUSTERS env var" "${TESTS_DIR}/test-values-clusters.yaml" "KAFKA_CLUSTERS"
 validate_output "cluster names in KAFKA_CLUSTERS" "${TESTS_DIR}/test-values-clusters.yaml" "msk-a"

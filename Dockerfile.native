@@ -20,7 +20,7 @@ RUN microdnf install -y unzip findutils zlib-static && \
 # Cache dependencies (fail fast on resolution/config errors).
 # Lockfile required — STRICT locking on compile/runtime classpaths.
 COPY build.gradle.kts settings.gradle.kts gradle.lockfile ./
-RUN gradle dependencies --no-daemon
+RUN gradle dependencies --configuration runtimeClasspath --no-daemon
 
 # Build the native binary (mostly-static: only libc dynamic -> runs on distroless/base)
 COPY src src

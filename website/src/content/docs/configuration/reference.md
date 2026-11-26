@@ -51,7 +51,7 @@ resolve exact-name JVM properties such as
 |---|---|---|
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Broker addresses for the default (single) cluster. |
 | `KAFKA_CLUSTER_NAME` | _(unset)_ | Optional `cluster_name` tag on Kafka series. Ignored when `KAFKA_CLUSTERS` is set. |
-| `KAFKA_CLUSTERS` | _(unset)_ | JSON array of clusters scraped in one process. Each object: `name`, `bootstrapServers`, optional `requestTimeoutMs`, `groupFilter`, `groupExclude`, `properties`. SASL/SSL from `KAFKA_*` still apply as defaults. Helm: do not put credentials in `properties` (plaintext Deployment env); use `kafka.existingSecret` for shared creds. Distinct per-cluster credentials are not supported. Not forwarded to the AdminClient. |
+| `KAFKA_CLUSTERS` | _(unset)_ | JSON array of clusters scraped in one process. Each object: `name`, `bootstrapServers`, optional `requestTimeoutMs`, `groupFilter`, `groupExclude`, `properties`. SASL/SSL from `KAFKA_*` still apply as defaults. Helm renders `properties` in the Deployment env. Keep credentials in `kafka.existingSecret` and use `properties` for non-secret overrides. Not forwarded to the AdminClient. |
 | `KAFKA_REQUEST_TIMEOUT_MS` | `30000` | Request timeout. |
 | `KAFKA_CHUNK_COUNT` | `1` | Split offset requests into N batches. Must be at least `1`; invalid values fall back to the default. |
 | `KAFKA_CHUNK_DELAY_MS` | `0` | Delay (ms) between batches. Must be non-negative; invalid values fall back to the default. |

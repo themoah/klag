@@ -69,10 +69,9 @@ kafka:
   clusterName: ""
   # Multiple clusters in one process. When non-empty, the chart
   # sets KAFKA_CLUSTERS to this list as JSON. Each entry needs a unique name.
-  # Shared SASL/SSL below apply to every cluster (kafka.existingSecret /
-  # saslJaasConfig). Distinct per-cluster credentials are not supported.
-  # Do not put sasl.jaas.config, ssl.*.password, or other secrets in
-  # clusters[].properties — Helm renders that list as plaintext KAFKA_CLUSTERS.
+  # Shared SASL/SSL below provide defaults for each cluster.
+  # Set non-secret overrides in clusters[].properties for mixed authentication.
+  # Helm renders that list as plaintext KAFKA_CLUSTERS. Keep credentials in a Secret.
   # clusters:
   #   - name: msk-a
   #     bootstrapServers: "b-1.a.amazonaws.com:9092"
@@ -85,8 +84,10 @@ kafka:
   requestTimeoutMs: 30000
   # Security protocol: PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL
   securityProtocol: ""
-  # SASL mechanism: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512
+  # SASL mechanism: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, AWS_MSK_IAM (JVM image)
   saslMechanism: ""
+  # Fully qualified SASL client callback handler class
+  saslClientCallbackHandlerClass: ""
   # JAAS configuration string for SASL authentication
   # Example: org.apache.kafka.common.security.plain.PlainLoginModule required username="user" password="pass";
   saslJaasConfig: ""

@@ -18,8 +18,8 @@ RUN apt-get update && \
 # Copy build files (lockfile required — STRICT locking on compile/runtime classpaths)
 COPY build.gradle.kts settings.gradle.kts gradle.lockfile ./
 
-# Download dependencies (cached layer)
-RUN gradle dependencies --no-daemon
+# Resolve the locked JVM runtime graph (cached layer)
+RUN gradle dependencies --configuration jvmRuntimeClasspath --no-daemon
 
 # Copy source code
 COPY src src

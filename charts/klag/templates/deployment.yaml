@@ -69,6 +69,10 @@ spec:
             - name: KAFKA_SASL_MECHANISM
               value: {{ .Values.kafka.saslMechanism | quote }}
             {{- end }}
+            {{- if .Values.kafka.saslClientCallbackHandlerClass }}
+            - name: KAFKA_SASL_CLIENT_CALLBACK_HANDLER_CLASS
+              value: {{ .Values.kafka.saslClientCallbackHandlerClass | quote }}
+            {{- end }}
             {{- if or .Values.kafka.saslJaasConfig .Values.kafka.existingSecret }}
             - name: KAFKA_SASL_JAAS_CONFIG
               valueFrom:

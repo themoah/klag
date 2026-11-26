@@ -31,6 +31,45 @@ helm install klag klag/klag \
   --set kafka.saslJaasConfig="org.apache.kafka.common.security.plain.PlainLoginModule required username='user' password='pass';"
 ```
 
+## With Amazon MSK IAM on EKS
+
+Use the JVM image (the chart default) or the release fat JAR for `AWS_MSK_IAM`.
+Associate a role with the Klag service account and namespace on your EKS cluster.
+The EKS Pod Identity Agent must run on the worker that hosts Klag. EKS injects
+the projected token and the AWS SDK retrieves short-lived credentials from the
+agent. See the [EKS Pod Identity setup guide](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html).
+
+For a cross-account MSK cluster, give the Pod Identity role `sts:AssumeRole` on
+a role in the MSK account. Configure that role to trust the Pod Identity role
+and grant it Kafka permissions on the target cluster, topics and consumer groups.
+If the Pod Identity association passes session tags, allow `sts:TagSession` in
+the target role's trust policy. See [MSK IAM permissions](https://docs.aws.amazon.com/msk/latest/developerguide/kafka-actions.html).
+
+```yaml
+serviceAccount:
+  name: klag-exporter  # Must match the Pod Identity association.
+kafka:
+  bootstrapServers: "b-1.example.kafka.us-east-1.amazonaws.com:9098,b-2.example.kafka.us-east-1.amazonaws.com:9098"
+  securityProtocol: SASL_SSL
+  saslMechanism: AWS_MSK_IAM
+  saslClientCallbackHandlerClass: software.amazon.msk.auth.iam.IAMClientCallbackHandler
+  saslJaasConfig: >-
+    software.amazon.msk.auth.iam.IAMLoginModule required
+    awsRoleArn="arn:aws:iam::123456789012:role/klag-msk-reader"
+    awsRoleSessionName="klag-exporter"
+    awsStsRegion="us-east-1"
+    awsAddDefaultProviders="false";
+```
+
+Use the full `BootstrapBrokerStringSaslIam` returned by MSK. Keep the role session
+name stable so broker re-authentication uses the same principal after credentials
+refresh. To use the Pod Identity role directly in the MSK account, set the JAAS
+value to `software.amazon.msk.auth.iam.IAMLoginModule required;`.
+
+With multiple clusters using different authentication mechanisms, set `security.protocol`,
+`sasl.mechanism`, `sasl.client.callback.handler.class`, and `sasl.jaas.config` in
+the MSK cluster's `properties`. The IAM JAAS options above contain role metadata only.
+
 ## From a local checkout (development)
 
 ```bash
@@ -114,9 +153,9 @@ memory for your group and partition count, then raise requests or limits before 
 One process can scrape several Kafka clusters. Set `kafka.clusters` with a unique
 `name` and `bootstrapServers` per entry. Shared SASL/SSL still come from
 `kafka.existingSecret` (or `kafka.saslJaasConfig`) and apply to every cluster.
-Distinct per-cluster credentials are not supported. Do not put JAAS, SSL passwords,
-or other secrets in `clusters[].properties`: Helm renders `kafka.clusters` as the
-plaintext `KAFKA_CLUSTERS` env value.
+Set non-secret overrides in `clusters[].properties`. Keep passwords and other
+credentials in a Secret because Helm renders `kafka.clusters` as the plaintext
+`KAFKA_CLUSTERS` env value.
 
 ```yaml
 kafka:
