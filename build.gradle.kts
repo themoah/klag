@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "io.github.themoah"
-version = "0.2.21"
+version = "0.2.22"
 
 repositories {
   mavenCentral()
@@ -29,6 +29,17 @@ configurations {
   }
 }
 
+// Only the JVM release JAR includes the MSK IAM provider and its AWS SDK dependencies.
+val jvmRuntimeClasspath by configurations.creating {
+  isCanBeConsumed = false
+  extendsFrom(configurations.runtimeClasspath.get())
+  attributes {
+    attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+    attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.JAR))
+  }
+  resolutionStrategy.activateDependencyLocking()
+}
+
 val vertxVersion = "4.5.34"
 val junitJupiterVersion = "5.9.1"
 val micrometerVersion = "1.16.6"
@@ -44,6 +55,8 @@ application {
 }
 
 dependencies {
+  jvmRuntimeClasspath("software.amazon.msk:aws-msk-iam-auth:2.4.0")
+
   implementation(platform("io.vertx:vertx-stack-depchain:$vertxVersion"))
   implementation("io.vertx:vertx-kafka-client")
   implementation("io.vertx:vertx-web")
@@ -91,6 +104,7 @@ java {
 }
 
 tasks.withType<ShadowJar> {
+  configurations.set(setOf(jvmRuntimeClasspath))
   archiveClassifier.set("fat")
   manifest {
     attributes(mapOf(

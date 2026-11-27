@@ -31,6 +31,37 @@ helm install klag klag/klag \
   --set kafka.saslJaasConfig="org.apache.kafka.common.security.plain.PlainLoginModule required username='user' password='pass';"
 ```
 
+## With Amazon MSK IAM
+
+Use the JVM image and the IAM bootstrap servers from MSK. Run Klag with AWS
+credentials that have access to the cluster.
+
+```yaml
+kafka:
+  bootstrapServers: "b-1.example.kafka.us-east-1.amazonaws.com:9098"
+  securityProtocol: SASL_SSL
+  saslMechanism: AWS_MSK_IAM
+  saslJaasConfig: 'software.amazon.msk.auth.iam.IAMLoginModule required;'
+extraEnv:
+  - name: KAFKA_SASL_CLIENT_CALLBACK_HANDLER_CLASS
+    value: software.amazon.msk.auth.iam.IAMClientCallbackHandler
+```
+
+Grant the Klag IAM role these permissions on the corresponding MSK resource ARNs.
+
+| Resource | IAM actions |
+| --- | --- |
+| Cluster | `kafka-cluster:Connect`, `kafka-cluster:DescribeCluster` |
+| Monitored topics | `kafka-cluster:DescribeTopic` |
+| Monitored consumer groups | `kafka-cluster:DescribeGroup` |
+
+If `kafka-cluster:DescribeGroup` is scoped to specific consumer groups, set
+`metrics.groupFilter` to match the groups covered by the IAM policy. In a
+multi-cluster Helm deployment, set `kafka.clusters[].groupFilter` on the MSK
+cluster entry.
+
+MSK authorizes IAM identities through IAM policies. See the [MSK IAM action reference](https://docs.aws.amazon.com/msk/latest/developerguide/kafka-actions.html).
+
 ## From a local checkout (development)
 
 ```bash

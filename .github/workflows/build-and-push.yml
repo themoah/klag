@@ -110,6 +110,9 @@ jobs:
       - name: Build fat JAR
         run: gradle shadowJar
 
+      - name: Smoke-test MSK IAM from the fat JAR
+        run: java -cp build/libs/*-fat.jar scripts/MskIamSaslSmokeTest.java
+
   # Validates the GraalVM native build (metadata hints stay correct).
   # PR-only: push-to-main runs just build-and-test; native was already
   # validated on the PR.
