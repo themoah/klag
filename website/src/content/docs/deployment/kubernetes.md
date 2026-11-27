@@ -55,6 +55,11 @@ Grant the Klag IAM role these permissions on the corresponding MSK resource ARNs
 | Monitored topics | `kafka-cluster:DescribeTopic` |
 | Monitored consumer groups | `kafka-cluster:DescribeGroup` |
 
+If `kafka-cluster:DescribeGroup` is scoped to specific consumer groups, set
+`metrics.groupFilter` to match the groups covered by the IAM policy. In a
+multi-cluster Helm deployment, set `kafka.clusters[].groupFilter` on the MSK
+cluster entry.
+
 MSK authorizes IAM identities through IAM policies. See the [MSK IAM action reference](https://docs.aws.amazon.com/msk/latest/developerguide/kafka-actions.html).
 
 ## From a local checkout (development)
