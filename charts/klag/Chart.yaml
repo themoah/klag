@@ -35,7 +35,7 @@ annotations:
       email: aviv@dozorets.com
   artifacthub.io/changes: |
     - kind: added
-      description: Amazon MSK IAM authentication in the JVM image and release JAR. Configure the callback with kafka.saslClientCallbackHandlerClass.
+      description: Amazon MSK IAM authentication in the JVM image and release JAR.
     - kind: security
       description: Java4Shell (CVE-2026-114938) mitigation. The HTTP server no longer accepts h2c upgrades, whose handler Base64-decoded the client's HTTP2-Settings header before routing or auth, and the JVM image now runs on SapMachine 21.0.13.1 (patched) and also starts with -XX:-UseBASE64Intrinsics. The native image was not affected
     - kind: security

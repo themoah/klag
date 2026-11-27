@@ -27,11 +27,6 @@ helm install klag ./charts/klag \
   --set kafka.saslJaasConfig="org.apache.kafka.common.security.plain.PlainLoginModule required username='user' password='pass';"
 ```
 
-### With Amazon MSK IAM
-
-Use the JVM image and an IAM-enabled bootstrap string. For EKS Pod Identity and
-cross-account role setup, see [the deployment guide](https://klag.dev/deployment/kubernetes/#with-amazon-msk-iam-on-eks).
-
 ### Using Existing Secrets (Recommended for Production)
 
 ```bash
@@ -150,11 +145,10 @@ cheaper — Klag never builds the series.
 |-----------|-------------|---------|
 | `kafka.bootstrapServers` | Kafka bootstrap servers (comma-separated) | `localhost:9092` |
 | `kafka.clusterName` | Optional `cluster_name` metric tag for a single cluster | `""` |
-| `kafka.clusters` | List of `{name, bootstrapServers, ...}` scraped in one process; sets `KAFKA_CLUSTERS`. Shared Secret credentials via `existingSecret`. For mixed authentication, set non-secret Kafka properties per cluster | `[]` |
+| `kafka.clusters` | List of `{name, bootstrapServers, ...}` scraped in one process; sets `KAFKA_CLUSTERS`. Shared creds via `existingSecret`; do not put secrets in `clusters[].properties`. Distinct per-cluster credentials are not supported | `[]` |
 | `kafka.requestTimeoutMs` | Admin client request timeout | `30000` |
 | `kafka.securityProtocol` | Security protocol (PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL) | `""` |
-| `kafka.saslMechanism` | SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, AWS_MSK_IAM) | `""` |
-| `kafka.saslClientCallbackHandlerClass` | Fully qualified SASL client callback handler class | `""` |
+| `kafka.saslMechanism` | SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512) | `""` |
 | `kafka.saslJaasConfig` | JAAS configuration string | `""` |
 | `kafka.sslTruststoreLocation` | Path inside the container to the SSL truststore (emits `KAFKA_SSL_TRUSTSTORE_LOCATION`) | `""` |
 | `kafka.sslTruststorePassword` | Truststore password, stored in the Kafka Secret and injected as `KAFKA_SSL_TRUSTSTORE_PASSWORD` | `""` |
