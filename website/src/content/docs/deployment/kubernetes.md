@@ -47,6 +47,16 @@ extraEnv:
     value: software.amazon.msk.auth.iam.IAMClientCallbackHandler
 ```
 
+Grant the Klag IAM role these permissions on the corresponding MSK resource ARNs.
+
+| Resource | IAM actions |
+| --- | --- |
+| Cluster | `kafka-cluster:Connect`, `kafka-cluster:DescribeCluster` |
+| Monitored topics | `kafka-cluster:DescribeTopic` |
+| Monitored consumer groups | `kafka-cluster:DescribeGroup` |
+
+MSK authorizes IAM identities through IAM policies. See the [MSK IAM action reference](https://docs.aws.amazon.com/msk/latest/developerguide/kafka-actions.html).
+
 ## From a local checkout (development)
 
 ```bash
